@@ -1,0 +1,568 @@
+var __defProp = Object.defineProperty;
+var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
+var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
+(function() {
+  "use strict";
+  function createOverlay() {
+    const container = document.createElement("div");
+    container.id = "tve-overlay";
+    container.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 999999;
+  `;
+    document.body.appendChild(container);
+    const hoverEl = createBoxElement("tve-hover", "rgba(59, 130, 246, 0.15)", "1px solid rgba(59, 130, 246, 0.6)");
+    container.appendChild(hoverEl);
+    const selectedEl = createBoxElement("tve-selected", "transparent", "2px solid #3b82f6");
+    container.appendChild(selectedEl);
+    const marginEl = createBoxElement("tve-margin", "rgba(251, 146, 60, 0.15)", "1px dashed rgba(251, 146, 60, 0.5)");
+    container.appendChild(marginEl);
+    const paddingEl = createBoxElement("tve-padding", "rgba(74, 222, 128, 0.15)", "1px dashed rgba(74, 222, 128, 0.5)");
+    container.appendChild(paddingEl);
+    const dropIndicatorEl = document.createElement("div");
+    dropIndicatorEl.id = "tve-drop-indicator";
+    dropIndicatorEl.style.cssText = `
+    position: fixed;
+    height: 2px;
+    background: #3b82f6;
+    display: none;
+    pointer-events: none;
+    z-index: 999999;
+  `;
+    container.appendChild(dropIndicatorEl);
+    const labelEl = document.createElement("div");
+    labelEl.id = "tve-label";
+    labelEl.style.cssText = `
+    position: fixed;
+    background: #3b82f6;
+    color: white;
+    font-size: 11px;
+    font-family: system-ui, sans-serif;
+    padding: 1px 6px;
+    border-radius: 0 0 4px 0;
+    display: none;
+    pointer-events: none;
+    z-index: 999999;
+    white-space: nowrap;
+  `;
+    container.appendChild(labelEl);
+    let currentSelectedElement = null;
+    function updatePositions() {
+      if (currentSelectedElement) {
+        const rect = currentSelectedElement.getBoundingClientRect();
+        const cs = getComputedStyle(currentSelectedElement);
+        positionBox(selectedEl, rect);
+        showGuides(rect, cs);
+      }
+    }
+    window.addEventListener("scroll", updatePositions, true);
+    window.addEventListener("resize", updatePositions);
+    function showGuides(rect, cs) {
+      const mt = parseFloat(cs.marginTop) || 0;
+      const mr = parseFloat(cs.marginRight) || 0;
+      const mb = parseFloat(cs.marginBottom) || 0;
+      const ml = parseFloat(cs.marginLeft) || 0;
+      if (mt || mr || mb || ml) {
+        marginEl.style.display = "block";
+        marginEl.style.top = `${rect.top - mt}px`;
+        marginEl.style.left = `${rect.left - ml}px`;
+        marginEl.style.width = `${rect.width + ml + mr}px`;
+        marginEl.style.height = `${rect.height + mt + mb}px`;
+      } else {
+        marginEl.style.display = "none";
+      }
+      const pt = parseFloat(cs.paddingTop) || 0;
+      const pr = parseFloat(cs.paddingRight) || 0;
+      const pb = parseFloat(cs.paddingBottom) || 0;
+      const pl = parseFloat(cs.paddingLeft) || 0;
+      if (pt || pr || pb || pl) {
+        paddingEl.style.display = "block";
+        paddingEl.style.top = `${rect.top + pt}px`;
+        paddingEl.style.left = `${rect.left + pl}px`;
+        paddingEl.style.width = `${rect.width - pl - pr}px`;
+        paddingEl.style.height = `${rect.height - pt - pb}px`;
+      } else {
+        paddingEl.style.display = "none";
+      }
+    }
+    return {
+      showHover(rect) {
+        positionBox(hoverEl, rect);
+        hoverEl.style.display = "block";
+      },
+      showSelected(rect, computedStyle) {
+        positionBox(selectedEl, rect);
+        selectedEl.style.display = "block";
+        showGuides(rect, computedStyle);
+        labelEl.style.display = "block";
+        labelEl.style.top = `${rect.top}px`;
+        labelEl.style.left = `${rect.left}px`;
+      },
+      showDropIndicator(rect, position) {
+        dropIndicatorEl.style.display = "block";
+        dropIndicatorEl.style.left = `${rect.left}px`;
+        dropIndicatorEl.style.width = `${rect.width}px`;
+        dropIndicatorEl.style.top = position === "before" ? `${rect.top}px` : `${rect.bottom}px`;
+      },
+      clear() {
+        hoverEl.style.display = "none";
+        selectedEl.style.display = "none";
+        marginEl.style.display = "none";
+        paddingEl.style.display = "none";
+        dropIndicatorEl.style.display = "none";
+        labelEl.style.display = "none";
+        currentSelectedElement = null;
+      },
+      clearHover() {
+        hoverEl.style.display = "none";
+      },
+      clearSelected() {
+        selectedEl.style.display = "none";
+        marginEl.style.display = "none";
+        paddingEl.style.display = "none";
+        labelEl.style.display = "none";
+        currentSelectedElement = null;
+      },
+      clearDropIndicator() {
+        dropIndicatorEl.style.display = "none";
+      }
+    };
+  }
+  function createBoxElement(id, bg, border) {
+    const el = document.createElement("div");
+    el.id = id;
+    el.style.cssText = `
+    position: fixed;
+    display: none;
+    pointer-events: none;
+    background: ${bg};
+    border: ${border};
+    z-index: 999999;
+  `;
+    return el;
+  }
+  function positionBox(el, rect) {
+    el.style.top = `${rect.top}px`;
+    el.style.left = `${rect.left}px`;
+    el.style.width = `${rect.width}px`;
+    el.style.height = `${rect.height}px`;
+  }
+  function setupInteraction(overlay, bridge, domMapper) {
+    let selectedElement = null;
+    let editMode = true;
+    document.addEventListener(
+      "click",
+      (e) => {
+        var _a;
+        if (!editMode) return;
+        const target = e.target;
+        if (((_a = target.id) == null ? void 0 : _a.startsWith("tve-")) || target.closest("#tve-overlay")) {
+          return;
+        }
+        e.preventDefault();
+        e.stopPropagation();
+        const mappedEl = domMapper.getClosestMappedElement(target);
+        if (!mappedEl) return;
+        const nodeId = domMapper.getNodeId(mappedEl);
+        if (!nodeId) return;
+        selectedElement = mappedEl;
+        const rect = mappedEl.getBoundingClientRect();
+        const cs = getComputedStyle(mappedEl);
+        overlay.clearHover();
+        overlay.showSelected(rect, cs);
+        bridge.sendToEditor({
+          type: "tve:select",
+          nodeId,
+          elementInfo: {
+            nodeId,
+            tagName: mappedEl.tagName.toLowerCase(),
+            classes: mappedEl.className,
+            textContent: getDirectTextContent(mappedEl),
+            attributes: getAttributes(mappedEl),
+            rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+            computedStyles: {
+              display: cs.display,
+              position: cs.position,
+              padding: cs.padding,
+              margin: cs.margin,
+              fontSize: cs.fontSize,
+              color: cs.color,
+              backgroundColor: cs.backgroundColor
+            }
+          }
+        });
+      },
+      true
+    );
+    document.addEventListener(
+      "mousemove",
+      (e) => {
+        var _a;
+        if (!editMode) return;
+        const target = e.target;
+        if (((_a = target.id) == null ? void 0 : _a.startsWith("tve-")) || target.closest("#tve-overlay")) {
+          return;
+        }
+        const mappedEl = domMapper.getClosestMappedElement(target);
+        if (!mappedEl || mappedEl === selectedElement) {
+          overlay.clearHover();
+          return;
+        }
+        const nodeId = domMapper.getNodeId(mappedEl);
+        if (!nodeId) {
+          overlay.clearHover();
+          return;
+        }
+        const rect = mappedEl.getBoundingClientRect();
+        overlay.showHover(rect);
+        bridge.sendToEditor({
+          type: "tve:hover",
+          nodeId,
+          tagName: mappedEl.tagName.toLowerCase(),
+          rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height }
+        });
+      },
+      true
+    );
+    document.addEventListener("mouseleave", () => {
+      overlay.clearHover();
+      bridge.sendToEditor({
+        type: "tve:hover",
+        nodeId: null,
+        tagName: "",
+        rect: null
+      });
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        selectedElement = null;
+        overlay.clear();
+        bridge.sendToEditor({ type: "tve:deselect" });
+      }
+    });
+    document.addEventListener(
+      "submit",
+      (e) => {
+        if (editMode) e.preventDefault();
+      },
+      true
+    );
+    document.addEventListener(
+      "dblclick",
+      (e) => {
+        var _a;
+        if (!editMode) return;
+        const target = e.target;
+        if ((_a = target.id) == null ? void 0 : _a.startsWith("tve-")) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const mappedEl = domMapper.getClosestMappedElement(target);
+        if (!mappedEl) return;
+        const nodeId = domMapper.getNodeId(mappedEl);
+        if (!nodeId) return;
+        const text = getDirectTextContent(mappedEl);
+        if (text === null) return;
+        mappedEl.contentEditable = "true";
+        mappedEl.focus();
+        const finishEdit = () => {
+          var _a2;
+          mappedEl.contentEditable = "false";
+          const newText = ((_a2 = mappedEl.textContent) == null ? void 0 : _a2.trim()) || "";
+          bridge.sendToEditor({
+            type: "tve:text-edit",
+            nodeId,
+            newText
+          });
+          mappedEl.removeEventListener("blur", finishEdit);
+          mappedEl.removeEventListener("keydown", handleKey);
+        };
+        const handleKey = (e2) => {
+          if (e2.key === "Enter" && !e2.shiftKey) {
+            e2.preventDefault();
+            mappedEl.blur();
+          }
+          if (e2.key === "Escape") {
+            mappedEl.textContent = text;
+            mappedEl.contentEditable = "false";
+            mappedEl.removeEventListener("blur", finishEdit);
+            mappedEl.removeEventListener("keydown", handleKey);
+          }
+        };
+        mappedEl.addEventListener("blur", finishEdit);
+        mappedEl.addEventListener("keydown", handleKey);
+      },
+      true
+    );
+    bridge.onMessage((message) => {
+      if (message.type === "tve:set-mode") {
+        editMode = message.mode === "edit";
+        if (!editMode) {
+          overlay.clear();
+          selectedElement = null;
+        }
+      }
+      if (message.type === "tve:highlight-node") {
+        if (message.nodeId) {
+          const el = domMapper.getElementByNodeId(message.nodeId);
+          if (el) {
+            const rect = el.getBoundingClientRect();
+            overlay.showHover(rect);
+            el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+          }
+        } else {
+          overlay.clearHover();
+        }
+      }
+    });
+  }
+  function getDirectTextContent(element) {
+    var _a;
+    const hasChildElements = element.querySelector(":scope > *") !== null;
+    if (hasChildElements) return null;
+    return ((_a = element.textContent) == null ? void 0 : _a.trim()) || null;
+  }
+  function getAttributes(element) {
+    const attrs = {};
+    for (const attr of Array.from(element.attributes)) {
+      if (attr.name !== "class") {
+        attrs[attr.name] = attr.value;
+      }
+    }
+    return attrs;
+  }
+  function setupBridge(domMapper) {
+    const handlers = [];
+    window.addEventListener("message", (event) => {
+      const data = event.data;
+      if (!data || typeof data.type !== "string" || !data.type.startsWith("tve:")) {
+        return;
+      }
+      if (data.type === "tve:provide-ast") {
+        domMapper.setAst(data.ast);
+        domMapper.remap();
+        sendToEditor({
+          type: "tve:dom-ready",
+          nodeCount: domMapper.getNodeCount()
+        });
+        return;
+      }
+      if (data.type === "tve:update-classes") {
+        const element = domMapper.getElementByNodeId(data.nodeId);
+        if (element) {
+          element.className = data.classes;
+        }
+        return;
+      }
+      if (data.type === "tve:update-text") {
+        const element = domMapper.getElementByNodeId(data.nodeId);
+        if (element) {
+          element.textContent = data.text;
+        }
+        return;
+      }
+      if (data.type === "tve:highlight-node") {
+        for (const handler of handlers) {
+          handler(data);
+        }
+        return;
+      }
+      for (const handler of handlers) {
+        handler(data);
+      }
+    });
+    function sendToEditor(message) {
+      window.parent.postMessage(message, "*");
+    }
+    return {
+      sendToEditor,
+      onMessage(handler) {
+        handlers.push(handler);
+      }
+    };
+  }
+  class DomMapper {
+    constructor() {
+      __publicField(this, "ast", []);
+      __publicField(this, "elementToNodeId", /* @__PURE__ */ new Map());
+      __publicField(this, "nodeIdToElement", /* @__PURE__ */ new Map());
+    }
+    setAst(ast) {
+      this.ast = ast;
+    }
+    remap() {
+      this.elementToNodeId.clear();
+      this.nodeIdToElement.clear();
+      const body = document.body;
+      if (!body) return;
+      const bodyElements = this.getContentElements(body);
+      const flatRoots = this.flattenComponents(this.ast);
+      this.matchChildren(flatRoots, bodyElements);
+      this.mapComponentsToDOM(this.ast, bodyElements);
+      console.log(
+        `[TVE DOM Mapper] Mapped ${this.elementToNodeId.size} elements`
+      );
+    }
+    /**
+     * For each component node, find the first DOM element rendered by its
+     * flattened children and map it to the component's nodeId.
+     * This allows getClosestMappedElement to find the component when
+     * clicking inside component-rendered content.
+     */
+    mapComponentsToDOM(nodes, domElements) {
+      for (const node of nodes) {
+        if ((node.isComponent || this.isPascalCase(node.tagName)) && node.children.length > 0) {
+          const firstChild = this.flattenComponents(node.children)[0];
+          if (firstChild) {
+            const domEl = this.nodeIdToElement.get(firstChild.nodeId);
+            if (domEl) {
+              if (!this.nodeIdToElement.has(node.nodeId)) {
+                this.nodeIdToElement.set(node.nodeId, domEl);
+              }
+            }
+          }
+        }
+        if (node.children.length > 0) {
+          this.mapComponentsToDOM(node.children, domElements);
+        }
+      }
+    }
+    /**
+     * Flatten component nodes: components don't render as DOM elements,
+     * so replace them with their children for matching purposes.
+     */
+    flattenComponents(nodes) {
+      const result = [];
+      for (const node of nodes) {
+        if (node.isComponent || this.isPascalCase(node.tagName)) {
+          result.push(...this.flattenComponents(node.children));
+        } else {
+          result.push(node);
+        }
+      }
+      return result;
+    }
+    isPascalCase(name) {
+      return /^[A-Z]/.test(name);
+    }
+    matchChildren(astNodes, domElements) {
+      let domIndex = 0;
+      for (const astNode of astNodes) {
+        if (domIndex >= domElements.length) break;
+        if (astNode.isComponent || this.isPascalCase(astNode.tagName)) {
+          const flatChildren = this.flattenComponents(astNode.children);
+          for (const child of flatChildren) {
+            if (domIndex >= domElements.length) break;
+            this.matchSingle(child, domElements, domIndex);
+            if (domIndex < domElements.length && domElements[domIndex].tagName.toLowerCase() === child.tagName.toLowerCase()) {
+              domIndex++;
+            }
+          }
+          continue;
+        }
+        const domEl = domElements[domIndex];
+        if (domEl.tagName.toLowerCase() === astNode.tagName.toLowerCase()) {
+          this.elementToNodeId.set(domEl, astNode.nodeId);
+          this.nodeIdToElement.set(astNode.nodeId, domEl);
+          const childElements = this.getContentElements(domEl);
+          const flatChildren = this.flattenComponents(astNode.children);
+          if (flatChildren.length > 0 && childElements.length > 0) {
+            this.matchChildren(flatChildren, childElements);
+          }
+          domIndex++;
+        } else {
+          domIndex++;
+          if (domIndex < domElements.length) {
+            const nextDomEl = domElements[domIndex];
+            if (nextDomEl.tagName.toLowerCase() === astNode.tagName.toLowerCase()) {
+              this.elementToNodeId.set(nextDomEl, astNode.nodeId);
+              this.nodeIdToElement.set(astNode.nodeId, nextDomEl);
+              const childElements = this.getContentElements(nextDomEl);
+              const flatChildren = this.flattenComponents(astNode.children);
+              if (flatChildren.length > 0 && childElements.length > 0) {
+                this.matchChildren(flatChildren, childElements);
+              }
+              domIndex++;
+            }
+          }
+        }
+      }
+    }
+    matchSingle(astNode, domElements, index) {
+      if (index >= domElements.length) return;
+      const domEl = domElements[index];
+      if (domEl.tagName.toLowerCase() === astNode.tagName.toLowerCase()) {
+        this.elementToNodeId.set(domEl, astNode.nodeId);
+        this.nodeIdToElement.set(astNode.nodeId, domEl);
+        const childElements = this.getContentElements(domEl);
+        const flatChildren = this.flattenComponents(astNode.children);
+        if (flatChildren.length > 0 && childElements.length > 0) {
+          this.matchChildren(flatChildren, childElements);
+        }
+      }
+    }
+    /** Get meaningful child elements (skip script, style, tve overlay) */
+    getContentElements(parent) {
+      var _a;
+      const elements = [];
+      for (const child of Array.from(parent.children)) {
+        const tag = child.tagName.toLowerCase();
+        if (tag === "script" || tag === "style" || tag === "link" || child.id === "tve-overlay" || ((_a = child.id) == null ? void 0 : _a.startsWith("tve-"))) {
+          continue;
+        }
+        elements.push(child);
+      }
+      return elements;
+    }
+    getNodeId(element) {
+      return this.elementToNodeId.get(element) || null;
+    }
+    getElementByNodeId(nodeId) {
+      return this.nodeIdToElement.get(nodeId) || null;
+    }
+    getNodeCount() {
+      return this.elementToNodeId.size;
+    }
+    /** Find the closest mapped ancestor */
+    getClosestMappedElement(element) {
+      let current = element;
+      while (current) {
+        if (this.elementToNodeId.has(current)) {
+          return current;
+        }
+        current = current.parentElement;
+      }
+      return null;
+    }
+  }
+  (function tveInjected() {
+    if (window.__tve_initialized) return;
+    window.__tve_initialized = true;
+    console.log("[TVE] Injected script loaded");
+    const domMapper = new DomMapper();
+    const overlay = createOverlay();
+    const bridge = setupBridge(domMapper);
+    setupInteraction(overlay, bridge, domMapper);
+    window.__tve_provideAst = (ast) => {
+      domMapper.setAst(ast);
+      domMapper.remap();
+      bridge.sendToEditor({
+        type: "tve:dom-ready",
+        nodeCount: domMapper.getNodeCount()
+      });
+    };
+    bridge.sendToEditor({ type: "tve:ready" });
+    document.addEventListener("astro:after-swap", () => {
+      domMapper.remap();
+      overlay.clear();
+      bridge.sendToEditor({
+        type: "tve:dom-ready",
+        nodeCount: domMapper.getNodeCount()
+      });
+    });
+  })();
+})();

@@ -1,0 +1,19 @@
+{
+  "name": "tailwind-visual-editor",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Visual editor for Astro + Tailwind pages with source file sync",
+  "bin": {
+    "tve": "./bin/tve.mjs"
+  },
+  "scripts": {
+    "start": "node bin/tve.mjs",
+    "dev": "concurrently -n server,editor -c blue,green \"pnpm --filter @tve/server dev\" \"pnpm --filter @tve/editor dev\"",
+    "build": "pnpm --filter @tve/shared build && pnpm --filter @tve/injected build && pnpm --filter @tve/server build && pnpm --filter @tve/editor build",
+    "build:injected": "pnpm --filter @tve/injected build"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "typescript": "^5.7.3"
+  }
+}

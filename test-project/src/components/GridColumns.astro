@@ -1,0 +1,24 @@
+---
+interface Props {
+  class?: string;
+}
+const { class: className } = Astro.props;
+---
+
+<section>
+    <div class="text-white bg-zinc-950 grid-cols-1 md:grid-cols-3 grid">
+      <div>
+        <h3 class="text-2xl font-semibold">Heading</h3>
+      </div>
+    
+      <div>
+        <h3 class="text-2xl font-semibold">Heading</h3>
+      </div>
+    
+      <div>
+        <h3 class="text-2xl font-semibold">Heading</h3>
+      </div>
+    
+      <slot />
+    </div>
+  </section>

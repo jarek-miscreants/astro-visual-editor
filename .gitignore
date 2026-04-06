@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.env
+*.local
+.DS_Store
+
+# Astro
+.astro/
+
+# TVE generated files in target projects
+tve-preview.astro
+
+# Editor settings
+.vscode/
+.idea/

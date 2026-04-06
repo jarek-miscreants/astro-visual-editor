@@ -1,0 +1,49 @@
+---
+import Layout from '../layouts/Layout.astro';
+import GridColumns from '../components/GridColumns.astro';
+---
+
+<Layout title="Home">
+  <header class="text-white py-8 bg-blue-600">
+    <div class="max-w-4xl mx-auto px-4">
+      <h1 class="text-4xl font-bold leading-tight">Welcome to TVE</h1>
+      <p class="mt-2 text-blue-100">A visual editor for Tailwind CSS</p>
+    </div>
+  </header>
+
+  <main class="max-w-4xl mx-auto px-4 py-12">
+    <section class="grid gap-2 grid-cols-1 md:grid-cols-3">
+      <div class="bg-white p-6 rounded-sm border">
+        <h2 class="text-xl font-semibold text-gray-800">Visual Editing</h2>
+        <p class="mt-2 text-gray-600">Click any element to edit its Tailwind classes visually.</p>
+      </div>
+      <div class="bg-white p-6 rounded-sm border">
+        <h2 class="text-xl font-semibold text-gray-800">Live Preview</h2>
+        <p class="mt-2 text-gray-600">See changes instantly in the browser preview.</p>
+      </div>
+      <div class="bg-white p-6 rounded-sm border">
+        <h2 class="text-xl font-semibold text-gray-800">Source Sync</h2>
+        <p class="mt-2 text-gray-600">Changes are written back to your source files.</p>
+      </div>
+    </section>
+    <section class="mt-12">
+      <h2 class="text-2xl text-gray-800 mb-4 font-medium">Get Started</h2>
+      <p class="text-gray-600 leading-relaxed">
+        Select a page from the toolbar, then click any element to start editing.
+        Use the properties panel on the right to modify Tailwind classes.
+      </p>
+      <button class="mt-4 bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+        Learn More
+      </button>
+    </section>
+
+  
+  </main>
+
+  <footer class="flex">
+  
+    <p>Built with Astro + Tailwind CSS</p>
+  </footer>
+
+  <GridColumns />
+</Layout>
