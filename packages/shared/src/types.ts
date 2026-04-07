@@ -76,6 +76,16 @@ export type Mutation =
       nodeId: string;
       newParentId: string;
       newPosition: number;
+    }
+  | {
+      type: "duplicate-element";
+      nodeId: string;
+    }
+  | {
+      type: "wrap-element";
+      nodeId: string;
+      wrapperTag: string;
+      wrapperClasses?: string;
     };
 
 /** Inverse of a mutation for undo */

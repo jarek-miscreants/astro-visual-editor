@@ -38,14 +38,19 @@ async function main() {
   console.log(`  Editor:  \x1b[36mhttp://localhost:3005\x1b[0m`);
   console.log(`  Backend: \x1b[36mhttp://localhost:3001\x1b[0m\n`);
 
-  // Start backend
+  // Start backend — quote path with spaces for shell mode on Windows
+  const isWindowsServer = process.platform === "win32";
+  const npxCmdServer = isWindowsServer ? "npx.cmd" : "npx";
+  const quotedPath = isWindowsServer && projectPath.includes(" ")
+    ? `"${projectPath}"`
+    : projectPath;
   const server = spawn(
-    "node",
-    ["--import", "tsx", path.join(ROOT, "packages/server/src/index.ts"), projectPath],
+    npxCmdServer,
+    ["tsx", "src/index.ts", quotedPath],
     {
       stdio: ["pipe", "pipe", "pipe"],
-      cwd: ROOT,
-      shell: process.platform === "win32",
+      cwd: path.join(ROOT, "packages/server"),
+      shell: isWindowsServer,
     }
   );
 

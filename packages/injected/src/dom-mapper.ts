@@ -2,19 +2,25 @@ interface ASTNodeLike {
   nodeId: string;
   tagName: string;
   isComponent: boolean;
+  isDynamic?: boolean;
   classes: string;
   children: ASTNodeLike[];
 }
 
 /**
  * Maps live DOM elements to AST nodeIds by walking both trees in parallel.
- * Components (PascalCase tags like Layout, Card) don't produce DOM elements,
- * so we skip them and match their children directly.
+ *
+ * Handles three cases:
+ * 1. Static elements: 1 AST node → 1 DOM element
+ * 2. Components: AST node has no DOM (children render in parent's place)
+ * 3. Dynamic templates (.map() loops): 1 AST node → N DOM elements
  */
 export class DomMapper {
   private ast: ASTNodeLike[] = [];
   private elementToNodeId = new Map<Element, string>();
   private nodeIdToElement = new Map<string, Element>();
+  /** For dynamic templates: nodeId → all matched DOM instances */
+  private nodeIdToInstances = new Map<string, Element[]>();
 
   setAst(ast: ASTNodeLike[]) {
     this.ast = ast;
@@ -23,64 +29,168 @@ export class DomMapper {
   remap() {
     this.elementToNodeId.clear();
     this.nodeIdToElement.clear();
+    this.nodeIdToInstances.clear();
 
     const body = document.body;
     if (!body) return;
 
     const bodyElements = this.getContentElements(body);
 
-    // Flatten AST roots: skip components, use their children
+    // Flatten AST roots (skip components)
     const flatRoots = this.flattenComponents(this.ast);
     this.matchChildren(flatRoots, bodyElements);
 
     // Map component nodes to their first rendered DOM element
-    // So clicking inside a component selects the component instance
-    this.mapComponentsToDOM(this.ast, bodyElements);
+    this.mapComponentsToDOM(this.ast);
 
     console.log(
-      `[TVE DOM Mapper] Mapped ${this.elementToNodeId.size} elements`
+      `[TVE DOM Mapper] Mapped ${this.elementToNodeId.size} elements (${this.nodeIdToInstances.size} dynamic templates)`
     );
   }
 
   /**
-   * For each component node, find the first DOM element rendered by its
-   * flattened children and map it to the component's nodeId.
-   * This allows getClosestMappedElement to find the component when
-   * clicking inside component-rendered content.
+   * Match a list of AST nodes against a list of DOM elements.
+   * Handles dynamic nodes by matching multiple consecutive DOM elements
+   * against a single AST template node.
    */
-  private mapComponentsToDOM(nodes: ASTNodeLike[], domElements: Element[]) {
+  private matchChildren(astNodes: ASTNodeLike[], domElements: Element[]) {
+    let domIndex = 0;
+
+    for (const astNode of astNodes) {
+      if (domIndex >= domElements.length) break;
+
+      // Skip components — they don't render as DOM elements
+      if (astNode.isComponent || this.isPascalCase(astNode.tagName)) {
+        const flatChildren = this.flattenComponents(astNode.children);
+        const consumed = this.matchChildren(flatChildren, domElements.slice(domIndex));
+        domIndex += consumed;
+        continue;
+      }
+
+      // Dynamic templates: match all consecutive DOM elements with the same tag
+      if (astNode.isDynamic) {
+        // Skip non-matching DOM elements first
+        while (
+          domIndex < domElements.length &&
+          domElements[domIndex].tagName.toLowerCase() !== astNode.tagName.toLowerCase()
+        ) {
+          domIndex++;
+        }
+        const consumed = this.matchDynamicTemplate(astNode, domElements, domIndex);
+        domIndex += consumed;
+        continue;
+      }
+
+      // Static element: skip unmatched DOM elements until we find a match
+      // (the DOM may have wrapper elements not in the AST, like Layout's <div>, <nav>)
+      while (domIndex < domElements.length) {
+        const matched = this.tryMatchAt(astNode, domElements, domIndex);
+        if (matched.success) {
+          domIndex = matched.nextIndex;
+          break;
+        }
+        domIndex++;
+      }
+    }
+
+    return domIndex;
+  }
+
+  /**
+   * Try to match a dynamic template node against multiple consecutive DOM elements.
+   * Returns the number of DOM elements consumed.
+   */
+  private matchDynamicTemplate(
+    astNode: ASTNodeLike,
+    domElements: Element[],
+    startIndex: number
+  ): number {
+    const instances: Element[] = [];
+    let i = startIndex;
+    const targetTag = astNode.tagName.toLowerCase();
+
+    // Match all consecutive DOM elements with the same tag
+    while (i < domElements.length) {
+      const domEl = domElements[i];
+      if (domEl.tagName.toLowerCase() !== targetTag) break;
+      instances.push(domEl);
+      this.elementToNodeId.set(domEl, astNode.nodeId);
+      i++;
+    }
+
+    if (instances.length > 0) {
+      // Map the nodeId to the first instance + track all instances
+      this.nodeIdToElement.set(astNode.nodeId, instances[0]);
+      this.nodeIdToInstances.set(astNode.nodeId, instances);
+
+      // Recursively map children of the template against the FIRST instance
+      // (assumes all instances have similar structure)
+      const childElements = this.getContentElements(instances[0]);
+      const flatChildren = this.flattenComponents(astNode.children);
+      if (flatChildren.length > 0 && childElements.length > 0) {
+        this.matchChildren(flatChildren, childElements);
+      }
+    }
+
+    return instances.length;
+  }
+
+  /**
+   * Try to match a static AST node at the given DOM index.
+   * Returns success and the next domIndex.
+   */
+  private tryMatchAt(
+    astNode: ASTNodeLike,
+    domElements: Element[],
+    startIndex: number
+  ): { success: boolean; nextIndex: number } {
+    if (startIndex >= domElements.length) {
+      return { success: false, nextIndex: startIndex };
+    }
+
+    const domEl = domElements[startIndex];
+    if (domEl.tagName.toLowerCase() === astNode.tagName.toLowerCase()) {
+      this.elementToNodeId.set(domEl, astNode.nodeId);
+      this.nodeIdToElement.set(astNode.nodeId, domEl);
+
+      // Recursively match children
+      const childElements = this.getContentElements(domEl);
+      const flatChildren = this.flattenComponents(astNode.children);
+      if (flatChildren.length > 0 && childElements.length > 0) {
+        this.matchChildren(flatChildren, childElements);
+      }
+
+      return { success: true, nextIndex: startIndex + 1 };
+    }
+
+    return { success: false, nextIndex: startIndex };
+  }
+
+  /**
+   * Map component nodes to their first rendered DOM element.
+   * Allows clicking inside component-rendered content to find a target.
+   */
+  private mapComponentsToDOM(nodes: ASTNodeLike[]) {
     for (const node of nodes) {
       if ((node.isComponent || this.isPascalCase(node.tagName)) && node.children.length > 0) {
-        // Find the first child's mapped DOM element
         const firstChild = this.flattenComponents(node.children)[0];
         if (firstChild) {
           const domEl = this.nodeIdToElement.get(firstChild.nodeId);
-          if (domEl) {
-            // Map the component nodeId to this DOM element (if not already mapped to something else)
-            if (!this.nodeIdToElement.has(node.nodeId)) {
-              this.nodeIdToElement.set(node.nodeId, domEl);
-              // Don't overwrite elementToNodeId — the DOM element keeps its own nodeId
-              // Instead, we'll handle this in getClosestMappedElement
-            }
+          if (domEl && !this.nodeIdToElement.has(node.nodeId)) {
+            this.nodeIdToElement.set(node.nodeId, domEl);
           }
         }
       }
-      // Recurse into children (components can contain other components)
       if (node.children.length > 0) {
-        this.mapComponentsToDOM(node.children, domElements);
+        this.mapComponentsToDOM(node.children);
       }
     }
   }
 
-  /**
-   * Flatten component nodes: components don't render as DOM elements,
-   * so replace them with their children for matching purposes.
-   */
   private flattenComponents(nodes: ASTNodeLike[]): ASTNodeLike[] {
     const result: ASTNodeLike[] = [];
     for (const node of nodes) {
       if (node.isComponent || this.isPascalCase(node.tagName)) {
-        // Component — skip it, use its children instead
         result.push(...this.flattenComponents(node.children));
       } else {
         result.push(node);
@@ -91,78 +201,6 @@ export class DomMapper {
 
   private isPascalCase(name: string): boolean {
     return /^[A-Z]/.test(name);
-  }
-
-  private matchChildren(astNodes: ASTNodeLike[], domElements: Element[]) {
-    let domIndex = 0;
-
-    for (const astNode of astNodes) {
-      if (domIndex >= domElements.length) break;
-
-      // Flatten this node if it's a component
-      if (astNode.isComponent || this.isPascalCase(astNode.tagName)) {
-        const flatChildren = this.flattenComponents(astNode.children);
-        // Match component's children against remaining DOM elements
-        for (const child of flatChildren) {
-          if (domIndex >= domElements.length) break;
-          this.matchSingle(child, domElements, domIndex);
-          // Advance domIndex for each matched child
-          if (domIndex < domElements.length &&
-              domElements[domIndex].tagName.toLowerCase() === child.tagName.toLowerCase()) {
-            domIndex++;
-          }
-        }
-        continue;
-      }
-
-      const domEl = domElements[domIndex];
-
-      if (domEl.tagName.toLowerCase() === astNode.tagName.toLowerCase()) {
-        this.elementToNodeId.set(domEl, astNode.nodeId);
-        this.nodeIdToElement.set(astNode.nodeId, domEl);
-
-        // Recursively match children (flattening any nested components)
-        const childElements = this.getContentElements(domEl);
-        const flatChildren = this.flattenComponents(astNode.children);
-        if (flatChildren.length > 0 && childElements.length > 0) {
-          this.matchChildren(flatChildren, childElements);
-        }
-
-        domIndex++;
-      } else {
-        // Tags don't match — skip this DOM element and retry
-        domIndex++;
-        if (domIndex < domElements.length) {
-          const nextDomEl = domElements[domIndex];
-          if (nextDomEl.tagName.toLowerCase() === astNode.tagName.toLowerCase()) {
-            this.elementToNodeId.set(nextDomEl, astNode.nodeId);
-            this.nodeIdToElement.set(astNode.nodeId, nextDomEl);
-
-            const childElements = this.getContentElements(nextDomEl);
-            const flatChildren = this.flattenComponents(astNode.children);
-            if (flatChildren.length > 0 && childElements.length > 0) {
-              this.matchChildren(flatChildren, childElements);
-            }
-            domIndex++;
-          }
-        }
-      }
-    }
-  }
-
-  private matchSingle(astNode: ASTNodeLike, domElements: Element[], index: number) {
-    if (index >= domElements.length) return;
-    const domEl = domElements[index];
-    if (domEl.tagName.toLowerCase() === astNode.tagName.toLowerCase()) {
-      this.elementToNodeId.set(domEl, astNode.nodeId);
-      this.nodeIdToElement.set(astNode.nodeId, domEl);
-
-      const childElements = this.getContentElements(domEl);
-      const flatChildren = this.flattenComponents(astNode.children);
-      if (flatChildren.length > 0 && childElements.length > 0) {
-        this.matchChildren(flatChildren, childElements);
-      }
-    }
   }
 
   /** Get meaningful child elements (skip script, style, tve overlay) */
@@ -192,11 +230,20 @@ export class DomMapper {
     return this.nodeIdToElement.get(nodeId) || null;
   }
 
+  /** Get all DOM instances for a node (for dynamic templates) */
+  getInstances(nodeId: string): Element[] {
+    return this.nodeIdToInstances.get(nodeId) || [];
+  }
+
+  getInstanceCount(nodeId: string): number {
+    return this.nodeIdToInstances.get(nodeId)?.length ?? 1;
+  }
+
   getNodeCount(): number {
     return this.elementToNodeId.size;
   }
 
-  /** Find the closest mapped ancestor */
+  /** Find the closest mapped ancestor (or self) */
   getClosestMappedElement(element: Element): Element | null {
     let current: Element | null = element;
     while (current) {

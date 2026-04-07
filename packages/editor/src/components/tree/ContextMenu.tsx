@@ -67,40 +67,12 @@ export function ContextMenu({ node, x, y, onClose }: ContextMenuProps) {
   }
 
   function handleDuplicate() {
-    if (!ast) return;
-    const parentInfo = findParent(ast, node.nodeId);
-    if (!parentInfo) return;
-
-    // Rebuild the HTML from the node (simplified — uses tag + classes + content)
-    const html = nodeToHtml(node);
-    applyMutation({
-      type: "add-element",
-      parentNodeId: parentInfo.parent.nodeId,
-      position: parentInfo.index + 1,
-      html,
-    });
+    applyMutation({ type: "duplicate-element", nodeId: node.nodeId });
     onClose();
   }
 
   function handleWrapInDiv() {
-    // Wrap = add a div parent, move this element into it
-    // For simplicity: delete element, add div with element's HTML as inner content
-    if (!ast) return;
-    const parentInfo = findParent(ast, node.nodeId);
-    if (!parentInfo) return;
-
-    const innerHtml = nodeToHtml(node);
-    // Remove old element
-    applyMutation({ type: "remove-element", nodeId: node.nodeId });
-    // Add wrapped version
-    setTimeout(() => {
-      applyMutation({
-        type: "add-element",
-        parentNodeId: parentInfo.parent.nodeId,
-        position: parentInfo.index,
-        html: `<div>\n  ${innerHtml}\n</div>`,
-      });
-    }, 100);
+    applyMutation({ type: "wrap-element", nodeId: node.nodeId, wrapperTag: "div" });
     onClose();
   }
 
@@ -251,25 +223,3 @@ function MenuDivider() {
   return <div className="my-1 border-t border-zinc-700" />;
 }
 
-/** Convert an AST node back to a simple HTML string (for duplicate/wrap) */
-function nodeToHtml(node: ASTNode): string {
-  const attrs: string[] = [];
-  if (node.classes) attrs.push(`class="${node.classes}"`);
-  for (const [key, value] of Object.entries(node.attributes)) {
-    attrs.push(`${key}="${value}"`);
-  }
-  const attrStr = attrs.length > 0 ? " " + attrs.join(" ") : "";
-
-  if (["img", "input", "br", "hr"].includes(node.tagName)) {
-    return `<${node.tagName}${attrStr} />`;
-  }
-
-  let inner = "";
-  if (node.textContent) {
-    inner = node.textContent;
-  } else if (node.children.length > 0) {
-    inner = "\n" + node.children.map((c) => "  " + nodeToHtml(c)).join("\n") + "\n";
-  }
-
-  return `<${node.tagName}${attrStr}>${inner}</${node.tagName}>`;
-}

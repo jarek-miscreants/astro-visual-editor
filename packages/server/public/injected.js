@@ -390,6 +390,8 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
       __publicField(this, "ast", []);
       __publicField(this, "elementToNodeId", /* @__PURE__ */ new Map());
       __publicField(this, "nodeIdToElement", /* @__PURE__ */ new Map());
+      /** For dynamic templates: nodeId → all matched DOM instances */
+      __publicField(this, "nodeIdToInstances", /* @__PURE__ */ new Map());
     }
     setAst(ast) {
       this.ast = ast;
@@ -397,44 +399,118 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
     remap() {
       this.elementToNodeId.clear();
       this.nodeIdToElement.clear();
+      this.nodeIdToInstances.clear();
       const body = document.body;
       if (!body) return;
       const bodyElements = this.getContentElements(body);
       const flatRoots = this.flattenComponents(this.ast);
       this.matchChildren(flatRoots, bodyElements);
-      this.mapComponentsToDOM(this.ast, bodyElements);
+      this.mapComponentsToDOM(this.ast);
       console.log(
-        `[TVE DOM Mapper] Mapped ${this.elementToNodeId.size} elements`
+        `[TVE DOM Mapper] Mapped ${this.elementToNodeId.size} elements (${this.nodeIdToInstances.size} dynamic templates)`
       );
     }
     /**
-     * For each component node, find the first DOM element rendered by its
-     * flattened children and map it to the component's nodeId.
-     * This allows getClosestMappedElement to find the component when
-     * clicking inside component-rendered content.
+     * Match a list of AST nodes against a list of DOM elements.
+     * Handles dynamic nodes by matching multiple consecutive DOM elements
+     * against a single AST template node.
      */
-    mapComponentsToDOM(nodes, domElements) {
+    matchChildren(astNodes, domElements) {
+      let domIndex = 0;
+      for (const astNode of astNodes) {
+        if (domIndex >= domElements.length) break;
+        if (astNode.isComponent || this.isPascalCase(astNode.tagName)) {
+          const flatChildren = this.flattenComponents(astNode.children);
+          const consumed = this.matchChildren(flatChildren, domElements.slice(domIndex));
+          domIndex += consumed;
+          continue;
+        }
+        if (astNode.isDynamic) {
+          while (domIndex < domElements.length && domElements[domIndex].tagName.toLowerCase() !== astNode.tagName.toLowerCase()) {
+            domIndex++;
+          }
+          const consumed = this.matchDynamicTemplate(astNode, domElements, domIndex);
+          domIndex += consumed;
+          continue;
+        }
+        while (domIndex < domElements.length) {
+          const matched = this.tryMatchAt(astNode, domElements, domIndex);
+          if (matched.success) {
+            domIndex = matched.nextIndex;
+            break;
+          }
+          domIndex++;
+        }
+      }
+      return domIndex;
+    }
+    /**
+     * Try to match a dynamic template node against multiple consecutive DOM elements.
+     * Returns the number of DOM elements consumed.
+     */
+    matchDynamicTemplate(astNode, domElements, startIndex) {
+      const instances = [];
+      let i = startIndex;
+      const targetTag = astNode.tagName.toLowerCase();
+      while (i < domElements.length) {
+        const domEl = domElements[i];
+        if (domEl.tagName.toLowerCase() !== targetTag) break;
+        instances.push(domEl);
+        this.elementToNodeId.set(domEl, astNode.nodeId);
+        i++;
+      }
+      if (instances.length > 0) {
+        this.nodeIdToElement.set(astNode.nodeId, instances[0]);
+        this.nodeIdToInstances.set(astNode.nodeId, instances);
+        const childElements = this.getContentElements(instances[0]);
+        const flatChildren = this.flattenComponents(astNode.children);
+        if (flatChildren.length > 0 && childElements.length > 0) {
+          this.matchChildren(flatChildren, childElements);
+        }
+      }
+      return instances.length;
+    }
+    /**
+     * Try to match a static AST node at the given DOM index.
+     * Returns success and the next domIndex.
+     */
+    tryMatchAt(astNode, domElements, startIndex) {
+      if (startIndex >= domElements.length) {
+        return { success: false, nextIndex: startIndex };
+      }
+      const domEl = domElements[startIndex];
+      if (domEl.tagName.toLowerCase() === astNode.tagName.toLowerCase()) {
+        this.elementToNodeId.set(domEl, astNode.nodeId);
+        this.nodeIdToElement.set(astNode.nodeId, domEl);
+        const childElements = this.getContentElements(domEl);
+        const flatChildren = this.flattenComponents(astNode.children);
+        if (flatChildren.length > 0 && childElements.length > 0) {
+          this.matchChildren(flatChildren, childElements);
+        }
+        return { success: true, nextIndex: startIndex + 1 };
+      }
+      return { success: false, nextIndex: startIndex };
+    }
+    /**
+     * Map component nodes to their first rendered DOM element.
+     * Allows clicking inside component-rendered content to find a target.
+     */
+    mapComponentsToDOM(nodes) {
       for (const node of nodes) {
         if ((node.isComponent || this.isPascalCase(node.tagName)) && node.children.length > 0) {
           const firstChild = this.flattenComponents(node.children)[0];
           if (firstChild) {
             const domEl = this.nodeIdToElement.get(firstChild.nodeId);
-            if (domEl) {
-              if (!this.nodeIdToElement.has(node.nodeId)) {
-                this.nodeIdToElement.set(node.nodeId, domEl);
-              }
+            if (domEl && !this.nodeIdToElement.has(node.nodeId)) {
+              this.nodeIdToElement.set(node.nodeId, domEl);
             }
           }
         }
         if (node.children.length > 0) {
-          this.mapComponentsToDOM(node.children, domElements);
+          this.mapComponentsToDOM(node.children);
         }
       }
     }
-    /**
-     * Flatten component nodes: components don't render as DOM elements,
-     * so replace them with their children for matching purposes.
-     */
     flattenComponents(nodes) {
       const result = [];
       for (const node of nodes) {
@@ -448,62 +524,6 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
     }
     isPascalCase(name) {
       return /^[A-Z]/.test(name);
-    }
-    matchChildren(astNodes, domElements) {
-      let domIndex = 0;
-      for (const astNode of astNodes) {
-        if (domIndex >= domElements.length) break;
-        if (astNode.isComponent || this.isPascalCase(astNode.tagName)) {
-          const flatChildren = this.flattenComponents(astNode.children);
-          for (const child of flatChildren) {
-            if (domIndex >= domElements.length) break;
-            this.matchSingle(child, domElements, domIndex);
-            if (domIndex < domElements.length && domElements[domIndex].tagName.toLowerCase() === child.tagName.toLowerCase()) {
-              domIndex++;
-            }
-          }
-          continue;
-        }
-        const domEl = domElements[domIndex];
-        if (domEl.tagName.toLowerCase() === astNode.tagName.toLowerCase()) {
-          this.elementToNodeId.set(domEl, astNode.nodeId);
-          this.nodeIdToElement.set(astNode.nodeId, domEl);
-          const childElements = this.getContentElements(domEl);
-          const flatChildren = this.flattenComponents(astNode.children);
-          if (flatChildren.length > 0 && childElements.length > 0) {
-            this.matchChildren(flatChildren, childElements);
-          }
-          domIndex++;
-        } else {
-          domIndex++;
-          if (domIndex < domElements.length) {
-            const nextDomEl = domElements[domIndex];
-            if (nextDomEl.tagName.toLowerCase() === astNode.tagName.toLowerCase()) {
-              this.elementToNodeId.set(nextDomEl, astNode.nodeId);
-              this.nodeIdToElement.set(astNode.nodeId, nextDomEl);
-              const childElements = this.getContentElements(nextDomEl);
-              const flatChildren = this.flattenComponents(astNode.children);
-              if (flatChildren.length > 0 && childElements.length > 0) {
-                this.matchChildren(flatChildren, childElements);
-              }
-              domIndex++;
-            }
-          }
-        }
-      }
-    }
-    matchSingle(astNode, domElements, index) {
-      if (index >= domElements.length) return;
-      const domEl = domElements[index];
-      if (domEl.tagName.toLowerCase() === astNode.tagName.toLowerCase()) {
-        this.elementToNodeId.set(domEl, astNode.nodeId);
-        this.nodeIdToElement.set(astNode.nodeId, domEl);
-        const childElements = this.getContentElements(domEl);
-        const flatChildren = this.flattenComponents(astNode.children);
-        if (flatChildren.length > 0 && childElements.length > 0) {
-          this.matchChildren(flatChildren, childElements);
-        }
-      }
     }
     /** Get meaningful child elements (skip script, style, tve overlay) */
     getContentElements(parent) {
@@ -524,10 +544,18 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
     getElementByNodeId(nodeId) {
       return this.nodeIdToElement.get(nodeId) || null;
     }
+    /** Get all DOM instances for a node (for dynamic templates) */
+    getInstances(nodeId) {
+      return this.nodeIdToInstances.get(nodeId) || [];
+    }
+    getInstanceCount(nodeId) {
+      var _a;
+      return ((_a = this.nodeIdToInstances.get(nodeId)) == null ? void 0 : _a.length) ?? 1;
+    }
     getNodeCount() {
       return this.elementToNodeId.size;
     }
-    /** Find the closest mapped ancestor */
+    /** Find the closest mapped ancestor (or self) */
     getClosestMappedElement(element) {
       let current = element;
       while (current) {

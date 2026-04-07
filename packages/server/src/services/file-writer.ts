@@ -242,6 +242,67 @@ export async function applyMutation(
         break;
       }
 
+      case "duplicate-element": {
+        const node = nodeMap.get(mutation.nodeId);
+        if (!node) return { success: false, error: `Node ${mutation.nodeId} not found` };
+
+        const validatedRange = validateElementRange(source, node);
+        if (!validatedRange) {
+          return { success: false, error: `Could not validate range for ${node.tagName}` };
+        }
+
+        // Extract original element text — preserves JSX expressions verbatim
+        const elementText = source.slice(validatedRange.start, validatedRange.end);
+
+        // Detect indentation of the element to use for the duplicate
+        const lineStart = source.lastIndexOf("\n", validatedRange.start);
+        const indent = source.slice(lineStart + 1, validatedRange.start);
+        const beforeOnLine = indent.trim() === "" ? indent : "";
+
+        // Insert the duplicate immediately after the original on a new line
+        s.appendRight(validatedRange.end, `\n${beforeOnLine}${elementText}`);
+        break;
+      }
+
+      case "wrap-element": {
+        const node = nodeMap.get(mutation.nodeId);
+        if (!node) return { success: false, error: `Node ${mutation.nodeId} not found` };
+
+        const validatedRange = validateElementRange(source, node);
+        if (!validatedRange) {
+          return { success: false, error: `Could not validate range for ${node.tagName}` };
+        }
+
+        // Extract original element text — preserves JSX expressions verbatim
+        const elementText = source.slice(validatedRange.start, validatedRange.end);
+
+        const lineStart = source.lastIndexOf("\n", validatedRange.start);
+        const indent = source.slice(lineStart + 1, validatedRange.start);
+        const isLineStart = indent.trim() === "";
+        const baseIndent = isLineStart ? indent : "";
+        const childIndent = baseIndent + "  ";
+
+        const wrapperTag = mutation.wrapperTag || "div";
+        const classAttr = mutation.wrapperClasses
+          ? ` class="${mutation.wrapperClasses}"`
+          : "";
+
+        const openTag = `<${wrapperTag}${classAttr}>`;
+        const closeTag = `</${wrapperTag}>`;
+
+        let replacement: string;
+        if (isLineStart) {
+          // Re-indent the inner content one level deeper
+          const reindented = elementText.replace(/\n/g, `\n  `);
+          replacement = `${openTag}\n${childIndent}${reindented}\n${baseIndent}${closeTag}`;
+        } else {
+          replacement = `${openTag}${elementText}${closeTag}`;
+        }
+
+        s.overwrite(validatedRange.start, validatedRange.end, replacement);
+        break;
+      }
+
       default:
         return { success: false, error: `Unknown mutation type` };
     }

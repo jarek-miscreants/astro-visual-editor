@@ -4,7 +4,6 @@ import { Plus, Trash2 } from "lucide-react";
 import { ElementTree } from "../tree/ElementTree";
 import { AddElementPanel } from "../tree/AddElementPanel";
 import { useEditorStore } from "../../store/editor-store";
-import type { ASTNode } from "@tve/shared";
 
 export function LeftSidebar() {
   const ast = useEditorStore((s) => s.ast);
@@ -56,15 +55,9 @@ export function LeftSidebar() {
       // Ctrl+D — duplicate
       if (e.ctrlKey && e.key === "d") {
         e.preventDefault();
-        const parentInfo = findParent(state.ast, state.selectedNodeId);
-        if (!parentInfo) return;
-        const node = state.nodeMap.get(state.selectedNodeId);
-        if (!node) return;
         state.applyMutation({
-          type: "add-element",
-          parentNodeId: parentInfo.parent.nodeId,
-          position: parentInfo.index + 1,
-          html: nodeToHtml(node),
+          type: "duplicate-element",
+          nodeId: state.selectedNodeId,
         });
       }
 
@@ -77,20 +70,11 @@ export function LeftSidebar() {
       // Ctrl+Alt+G — wrap in div
       if (e.ctrlKey && e.altKey && e.key === "g") {
         e.preventDefault();
-        const parentInfo = findParent(state.ast, state.selectedNodeId);
-        if (!parentInfo) return;
-        const node = state.nodeMap.get(state.selectedNodeId);
-        if (!node) return;
-        const innerHtml = nodeToHtml(node);
-        state.applyMutation({ type: "remove-element", nodeId: state.selectedNodeId });
-        setTimeout(() => {
-          useEditorStore.getState().applyMutation({
-            type: "add-element",
-            parentNodeId: parentInfo.parent.nodeId,
-            position: parentInfo.index,
-            html: `<div>\n  ${innerHtml}\n</div>`,
-          });
-        }, 100);
+        state.applyMutation({
+          type: "wrap-element",
+          nodeId: state.selectedNodeId,
+          wrapperTag: "div",
+        });
       }
     }
 
@@ -180,37 +164,3 @@ export function LeftSidebar() {
   );
 }
 
-function findParent(nodes: ASTNode[], targetId: string): { parent: ASTNode; index: number } | null {
-  for (const n of nodes) {
-    for (let i = 0; i < n.children.length; i++) {
-      if (n.children[i].nodeId === targetId) {
-        return { parent: n, index: i };
-      }
-    }
-    const found = findParent(n.children, targetId);
-    if (found) return found;
-  }
-  return null;
-}
-
-function nodeToHtml(node: ASTNode): string {
-  const attrs: string[] = [];
-  if (node.classes) attrs.push(`class="${node.classes}"`);
-  for (const [key, value] of Object.entries(node.attributes)) {
-    attrs.push(`${key}="${value}"`);
-  }
-  const attrStr = attrs.length > 0 ? " " + attrs.join(" ") : "";
-
-  if (["img", "input", "br", "hr"].includes(node.tagName)) {
-    return `<${node.tagName}${attrStr} />`;
-  }
-
-  let inner = "";
-  if (node.textContent) {
-    inner = node.textContent;
-  } else if (node.children.length > 0) {
-    inner = "\n" + node.children.map((c) => "  " + nodeToHtml(c)).join("\n") + "\n";
-  }
-
-  return `<${node.tagName}${attrStr}>${inner}</${node.tagName}>`;
-}

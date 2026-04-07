@@ -139,6 +139,13 @@ export function computeInverse(
         newPosition: 0,
       };
     }
+    case "duplicate-element":
+      return {
+        type: "remove-element",
+        nodeId: "",
+      };
+    case "wrap-element":
+      return mutation;
     default:
       return mutation;
   }

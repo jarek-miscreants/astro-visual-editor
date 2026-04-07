@@ -28,9 +28,82 @@ componentsRouter.post("/preview", async (req, res) => {
     let importPath = path.relative(pagesDir, componentFullPath).replace(/\\/g, "/");
     if (!importPath.startsWith(".")) importPath = "./" + importPath;
 
+    // Try to find a Layout component to wrap the preview in (so global styles load)
+    const layoutCandidates = [
+      "src/layouts/Layout.astro",
+      "src/layouts/BaseLayout.astro",
+      "src/layouts/MainLayout.astro",
+      "src/layouts/Default.astro",
+      "src/layouts/index.astro",
+    ];
+    let layoutImport: string | null = null;
+    let layoutName: string | null = null;
+    let layoutHasTitle = false;
+
+    for (const candidate of layoutCandidates) {
+      const candidatePath = path.join(projectPath, candidate);
+      try {
+        const content = await fs.readFile(candidatePath, "utf-8");
+        const candidateName = path.basename(candidate, ".astro");
+        const relativeImport = path
+          .relative(pagesDir, candidatePath)
+          .replace(/\\/g, "/");
+        layoutImport = relativeImport.startsWith(".")
+          ? relativeImport
+          : "./" + relativeImport;
+        layoutName = candidateName;
+        // Check if layout accepts a title prop
+        layoutHasTitle = /\btitle\??\s*:/i.test(content) || /\btitle\b/i.test(content);
+        break;
+      } catch {
+        continue;
+      }
+    }
+
+    // Try to find a global stylesheet to import (for projects without a Layout)
+    let globalCssImport: string | null = null;
+    const cssCandidates = [
+      "src/styles/global.css",
+      "src/styles/main.css",
+      "src/styles/app.css",
+      "src/global.css",
+      "src/app.css",
+    ];
+    for (const candidate of cssCandidates) {
+      const candidatePath = path.join(projectPath, candidate);
+      try {
+        await fs.access(candidatePath);
+        const relativeImport = path
+          .relative(pagesDir, candidatePath)
+          .replace(/\\/g, "/");
+        globalCssImport = relativeImport.startsWith(".")
+          ? relativeImport
+          : "./" + relativeImport;
+        break;
+      } catch {
+        continue;
+      }
+    }
+
     // Generate preview page
-    const previewContent = `---
+    let previewContent: string;
+    if (layoutImport && layoutName) {
+      // Wrap in project layout (so global styles, fonts, head tags all work)
+      const titleProp = layoutHasTitle ? ` title="Preview: ${componentName}"` : "";
+      previewContent = `---
+import ${layoutName} from '${layoutImport}';
 import ${componentName} from '${importPath}';
+---
+
+<${layoutName}${titleProp}>
+  <${componentName} />
+</${layoutName}>
+`;
+    } else {
+      // Standalone with optional global CSS import
+      const cssImport = globalCssImport ? `import '${globalCssImport}';\n` : "";
+      previewContent = `---
+${cssImport}import ${componentName} from '${importPath}';
 ---
 
 <!doctype html>
@@ -40,11 +113,12 @@ import ${componentName} from '${importPath}';
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Preview: ${componentName}</title>
   </head>
-  <body class="p-8 bg-gray-50">
+  <body>
     <${componentName} />
   </body>
 </html>
 `;
+    }
 
     await fs.mkdir(pagesDir, { recursive: true });
     await fs.writeFile(previewPagePath, previewContent, "utf-8");
