@@ -18,7 +18,7 @@ const app = express();
 const server = createServer(app);
 const wss = new WebSocketServer({ server, path: "/ws" });
 
-const PORT = Number(process.env.PORT) || 3001;
+const PORT = Number(process.env.PORT) || 3011;
 const PROJECT_PATH = process.env.TVE_PROJECT_PATH || process.argv[2] || "";
 
 if (!PROJECT_PATH) {

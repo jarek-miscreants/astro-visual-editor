@@ -36,7 +36,7 @@ async function main() {
   console.log(`\x1b[36m╚══════════════════════════════════════╝\x1b[0m\n`);
   console.log(`  Project: \x1b[32m${projectPath}\x1b[0m`);
   console.log(`  Editor:  \x1b[36mhttp://localhost:3005\x1b[0m`);
-  console.log(`  Backend: \x1b[36mhttp://localhost:3001\x1b[0m\n`);
+  console.log(`  Backend: \x1b[36mhttp://localhost:3011\x1b[0m\n`);
 
   // Start backend — quote path with spaces for shell mode on Windows
   const isWindowsServer = process.platform === "win32";
@@ -67,7 +67,7 @@ async function main() {
   });
 
   // Wait for server to be ready
-  await waitForServer("http://localhost:3001/api/project/info", 10000);
+  await waitForServer("http://localhost:3011/api/project/info", 10000);
 
   // Start editor
   const isWindows = process.platform === "win32";

@@ -334,67 +334,102 @@ export async function applyMutation(
 
 /**
  * Validate and correct an element's source range from the AST.
- * The Astro compiler's position.end can be off by one in some cases,
- * pointing to characters of the parent's closing tag. This function
- * verifies the start matches `<{tagName}` and end is `>` or self-closing.
+ *
+ * The Astro compiler's position offsets are unreliable — for some elements
+ * (notably <span>, but observed on others too) start.offset is shifted forward
+ * by 2-3 chars, landing inside the tag name, and end.offset overshoots past
+ * the closing `>`. We can't trust either bound, so we re-locate them by
+ * searching the source directly:
+ *   1. Find `<tagName` near the reported start (wide search window).
+ *   2. Find the matching `</tagName>` by walking forward and tracking
+ *      depth of nested same-name tags.
  */
+const VOID_ELEMENTS = new Set([
+  "img", "input", "br", "hr", "meta", "link", "area", "base",
+  "col", "embed", "source", "track", "wbr", "slot",
+]);
+
 function validateElementRange(
   source: string,
   node: { tagName: string; position: { start: { offset: number }; end: { offset: number } } }
 ): { start: number; end: number } | null {
-  const start = node.position.start.offset;
-  let end = node.position.end.offset;
+  const tagName = node.tagName;
+  const approxStart = node.position.start.offset;
+  const approxEnd = node.position.end.offset;
+  const startNeedle = `<${tagName}`;
+  const startNeedleLower = startNeedle.toLowerCase();
 
-  // Validate start: must be `<{tagName}` (case-insensitive)
-  const expectedStart = `<${node.tagName}`;
-  const actualStart = source.slice(start, start + expectedStart.length);
-  if (actualStart.toLowerCase() !== expectedStart.toLowerCase()) {
-    // Try to find the actual element start nearby (within 5 chars)
-    for (let offset = -3; offset <= 3; offset++) {
-      const probe = source.slice(start + offset, start + offset + expectedStart.length);
-      if (probe.toLowerCase() === expectedStart.toLowerCase()) {
-        return validateElementRange(source, {
-          tagName: node.tagName,
-          position: { start: { offset: start + offset }, end: { offset: end } },
-        });
+  // Step 1: locate `<tagName` near the reported start. Try the reported
+  // offset first, then expand outward up to ±50 chars. The next char after
+  // the tag name must be a tag terminator (whitespace, `>`, or `/`).
+  let realStart = -1;
+  const isTagBoundary = (idx: number) => {
+    const c = source[idx];
+    return c === " " || c === "\t" || c === "\n" || c === "\r" || c === ">" || c === "/";
+  };
+  const probeMatch = (offset: number) => {
+    if (offset < 0 || offset + startNeedle.length > source.length) return false;
+    if (source.slice(offset, offset + startNeedle.length).toLowerCase() !== startNeedleLower) {
+      return false;
+    }
+    return isTagBoundary(offset + startNeedle.length);
+  };
+  if (probeMatch(approxStart)) {
+    realStart = approxStart;
+  } else {
+    for (let delta = 1; delta <= 50 && realStart === -1; delta++) {
+      if (probeMatch(approxStart - delta)) realStart = approxStart - delta;
+      else if (probeMatch(approxStart + delta)) realStart = approxStart + delta;
+    }
+  }
+  if (realStart === -1) return null;
+
+  // Step 2: find the end of the opening tag (the `>` that terminates `<tagName ...>`).
+  const openTagEnd = findOpenTagEnd(source, realStart);
+  if (openTagEnd === -1) return null;
+
+  // Self-closing `<tag ... />` or void element — done.
+  const isSelfClosing = source[openTagEnd - 2] === "/";
+  const isVoid = VOID_ELEMENTS.has(tagName.toLowerCase());
+  if (isSelfClosing || isVoid) {
+    return { start: realStart, end: openTagEnd };
+  }
+
+  // Step 3: walk forward tracking nesting of same-name open/close tags
+  // until we find the matching `</tagName>`.
+  const lowered = source.toLowerCase();
+  const closeNeedleLower = `</${tagName}`.toLowerCase();
+  const openNeedleLen = startNeedle.length;
+  const closeNeedleLen = closeNeedleLower.length;
+  let depth = 1;
+  let cursor = openTagEnd;
+  while (cursor < source.length) {
+    const nextOpen = lowered.indexOf(startNeedleLower, cursor);
+    const nextClose = lowered.indexOf(closeNeedleLower, cursor);
+    if (nextClose === -1) return null;
+    if (nextOpen !== -1 && nextOpen < nextClose) {
+      if (isTagBoundary(nextOpen + openNeedleLen)) {
+        depth++;
       }
+      cursor = nextOpen + openNeedleLen;
+      continue;
     }
-    return null;
-  }
-
-  // Validate end: should be the character after `>`
-  // Check the character at end-1 — should be `>`
-  if (source[end - 1] !== ">") {
-    // Search forward for `>` (within 10 chars) or backward
-    let found = false;
-    for (let offset = -2; offset <= 10; offset++) {
-      if (source[end + offset - 1] === ">") {
-        end = end + offset;
-        found = true;
-        break;
-      }
+    // Closing tag candidate — must be followed by optional whitespace then `>`
+    let closeEnd = nextClose + closeNeedleLen;
+    while (closeEnd < source.length && (source[closeEnd] === " " || source[closeEnd] === "\t")) {
+      closeEnd++;
     }
-    if (!found) return null;
-  }
-
-  // For non-self-closing elements, verify the element ends with `</tagName>`
-  // (unless it's a void element like <img />)
-  const VOID_ELEMENTS = new Set(["img", "input", "br", "hr", "meta", "link", "area", "base", "col", "embed", "source", "track", "wbr", "slot"]);
-  const isVoid = VOID_ELEMENTS.has(node.tagName.toLowerCase());
-  const isSelfClosing = source.slice(end - 2, end) === "/>";
-
-  if (!isVoid && !isSelfClosing) {
-    const expectedClose = `</${node.tagName}>`;
-    const actualClose = source.slice(end - expectedClose.length, end);
-    if (actualClose.toLowerCase() !== expectedClose.toLowerCase()) {
-      // Search nearby for the actual closing tag
-      const idx = source.indexOf(expectedClose, end - expectedClose.length - 5);
-      if (idx === -1 || idx > end + 5) return null;
-      end = idx + expectedClose.length;
+    if (source[closeEnd] !== ">") {
+      cursor = nextClose + closeNeedleLen;
+      continue;
     }
+    depth--;
+    if (depth === 0) {
+      return { start: realStart, end: closeEnd + 1 };
+    }
+    cursor = closeEnd + 1;
   }
-
-  return { start, end };
+  return null;
 }
 
 /**

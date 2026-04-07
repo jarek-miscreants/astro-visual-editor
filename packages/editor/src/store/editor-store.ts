@@ -200,7 +200,24 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     try {
       const result = await api.applyMutation(state.currentFile, mutation);
       if (result.success && result.ast) {
-        set({ ast: result.ast, nodeMap: buildNodeMap(result.ast) });
+        const nextState: Partial<EditorState> = {
+          ast: result.ast,
+          nodeMap: buildNodeMap(result.ast),
+        };
+        // After a structural mutation, the previous selectedNodeId is stale —
+        // nodeIds are positional (`tve-{hash}-{index}`), so deletes/inserts
+        // shift them. Clear selection so the next action doesn't operate on
+        // a different element that happened to land on the old index.
+        if (
+          mutation.type === "remove-element" &&
+          state.selectedNodeId === mutation.nodeId
+        ) {
+          nextState.selectedNodeId = null;
+          nextState.selectedElementInfo = null;
+        }
+        set(nextState);
+      } else if (!result.success) {
+        console.error("Mutation failed:", result.error);
       }
     } catch (err) {
       console.error("Failed to apply mutation:", err);

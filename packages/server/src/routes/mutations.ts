@@ -19,6 +19,7 @@ mutationsRouter.post("/*filePath", async (req, res) => {
     const fullPath = resolveProjectPath(projectPath, filePath);
 
     const mutation: Mutation = req.body;
+    console.log(`[Mutation] ${mutation?.type} on ${filePath}`, mutation);
 
     if (!mutation || !mutation.type || !VALID_MUTATION_TYPES.has(mutation.type)) {
       res.status(400).json({ error: `Invalid mutation type: ${mutation?.type}` });
@@ -34,8 +35,10 @@ mutationsRouter.post("/*filePath", async (req, res) => {
     const result = await applyMutation(fullPath, mutation);
 
     if (result.success) {
+      console.log(`[Mutation] OK ${mutation.type}`);
       res.json({ success: true, ast: result.ast });
     } else {
+      console.log(`[Mutation] FAIL ${mutation.type}: ${result.error}`);
       res.status(400).json({ success: false, error: result.error });
     }
   } catch (err: any) {
