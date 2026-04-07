@@ -35,6 +35,15 @@ export async function applyMutation(
         );
 
         if (classMatch) {
+          // Capture group 3 is the JSX expression form `{...}`. Refuse to
+          // overwrite — that would clobber a dynamic binding like
+          // `class={classes}` and break the component.
+          if (classMatch[3] !== undefined) {
+            return {
+              success: false,
+              error: `Cannot edit class on <${node.tagName}> — it uses a JSX expression binding (class={${classMatch[3]}}). Edit the source directly or set the class via the parent component's prop.`,
+            };
+          }
           // +1 to skip the leading whitespace we matched
           const attrStart = tagStart + classMatch.index! + 1;
           const fullMatch = classMatch[0].trimStart();

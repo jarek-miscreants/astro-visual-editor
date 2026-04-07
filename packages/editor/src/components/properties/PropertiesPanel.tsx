@@ -28,7 +28,13 @@ export function PropertiesPanel({ nodeId, elementInfo }: PropertiesPanelProps) {
   const nodeMap = useEditorStore((s) => s.nodeMap);
 
   const astNode = nodeMap.get(nodeId);
-  const classes = astNode?.classes ?? elementInfo.classes;
+  const classExpression = astNode?.classExpression ?? null;
+  // When the element binds class via a JSX expression, never fall back to the
+  // iframe's computed class string — that's the resolved value, and writing it
+  // back would clobber the binding.
+  const classes = classExpression
+    ? ""
+    : astNode?.classes ?? elementInfo.classes;
   const attributes = astNode?.attributes ?? elementInfo.attributes;
   const isComponent = astNode?.isComponent || /^[A-Z]/.test(elementInfo.tagName);
 
@@ -72,11 +78,27 @@ export function PropertiesPanel({ nodeId, elementInfo }: PropertiesPanelProps) {
         <div className="mb-2 text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">
           Classes
         </div>
-        <TailwindClassEditor
-          nodeId={nodeId}
-          classes={classes}
-          onClassesChange={handleClassesChange}
-        />
+        {classExpression ? (
+          <div className="border border-amber-500/30 bg-amber-500/5 p-2 text-[10px] text-amber-300/80">
+            <div className="mb-1 font-semibold text-amber-300">
+              JSX expression binding
+            </div>
+            <div className="mb-1 font-mono text-amber-200/70">
+              class={classExpression}
+            </div>
+            <div className="text-amber-300/60">
+              Class is bound to a variable. Editing here is disabled to avoid
+              breaking the component. Edit the source, or set the class via
+              this component's parent prop.
+            </div>
+          </div>
+        ) : (
+          <TailwindClassEditor
+            nodeId={nodeId}
+            classes={classes}
+            onClassesChange={handleClassesChange}
+          />
+        )}
       </div>
 
       {/* Attributes — read/write all non-class attrs */}

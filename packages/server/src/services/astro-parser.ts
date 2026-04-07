@@ -49,6 +49,7 @@ async function parseAstroSourceAsync(
 
       // Extract class attribute
       let classes = "";
+      let classExpression: string | null = null;
       const attributes: Record<string, string> = {};
 
       if (node.attributes) {
@@ -64,7 +65,13 @@ async function parseAstroSourceAsync(
               attributes[attr.name] = attr.value || "";
             }
           } else if (attr.kind === "expression") {
-            attributes[attr.name] = `{${attr.value || "..."}}`;
+            if (attr.name === "class") {
+              // class={expr} — preserve so we can show it read-only and refuse
+              // to overwrite the binding with a string literal
+              classExpression = `{${attr.value || "..."}}`;
+            } else {
+              attributes[attr.name] = `{${attr.value || "..."}}`;
+            }
           }
         }
       }
@@ -93,6 +100,7 @@ async function parseAstroSourceAsync(
         tagName,
         isComponent,
         classes,
+        classExpression,
         textContent,
         attributes,
         children: [],

@@ -8,6 +8,9 @@ export interface ASTNode {
   isComponent: boolean;
   /** CSS classes string */
   classes: string;
+  /** If class is bound via a JSX expression (e.g. `class={classes}`), the
+   *  raw expression text in `{...}` form. Mutually exclusive with `classes`. */
+  classExpression?: string | null;
   /** Text content (for text-only nodes) */
   textContent: string | null;
   /** HTML attributes */
