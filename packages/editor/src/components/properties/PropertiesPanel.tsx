@@ -3,6 +3,7 @@ import { Paintbrush, LayoutGrid, Type as TypeIcon } from "lucide-react";
 import type { ElementInfo } from "@tve/shared";
 import { useEditorStore } from "../../store/editor-store";
 import { TailwindClassEditor } from "./TailwindClassEditor";
+import { AttributesPanel } from "./AttributesPanel";
 import { TokenSuggestions } from "./TokenSuggestions";
 import { StyleTab } from "./StyleTab";
 import { LayoutTab } from "./LayoutTab";
@@ -28,6 +29,7 @@ export function PropertiesPanel({ nodeId, elementInfo }: PropertiesPanelProps) {
 
   const astNode = nodeMap.get(nodeId);
   const classes = astNode?.classes ?? elementInfo.classes;
+  const attributes = astNode?.attributes ?? elementInfo.attributes;
   const isComponent = astNode?.isComponent || /^[A-Z]/.test(elementInfo.tagName);
 
   function handleClassesChange(newClasses: string) {
@@ -76,6 +78,9 @@ export function PropertiesPanel({ nodeId, elementInfo }: PropertiesPanelProps) {
           onClassesChange={handleClassesChange}
         />
       </div>
+
+      {/* Attributes — read/write all non-class attrs */}
+      <AttributesPanel nodeId={nodeId} attributes={attributes} />
 
       {/* Tabs */}
       <div className="flex border-b border-zinc-800 bg-zinc-950">

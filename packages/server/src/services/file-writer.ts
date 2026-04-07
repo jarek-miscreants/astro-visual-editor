@@ -1,4 +1,5 @@
 import fs from "fs/promises";
+import path from "path";
 import MagicString from "magic-string";
 import type { Mutation, ASTNode } from "@tve/shared";
 import { parseAstroFileAsync, buildNodeMap } from "./astro-parser.js";
@@ -157,6 +158,10 @@ export async function applyMutation(
           const insertHtml = `${mutation.html}\n${childIndent}`;
           s.appendLeft(targetChild.position.start.offset, insertHtml);
         }
+
+        // If the inserted HTML references project components (PascalCase tags),
+        // add the missing imports to the frontmatter so the page still renders.
+        await ensureComponentImports(s, source, filePath, mutation.html);
         break;
       }
 
@@ -381,6 +386,73 @@ function validateElementRange(
   }
 
   return { start, end };
+}
+
+/**
+ * Scan inserted HTML for PascalCase tag references (project components) and
+ * append missing imports to the file's frontmatter. Without this, inserting
+ * `<MyComponent />` would leave the page broken — the tag would be undefined
+ * at render time and Astro would fail to compile.
+ */
+async function ensureComponentImports(
+  s: MagicString,
+  source: string,
+  filePath: string,
+  html: string
+): Promise<void> {
+  // Collect PascalCase tag names from the inserted HTML
+  const tagRegex = /<([A-Z][A-Za-z0-9]*)\b/g;
+  const tags = new Set<string>();
+  let m: RegExpExecArray | null;
+  while ((m = tagRegex.exec(html)) !== null) {
+    if (m[1] !== "Fragment") tags.add(m[1]);
+  }
+  if (tags.size === 0) return;
+
+  // Locate frontmatter `---` ... `---`
+  const fmStart = source.indexOf("---");
+  if (fmStart !== 0 && source.slice(0, fmStart).trim() !== "") return;
+  if (fmStart === -1) return;
+  const fmEnd = source.indexOf("---", fmStart + 3);
+  if (fmEnd === -1) return;
+  const frontmatter = source.slice(fmStart + 3, fmEnd);
+
+  // Find the project root by walking up from filePath until we find src/
+  const normalized = filePath.replace(/\\/g, "/");
+  const srcIdx = normalized.lastIndexOf("/src/");
+  if (srcIdx === -1) return;
+  const projectRoot = filePath.slice(0, srcIdx);
+  const componentsDir = path.join(projectRoot, "src", "components");
+  const sourceDir = path.dirname(filePath);
+
+  const importLines: string[] = [];
+  for (const tag of tags) {
+    // Already imported? Match `import Tag` or `import { Tag` or `import Tag,`
+    const importRe = new RegExp(
+      `\\bimport\\s+(?:\\{[^}]*\\b${tag}\\b[^}]*\\}|${tag}\\b)`
+    );
+    if (importRe.test(frontmatter)) continue;
+
+    // Resolve component file
+    const compPath = path.join(componentsDir, `${tag}.astro`);
+    try {
+      await fs.access(compPath);
+    } catch {
+      continue; // Not a project component — leave it alone
+    }
+
+    let importPath = path.relative(sourceDir, compPath).replace(/\\/g, "/");
+    if (!importPath.startsWith(".")) importPath = "./" + importPath;
+    importLines.push(`import ${tag} from "${importPath}";`);
+  }
+
+  if (importLines.length === 0) return;
+
+  // Insert imports just before the closing `---`, preserving newlines
+  const needsLeadingNewline = !frontmatter.endsWith("\n");
+  const insertText =
+    (needsLeadingNewline ? "\n" : "") + importLines.join("\n") + "\n";
+  s.appendLeft(fmEnd, insertText);
 }
 
 /** Find the end of the opening tag (position of '>') */
