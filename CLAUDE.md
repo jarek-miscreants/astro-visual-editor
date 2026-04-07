@@ -88,12 +88,15 @@ pnpm --filter @tve/editor build     # Build the editor frontend
 
 ### Phase 3: Structural Editing + Components (Complete)
 - **Context menu** — Right-click tree nodes: add child/before/after, duplicate (Ctrl+D), delete (Del), wrap in div (Ctrl+Alt+G), extract to component
-- **Add Element panel** — Searchable popover (Ctrl+E) with categorized HTML elements (Structure, Text, Media, Interactive, List) + project components. Click outside to close
-- **Tree drag-and-drop** — @dnd-kit/core with grip handles, three drop positions (before/after/inside), drag overlay, cycle prevention
+- **Add Element panel** — Searchable popover (Ctrl+E) with categorized HTML elements (Structure, Text, Media, Interactive, List, Astro slot/named slot) + project components. Click outside to close
+- **Tree drag-and-drop** — @dnd-kit/core with grip handles, lenient drop zones (4px edge for before/after, rest defaults to "inside"), drag overlay, cycle prevention
 - **New Component dialog** — `+ Component` toolbar button, creates `src/components/{Name}.astro` with Props interface skeleton
 - **Extract to Component** — Context menu: extracts element HTML into new `.astro` file, adds import, replaces original with `<ComponentName />`
 - **Component preview** — Generates `tve-preview.astro` page that imports and renders component in isolation
 - **Double-click to enter** — Double-click component instances in tree to navigate into the component source
+- **Slot support** — Empty components show a green dashed slot placeholder (with custom slot icon). Click or drop elements into it. Self-closing `<Component />` automatically converts to `<Component>...</Component>` when content is added
+- **Components default expanded** — Component nodes show expand chevron and are expanded by default so the slot is visible
+- **Green coloring** — Components and slot elements use green-500 styling to distinguish from regular HTML
 
 ### Phase 4: Design System + Theme (Complete)
 - **@theme editor** — First tab in Design System panel. Define custom CSS variables organized by category:
@@ -113,6 +116,16 @@ pnpm --filter @tve/editor build     # Build the editor frontend
 - **Fonts tab** — Custom font family editor with popular font quick-picks (Inter, Playfair Display, etc.), live preview, Google Fonts `<link>` tag generator. Full type scale and font weight visual reference
 - **Unified theme store** — `tailwind-defaults.ts` single source of truth, `theme-store.ts` loads project config and merges with defaults. All controls read from store
 - **Token-aware properties** — Properties panel shows matching tokens with one-click apply
+
+### Phase 5: UI Polish + Stability (Complete)
+- **shadcn-inspired UI** — All panels darker (zinc-950), brighter labels (zinc-400 + font-medium), borderless flat design (no rounded corners), refined typography, custom select chevrons, focus rings
+- **Tabbed properties panel** — Style/Layout/Text tabs with active blue indicator bar
+- **Spacing controls** — Neutral box-model editor (no orange/green tints)
+- **`tve` CLI launcher** — `npm start` or `node bin/tve.mjs <project-path>` with interactive prompt fallback to test project
+- **File-writer hardening** — `validateElementRange()` validates AST positions before mutating, prevents corruption from off-by-one position errors
+- **`update-classes` opening-tag-only search** — Regex limited to opening tag via `findOpenTagEnd()`, prevents matching child element class attributes
+- **Iframe selection auto-expand** — Tree auto-expands parent nodes when descendant is selected, scrolls into view
+- **Component DOM mapping** — Component nodeIds also map to first rendered DOM element for clickable component-rendered content
 
 ### Future
 - Image handling, component prop editing

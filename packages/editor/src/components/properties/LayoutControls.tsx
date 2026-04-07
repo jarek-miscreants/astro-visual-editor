@@ -113,7 +113,7 @@ export function LayoutControls({ classes, onClassesChange }: LayoutControlsProps
 function ControlGroup({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <div className="mb-1 text-[10px] text-zinc-500">{label}</div>
+      <div className="mb-1.5 text-[10px] font-medium text-zinc-400">{label}</div>
       {children}
     </div>
   );
@@ -139,10 +139,10 @@ function ButtonGroup({
           <button
             key={opt}
             onClick={() => onChange(isActive ? "" : opt)}
-            className={`rounded px-1.5 py-0.5 text-[10px] font-mono transition-colors ${
+            className={` border px-2 py-0.5 text-[10px] font-mono transition-colors ${
               isActive
-                ? "bg-blue-600/30 text-blue-300 border border-blue-500/40"
-                : "bg-zinc-800 text-zinc-400 border border-transparent hover:bg-zinc-700 hover:text-zinc-300"
+                ? "border-blue-500/40 bg-blue-500/15 text-blue-300"
+                : "border-zinc-800 bg-zinc-900 text-zinc-400 hover:border-zinc-700 hover:bg-zinc-800 hover:text-zinc-200"
             }`}
             title={opt}
           >
@@ -167,7 +167,7 @@ function SelectControl({
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full rounded bg-zinc-800 border border-zinc-700 px-2 py-1 text-[11px] text-zinc-300 outline-none focus:border-blue-500"
+      className="h-7 w-full  border border-zinc-800 bg-zinc-900 px-2.5 text-[11px] text-zinc-200 outline-none focus:border-blue-500 hover:border-zinc-700 transition-colors cursor-pointer"
     >
       <option value="">none</option>
       {options.map((opt) => (

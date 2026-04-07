@@ -39,7 +39,7 @@ export function LayoutTab({ classes, onClassesChange }: LayoutTabProps) {
         <select
           value={OVERFLOW.find((o) => hasClass(classes, o)) || ""}
           onChange={(e) => onClassesChange(replaceClassFromSet(classes, OVERFLOW, e.target.value))}
-          className="w-full rounded bg-zinc-800 border border-zinc-700 px-2 py-1 text-[11px] text-zinc-300 outline-none focus:border-blue-500"
+          className="h-7 w-full  border border-zinc-800 bg-zinc-900 px-2.5 text-[11px] text-zinc-200 outline-none focus:border-blue-500 hover:border-zinc-700 transition-colors cursor-pointer"
         >
           <option value="">default</option>
           {OVERFLOW.map((o) => (
@@ -54,7 +54,7 @@ export function LayoutTab({ classes, onClassesChange }: LayoutTabProps) {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="border-b border-zinc-800 px-3 py-3">
-      <div className="mb-2 text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">{title}</div>
+      <div className="mb-2 text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">{title}</div>
       {children}
     </div>
   );
@@ -89,14 +89,14 @@ function SizeControl({
 
   return (
     <div>
-      <div className="mb-0.5 text-[9px] text-zinc-500">{label}</div>
+      <div className="mb-1 text-[10px] font-medium text-zinc-400">{label}</div>
       <select
         value={currentValue}
         onChange={(e) => {
           const newClass = e.target.value ? `${prefix}-${e.target.value}` : "";
           onClassesChange(replaceClassByPrefix(classes, `${prefix}-`, newClass));
         }}
-        className="w-full rounded bg-zinc-800 border border-zinc-700 px-1.5 py-0.5 text-[10px] text-zinc-300 outline-none focus:border-blue-500"
+        className="h-7 w-full  border border-zinc-800 bg-zinc-900 px-2 text-[10px] text-zinc-200 outline-none focus:border-blue-500 hover:border-zinc-700 transition-colors cursor-pointer"
       >
         <option value="">auto</option>
         {values.map((v) => (

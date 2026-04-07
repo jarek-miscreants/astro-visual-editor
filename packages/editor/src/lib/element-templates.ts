@@ -51,9 +51,9 @@ export const ELEMENT_TEMPLATES: TemplateGroup[] = [
   {
     label: "Interactive",
     templates: [
-      { tag: "button", label: "Button", defaultClasses: "px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors", defaultContent: "Button" },
-      { tag: "input", label: "Input", defaultClasses: "border border-gray-300 rounded px-3 py-2 outline-none focus:border-blue-500", defaultAttributes: { type: "text", placeholder: "Enter text..." } },
-      { tag: "textarea", label: "Textarea", defaultClasses: "border border-gray-300 rounded px-3 py-2 outline-none focus:border-blue-500", defaultContent: "" },
+      { tag: "button", label: "Button", defaultClasses: "px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 transition-colors", defaultContent: "Button" },
+      { tag: "input", label: "Input", defaultClasses: "border border-gray-300 px-3 py-2 outline-none focus:border-blue-500", defaultAttributes: { type: "text", placeholder: "Enter text..." } },
+      { tag: "textarea", label: "Textarea", defaultClasses: "border border-gray-300 px-3 py-2 outline-none focus:border-blue-500", defaultContent: "" },
       { tag: "form", label: "Form" },
     ],
   },

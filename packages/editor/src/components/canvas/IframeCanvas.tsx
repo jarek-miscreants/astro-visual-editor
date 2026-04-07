@@ -103,7 +103,7 @@ export function IframeCanvas() {
           {devServerStatus === "stopped" && (
             <button
               onClick={startDevServer}
-              className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 transition-colors"
+              className=" bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 transition-colors"
             >
               Start Dev Server
             </button>
@@ -116,7 +116,7 @@ export function IframeCanvas() {
               <p className="mb-2 text-xs text-red-400">Failed to start dev server</p>
               <button
                 onClick={startDevServer}
-                className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500"
+                className=" bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500"
               >
                 Retry
               </button>
@@ -138,7 +138,7 @@ export function IframeCanvas() {
   return (
     <div className="relative flex h-full justify-center bg-zinc-950 p-2 overflow-auto">
       <div
-        className="h-full overflow-hidden rounded-lg border border-zinc-800 bg-white transition-all duration-300"
+        className="h-full overflow-hidden  border border-zinc-800 bg-white transition-all duration-300"
         style={{ width: deviceWidth ? `${deviceWidth}px` : "100%", maxWidth: "100%" }}
       >
         <iframe

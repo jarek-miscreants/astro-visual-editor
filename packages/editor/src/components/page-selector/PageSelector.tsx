@@ -34,7 +34,7 @@ export function PageSelector() {
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-1.5 rounded-md bg-zinc-800 px-2.5 py-1 text-xs text-zinc-300 hover:bg-zinc-700 transition-colors"
+        className="flex items-center gap-1.5  bg-zinc-800 px-2.5 py-1 text-xs text-zinc-300 hover:bg-zinc-700 transition-colors"
       >
         <FileText size={12} />
         {displayName}
@@ -42,7 +42,7 @@ export function PageSelector() {
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full z-50 mt-1 w-64 rounded-lg border border-zinc-700 bg-zinc-800 py-1 shadow-xl">
+        <div className="absolute left-0 top-full z-50 mt-1 w-64  border border-zinc-700 bg-zinc-800 py-1 shadow-xl">
           {pages.length > 0 && (
             <FileGroup
               label="Pages"

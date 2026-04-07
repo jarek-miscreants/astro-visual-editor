@@ -34,75 +34,78 @@ export function Toolbar() {
   const projectName = useEditorStore((s) => s.projectName);
 
   return (
-    <div className="flex h-11 items-center gap-3 border-b border-zinc-800 bg-zinc-900 px-3">
+    <div className="flex h-12 items-center gap-2 border-b border-zinc-800 bg-zinc-950 px-3">
       {/* Project name */}
-      <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+      <span className="text-[11px] font-semibold text-zinc-200 tracking-tight">
         {projectName || "TVE"}
       </span>
 
-      <div className="mx-1 h-5 w-px bg-zinc-700" />
+      <Divider />
 
       {/* Dev server control */}
       {devServerStatus === "stopped" || devServerStatus === "error" ? (
         <button
           onClick={startDevServer}
-          className="flex items-center gap-1.5 rounded-md bg-emerald-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-emerald-500 transition-colors"
+          className="inline-flex h-7 items-center gap-1.5  bg-emerald-500 px-2.5 text-xs font-medium text-white shadow-sm hover:bg-emerald-400 transition-colors"
         >
-          <Play size={12} />
+          <Play size={11} />
           Start
         </button>
       ) : devServerStatus === "starting" ? (
-        <span className="flex items-center gap-1.5 text-xs text-yellow-400">
+        <span className="inline-flex items-center gap-1.5 text-xs text-amber-400">
           <Loader2 size={12} className="animate-spin" />
           Starting...
         </span>
       ) : (
-        <span className="flex items-center gap-1.5 text-xs text-emerald-400">
-          <Square size={10} fill="currentColor" />
+        <span className="inline-flex items-center gap-1.5 text-xs text-emerald-400">
+          <span className="relative flex h-2 w-2">
+            <span className="absolute inline-flex h-full w-full animate-ping  bg-emerald-400 opacity-75" />
+            <span className="relative inline-flex h-2 w-2  bg-emerald-400" />
+          </span>
           Running
         </span>
       )}
 
-      <div className="mx-1 h-5 w-px bg-zinc-700" />
+      <Divider />
 
       {/* Page selector */}
       <PageSelector />
 
-      <div className="mx-1 h-5 w-px bg-zinc-700" />
+      <Divider />
 
       {/* Undo/Redo */}
-      <button
-        onClick={() => {
-          const entry = useHistoryStore.getState().undo();
-          if (entry) applyMutation(entry.inverse, true);
-        }}
-        disabled={!canUndo}
-        className={`rounded p-1 ${canUndo ? "text-zinc-400 hover:bg-zinc-800 hover:text-white" : "text-zinc-600 cursor-not-allowed"}`}
-        title="Undo (Ctrl+Z)"
-      >
-        <Undo2 size={14} />
-      </button>
-      <button
-        onClick={() => {
-          const entry = useHistoryStore.getState().redo();
-          if (entry) applyMutation(entry.mutation, true);
-        }}
-        disabled={!canRedo}
-        className={`rounded p-1 ${canRedo ? "text-zinc-400 hover:bg-zinc-800 hover:text-white" : "text-zinc-600 cursor-not-allowed"}`}
-        title="Redo (Ctrl+Shift+Z)"
-      >
-        <Redo2 size={14} />
-      </button>
+      <div className="flex items-center gap-0.5">
+        <IconButton
+          onClick={() => {
+            const entry = useHistoryStore.getState().undo();
+            if (entry) applyMutation(entry.inverse, true);
+          }}
+          disabled={!canUndo}
+          title="Undo (Ctrl+Z)"
+        >
+          <Undo2 size={13} />
+        </IconButton>
+        <IconButton
+          onClick={() => {
+            const entry = useHistoryStore.getState().redo();
+            if (entry) applyMutation(entry.mutation, true);
+          }}
+          disabled={!canRedo}
+          title="Redo (Ctrl+Shift+Z)"
+        >
+          <Redo2 size={13} />
+        </IconButton>
+      </div>
 
-      <div className="mx-1 h-5 w-px bg-zinc-700" />
+      <Divider />
 
       {/* New Component */}
       <button
         onClick={() => setShowNewComponent(true)}
-        className="flex items-center gap-1 rounded-md bg-zinc-800 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-700 transition-colors"
+        className="inline-flex h-7 items-center gap-1.5  border border-zinc-800 bg-zinc-900 px-2.5 text-xs font-medium text-zinc-300 shadow-sm hover:bg-zinc-800 hover:text-white hover:border-zinc-700 transition-colors"
         title="Create new component"
       >
-        <Plus size={12} />
+        <Plus size={11} />
         Component
       </button>
 
@@ -112,10 +115,10 @@ export function Toolbar() {
 
       <button
         onClick={() => setShowDesignSystem(true)}
-        className="flex items-center gap-1 rounded-md bg-zinc-800 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-700 transition-colors"
+        className="inline-flex h-7 items-center gap-1.5  border border-zinc-800 bg-zinc-900 px-2.5 text-xs font-medium text-zinc-300 shadow-sm hover:bg-zinc-800 hover:text-white hover:border-zinc-700 transition-colors"
         title="Design System"
       >
-        <Palette size={12} />
+        <Palette size={11} />
         Design
       </button>
 
@@ -126,45 +129,31 @@ export function Toolbar() {
       <div className="flex-1" />
 
       {/* Mode toggle */}
-      <div className="flex rounded-md bg-zinc-800 p-0.5">
-        <button
-          onClick={() => setMode("edit")}
-          className={`flex items-center gap-1 rounded px-2 py-1 text-xs transition-colors ${
-            mode === "edit"
-              ? "bg-zinc-700 text-white"
-              : "text-zinc-400 hover:text-zinc-200"
-          }`}
-        >
-          <Pencil size={12} />
+      <div className="inline-flex items-center gap-0.5  border border-zinc-800 bg-zinc-900 p-0.5 shadow-sm">
+        <SegmentButton active={mode === "edit"} onClick={() => setMode("edit")}>
+          <Pencil size={11} />
           Edit
-        </button>
-        <button
-          onClick={() => setMode("preview")}
-          className={`flex items-center gap-1 rounded px-2 py-1 text-xs transition-colors ${
-            mode === "preview"
-              ? "bg-zinc-700 text-white"
-              : "text-zinc-400 hover:text-zinc-200"
-          }`}
-        >
-          <Eye size={12} />
+        </SegmentButton>
+        <SegmentButton active={mode === "preview"} onClick={() => setMode("preview")}>
+          <Eye size={11} />
           Preview
-        </button>
+        </SegmentButton>
       </div>
 
       {/* Device presets */}
-      <div className="flex items-center gap-0.5 rounded-md bg-zinc-800 p-0.5">
+      <div className="inline-flex items-center gap-0.5  border border-zinc-800 bg-zinc-900 p-0.5 shadow-sm">
         {([
-          { key: "desktop" as const, icon: <Monitor size={13} />, label: "Desktop" },
-          { key: "tablet" as const, icon: <Tablet size={13} />, label: "Tablet (768px)" },
-          { key: "mobile" as const, icon: <Smartphone size={13} />, label: "Mobile (375px)" },
+          { key: "desktop" as const, icon: <Monitor size={12} />, label: "Desktop" },
+          { key: "tablet" as const, icon: <Tablet size={12} />, label: "Tablet (768px)" },
+          { key: "mobile" as const, icon: <Smartphone size={12} />, label: "Mobile (375px)" },
         ]).map(({ key, icon, label }) => (
           <button
             key={key}
             onClick={() => setDevicePreset(key)}
-            className={`rounded p-1 transition-colors ${
+            className={`flex h-6 w-6 items-center justify-center  transition-colors ${
               devicePreset === key
-                ? "bg-zinc-700 text-white"
-                : "text-zinc-400 hover:text-zinc-200"
+                ? "bg-zinc-800 text-white shadow-sm"
+                : "text-zinc-500 hover:text-zinc-300"
             }`}
             title={label}
           >
@@ -173,5 +162,59 @@ export function Toolbar() {
         ))}
       </div>
     </div>
+  );
+}
+
+function Divider() {
+  return <div className="mx-1 h-5 w-px bg-zinc-800" />;
+}
+
+function IconButton({
+  children,
+  onClick,
+  disabled,
+  title,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+  title?: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      className={`flex h-7 w-7 items-center justify-center  transition-colors ${
+        disabled
+          ? "text-zinc-700 cursor-not-allowed"
+          : "text-zinc-400 hover:bg-zinc-900 hover:text-white"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function SegmentButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`inline-flex h-6 items-center gap-1  px-2 text-[11px] font-medium transition-colors ${
+        active
+          ? "bg-zinc-800 text-white shadow-sm"
+          : "text-zinc-500 hover:text-zinc-300"
+      }`}
+    >
+      {children}
+    </button>
   );
 }

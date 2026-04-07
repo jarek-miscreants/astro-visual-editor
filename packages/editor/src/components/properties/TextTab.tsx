@@ -26,7 +26,7 @@ export function TextTab({
       {/* Content editor */}
       {textContent !== null && (
         <div className="border-b border-zinc-800 px-3 py-3">
-          <div className="mb-2 text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">
+          <div className="mb-2 text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">
             Content
           </div>
           <TextContentEditor text={textContent} onTextChange={onTextChange} />
@@ -58,7 +58,7 @@ function TextContentEditor({
           (e.target as HTMLTextAreaElement).blur();
         }
       }}
-      className="w-full rounded border border-zinc-700 bg-zinc-800 px-2 py-1 text-xs text-zinc-200 outline-none focus:border-blue-500 resize-none"
+      className="w-full  border border-zinc-800 bg-zinc-900 px-2.5 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 resize-none transition-colors"
       rows={3}
     />
   );

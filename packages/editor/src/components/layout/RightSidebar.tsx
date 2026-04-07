@@ -6,9 +6,9 @@ export function RightSidebar() {
   const selectedElementInfo = useEditorStore((s) => s.selectedElementInfo);
 
   return (
-    <div className="flex h-full flex-col bg-zinc-900">
-      <div className="flex items-center border-b border-zinc-800 px-3 py-2">
-        <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+    <div className="flex h-full flex-col bg-zinc-950 border-l border-zinc-800">
+      <div className="flex h-10 items-center border-b border-zinc-800 px-3">
+        <span className="text-[11px] font-semibold text-zinc-200 tracking-tight">
           Properties
         </span>
       </div>
@@ -19,9 +19,11 @@ export function RightSidebar() {
             elementInfo={selectedElementInfo}
           />
         ) : (
-          <p className="px-3 py-4 text-xs text-zinc-500 text-center">
-            Select an element to edit its properties
-          </p>
+          <div className="flex h-full items-center justify-center px-6">
+            <p className="text-xs text-zinc-500 text-center leading-relaxed">
+              Select an element<br />to edit its properties
+            </p>
+          </div>
         )}
       </div>
     </div>

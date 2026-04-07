@@ -91,7 +91,7 @@ export function TailwindClassEditor({
 
       {/* Search input */}
       <div className="relative">
-        <div className="flex items-center gap-1 rounded border border-zinc-700 bg-zinc-800 px-2">
+        <div className="flex items-center gap-1  border border-zinc-700 bg-zinc-800 px-2">
           <Search size={11} className="text-zinc-500" />
           <input
             ref={inputRef}
@@ -106,7 +106,7 @@ export function TailwindClassEditor({
         </div>
 
         {showSuggestions && suggestions.length > 0 && (
-          <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-48 overflow-auto rounded border border-zinc-700 bg-zinc-800 py-1 shadow-lg">
+          <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-48 overflow-auto  border border-zinc-700 bg-zinc-800 py-1 shadow-lg">
             {suggestions.map((item, idx) => (
               <button
                 key={item.name}
@@ -122,7 +122,7 @@ export function TailwindClassEditor({
               >
                 {item.color && (
                   <span
-                    className="h-3 w-3 shrink-0 rounded-sm border border-zinc-600"
+                    className="h-3 w-3 shrink-0  border border-zinc-600"
                     style={{ backgroundColor: item.color }}
                   />
                 )}
@@ -169,7 +169,7 @@ function SmartClassChip({
   return (
     <div ref={ref} className="relative">
       <span
-        className={`group flex items-center gap-0.5 rounded px-1.5 py-0.5 font-mono text-[11px] transition-colors ${
+        className={`group flex items-center gap-0.5  px-1.5 py-0.5 font-mono text-[11px] transition-colors ${
           open
             ? "bg-blue-600/20 text-blue-300 border border-blue-500/40"
             : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700 border border-transparent"
@@ -188,14 +188,14 @@ function SmartClassChip({
             e.stopPropagation();
             onRemove();
           }}
-          className="ml-0.5 rounded-sm p-0.5 text-zinc-500 opacity-0 hover:text-red-400 group-hover:opacity-100"
+          className="ml-0.5  p-0.5 text-zinc-500 opacity-0 hover:text-red-400 group-hover:opacity-100"
         >
           <X size={8} />
         </button>
       </span>
 
       {open && (
-        <div className="absolute left-0 top-full z-50 mt-1 max-h-52 w-40 overflow-auto rounded border border-zinc-700 bg-zinc-800 py-1 shadow-lg">
+        <div className="absolute left-0 top-full z-50 mt-1 max-h-52 w-40 overflow-auto  border border-zinc-700 bg-zinc-800 py-1 shadow-lg">
           {alternatives.map((alt) => (
             <button
               key={alt.value}
@@ -214,7 +214,7 @@ function SmartClassChip({
             >
               {alt.color && (
                 <span
-                  className="h-3 w-3 shrink-0 rounded-sm border border-zinc-600"
+                  className="h-3 w-3 shrink-0  border border-zinc-600"
                   style={{ backgroundColor: alt.color }}
                 />
               )}

@@ -88,7 +88,7 @@ function ColorPicker({
         <div className="flex items-center gap-1">
           {currentHex && (
             <span
-              className="h-4 w-4 rounded border border-zinc-600"
+              className="h-4 w-4  border border-zinc-600"
               style={{ backgroundColor: currentHex }}
             />
           )}
@@ -100,30 +100,30 @@ function ColorPicker({
 
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full rounded bg-zinc-800 border border-zinc-700 px-2 py-1 text-[10px] text-zinc-400 hover:bg-zinc-700 text-left"
+        className="w-full  bg-zinc-800 border border-zinc-700 px-2 py-1 text-[10px] text-zinc-400 hover:bg-zinc-700 text-left"
       >
         {expanded ? "Close palette" : "Choose color..."}
       </button>
 
       {expanded && (
-        <div className="mt-1.5 rounded border border-zinc-700 bg-zinc-800 p-2">
+        <div className="mt-1.5  border border-zinc-700 bg-zinc-800 p-2">
           {/* Special values */}
           <div className="flex gap-1 mb-2">
             <button
               onClick={clearColor}
-              className="rounded px-1.5 py-0.5 text-[9px] bg-zinc-700 text-zinc-400 hover:bg-zinc-600"
+              className=" px-1.5 py-0.5 text-[9px] bg-zinc-700 text-zinc-400 hover:bg-zinc-600"
             >
               none
             </button>
             <button
               onClick={() => setColor(`${prefix}-white`)}
-              className="rounded px-1.5 py-0.5 text-[9px] bg-white text-zinc-900 border border-zinc-600"
+              className=" px-1.5 py-0.5 text-[9px] bg-white text-zinc-900 border border-zinc-600"
             >
               white
             </button>
             <button
               onClick={() => setColor(`${prefix}-black`)}
-              className="rounded px-1.5 py-0.5 text-[9px] bg-black text-white border border-zinc-600"
+              className=" px-1.5 py-0.5 text-[9px] bg-black text-white border border-zinc-600"
             >
               black
             </button>
@@ -141,7 +141,7 @@ function ColorPicker({
                     <button
                       key={shade}
                       onClick={() => setColor(cls)}
-                      className={`h-4 w-4 rounded-sm transition-transform ${
+                      className={`h-4 w-4  transition-transform ${
                         isActive ? "ring-2 ring-white scale-125 z-10" : "hover:scale-110"
                       }`}
                       style={{ backgroundColor: hex }}

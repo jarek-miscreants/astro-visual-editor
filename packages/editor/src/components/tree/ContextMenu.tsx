@@ -152,7 +152,7 @@ export function ContextMenu({ node, x, y, onClose }: ContextMenuProps) {
   return (
     <div
       ref={ref}
-      className="fixed z-[9999] min-w-[180px] rounded-lg border border-zinc-700 bg-zinc-800 py-1 shadow-xl"
+      className="fixed z-[9999] min-w-[180px]  border border-zinc-700 bg-zinc-800 py-1 shadow-xl"
       style={{ left: x, top: y }}
     >
       <MenuHeader label={`<${node.tagName}>`} />

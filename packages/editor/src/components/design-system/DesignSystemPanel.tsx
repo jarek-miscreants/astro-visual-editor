@@ -21,7 +21,7 @@ export function DesignSystemPanel({ onClose }: DesignSystemPanelProps) {
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-stretch bg-black/50">
-      <div className="m-4 flex flex-1 flex-col rounded-xl border border-zinc-700 bg-zinc-900 shadow-2xl overflow-hidden">
+      <div className="m-4 flex flex-1 flex-col  border border-zinc-700 bg-zinc-900 shadow-2xl overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
           <h2 className="text-sm font-semibold text-zinc-200">Design System</h2>
@@ -38,7 +38,7 @@ export function DesignSystemPanel({ onClose }: DesignSystemPanelProps) {
                   URL.revokeObjectURL(url);
                 }
               }}
-              className="flex items-center gap-1 rounded px-2 py-1 text-xs text-zinc-400 hover:bg-zinc-800 hover:text-white"
+              className="flex items-center gap-1  px-2 py-1 text-xs text-zinc-400 hover:bg-zinc-800 hover:text-white"
             >
               <Download size={12} />
               Export
@@ -60,12 +60,12 @@ export function DesignSystemPanel({ onClose }: DesignSystemPanelProps) {
                 };
                 input.click();
               }}
-              className="flex items-center gap-1 rounded px-2 py-1 text-xs text-zinc-400 hover:bg-zinc-800 hover:text-white"
+              className="flex items-center gap-1  px-2 py-1 text-xs text-zinc-400 hover:bg-zinc-800 hover:text-white"
             >
               <Upload size={12} />
               Import
             </button>
-            <button onClick={onClose} className="rounded p-1 text-zinc-400 hover:bg-zinc-800 hover:text-white">
+            <button onClick={onClose} className=" p-1 text-zinc-400 hover:bg-zinc-800 hover:text-white">
               <X size={14} />
             </button>
           </div>
@@ -189,7 +189,7 @@ function ColorsEditor({
                   if (!hex) return null;
                   return (
                     <div key={shade} className="flex flex-col items-center gap-0.5">
-                      <div className="h-8 w-8 rounded border border-zinc-700" style={{ backgroundColor: hex }} title={`${name}-${shade}: ${hex}`} />
+                      <div className="h-8 w-8  border border-zinc-700" style={{ backgroundColor: hex }} title={`${name}-${shade}: ${hex}`} />
                       <span className="text-[7px] text-zinc-600">{shade}</span>
                     </div>
                   );
@@ -210,7 +210,7 @@ function ColorsEditor({
           {customColorNames.map((name) => {
             const shades = (extend.colors || {})[name] || {};
             return (
-              <div key={name} className="mb-3 rounded-lg bg-zinc-800 p-3">
+              <div key={name} className="mb-3  bg-zinc-800 p-3">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-[11px] font-medium text-zinc-300 capitalize">{name}</span>
                   <button onClick={() => removeCustomColor(name)} className="text-zinc-500 hover:text-red-400">
@@ -228,7 +228,7 @@ function ColorsEditor({
                           newColors[name] = { ...newColors[name], [shade]: e.target.value };
                           onUpdateExtend({ ...extend, colors: newColors });
                         }}
-                        className="h-8 w-8 cursor-pointer rounded border border-zinc-600 bg-transparent p-0"
+                        className="h-8 w-8 cursor-pointer  border border-zinc-600 bg-transparent p-0"
                         title={`${name}-${shade}`}
                       />
                       <span className="text-[7px] text-zinc-600">{shade}</span>
@@ -247,13 +247,13 @@ function ColorsEditor({
           value={newColorName}
           onChange={(e) => setNewColorName(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
           placeholder="new-color-name"
-          className="rounded bg-zinc-800 border border-zinc-700 px-2 py-1 text-xs text-zinc-300 outline-none focus:border-blue-500 font-mono"
+          className=" bg-zinc-800 border border-zinc-700 px-2 py-1 text-xs text-zinc-300 outline-none focus:border-blue-500 font-mono"
           onKeyDown={(e) => e.key === "Enter" && addCustomColor()}
         />
         <button
           onClick={addCustomColor}
           disabled={!newColorName}
-          className="flex items-center gap-1 rounded bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-500 disabled:opacity-50"
+          className="flex items-center gap-1  bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-500 disabled:opacity-50"
         >
           <Plus size={11} />
           Add Color
@@ -323,7 +323,7 @@ function FontsEditor({
       <div className="space-y-2">
         <div className="text-[10px] font-semibold text-zinc-500 uppercase">Defaults</div>
         {["sans", "serif", "mono"].map((name) => (
-          <div key={name} className="flex items-center gap-3 rounded bg-zinc-800/50 px-3 py-2">
+          <div key={name} className="flex items-center gap-3  bg-zinc-800/50 px-3 py-2">
             <code className="w-20 text-[11px] text-blue-400">font-{name}</code>
             <span className="text-xs text-zinc-400" style={{ fontFamily: name === "mono" ? "monospace" : name === "serif" ? "serif" : "sans-serif" }}>
               The quick brown fox jumps over the lazy dog
@@ -339,7 +339,7 @@ function FontsEditor({
             Custom <span className="text-zinc-600 normal-case">(in tailwind.config.mjs)</span>
           </div>
           {Object.entries(fontFamily).map(([name, families]) => (
-            <div key={name} className="rounded-lg bg-zinc-800 p-3 space-y-2">
+            <div key={name} className=" bg-zinc-800 p-3 space-y-2">
               <div className="flex items-center justify-between">
                 <code className="text-[11px] text-blue-400">font-{name}</code>
                 <button onClick={() => removeFont(name)} className="text-zinc-500 hover:text-red-400">
@@ -350,7 +350,7 @@ function FontsEditor({
                 value={Array.isArray(families) ? families.join(", ") : String(families)}
                 onChange={(e) => updateFont(name, e.target.value)}
                 placeholder="Font Name, fallback"
-                className="w-full rounded bg-zinc-900 border border-zinc-700 px-2 py-1 text-xs text-zinc-300 outline-none focus:border-blue-500 font-mono"
+                className="w-full  bg-zinc-900 border border-zinc-700 px-2 py-1 text-xs text-zinc-300 outline-none focus:border-blue-500 font-mono"
               />
               <div className="text-xs text-zinc-400" style={{ fontFamily: Array.isArray(families) ? families.join(", ") : String(families) }}>
                 The quick brown fox jumps over the lazy dog
@@ -362,7 +362,7 @@ function FontsEditor({
                   <button
                     key={font}
                     onClick={() => updateFont(name, `${font}, sans-serif`)}
-                    className="rounded bg-zinc-900 px-1.5 py-0.5 text-[9px] text-zinc-500 hover:bg-zinc-700 hover:text-zinc-300"
+                    className=" bg-zinc-900 px-1.5 py-0.5 text-[9px] text-zinc-500 hover:bg-zinc-700 hover:text-zinc-300"
                   >
                     {font}
                   </button>
@@ -379,13 +379,13 @@ function FontsEditor({
           value={newFontName}
           onChange={(e) => setNewFontName(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ""))}
           placeholder="fontname"
-          className="rounded bg-zinc-800 border border-zinc-700 px-2 py-1 text-xs text-zinc-300 outline-none focus:border-blue-500 font-mono"
+          className=" bg-zinc-800 border border-zinc-700 px-2 py-1 text-xs text-zinc-300 outline-none focus:border-blue-500 font-mono"
           onKeyDown={(e) => e.key === "Enter" && addFont()}
         />
         <button
           onClick={addFont}
           disabled={!newFontName}
-          className="flex items-center gap-1 rounded bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-500 disabled:opacity-50"
+          className="flex items-center gap-1  bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-500 disabled:opacity-50"
         >
           <Plus size={11} />
           Add Font
@@ -393,14 +393,14 @@ function FontsEditor({
       </div>
 
       {/* Font loading hint */}
-      <div className="rounded-lg border border-zinc-700 bg-zinc-800/50 p-3">
+      <div className=" border border-zinc-700 bg-zinc-800/50 p-3">
         <div className="text-[10px] font-semibold text-zinc-400 mb-1">Loading Fonts</div>
         <p className="text-[11px] text-zinc-500">
           Add a Google Fonts <code className="text-zinc-400">&lt;link&gt;</code> to your{" "}
           <code className="text-zinc-400">Layout.astro</code> &lt;head&gt; to load custom fonts:
         </p>
         {Object.entries(fontFamily).length > 0 && (
-          <pre className="mt-2 rounded bg-zinc-900 p-2 text-[10px] text-zinc-400 overflow-x-auto">
+          <pre className="mt-2  bg-zinc-900 p-2 text-[10px] text-zinc-400 overflow-x-auto">
             {Object.entries(fontFamily).map(([, families]) => {
               const primary = Array.isArray(families) ? families[0] : String(families).split(",")[0].trim();
               if (!primary || primary === "sans-serif" || primary === "serif" || primary === "monospace") return null;
@@ -425,7 +425,7 @@ function TypeScalePreview({ theme }: { theme: any }) {
         </h3>
         <div className="space-y-1">
           {Object.entries(theme.fontSize as Record<string, string>).map(([name, value]) => (
-            <div key={name} className="flex items-baseline gap-3 rounded px-2 py-1.5 hover:bg-zinc-800/50">
+            <div key={name} className="flex items-baseline gap-3  px-2 py-1.5 hover:bg-zinc-800/50">
               <code className="w-10 shrink-0 text-right text-[10px] text-blue-400">{name}</code>
               <span className="flex-1 truncate text-zinc-200" style={{ fontSize: value }}>
                 The quick brown fox
@@ -443,7 +443,7 @@ function TypeScalePreview({ theme }: { theme: any }) {
         </h3>
         <div className="space-y-1">
           {Object.entries(theme.fontWeight as Record<string, string>).map(([name, value]) => (
-            <div key={name} className="flex items-baseline gap-3 rounded px-2 py-1.5 hover:bg-zinc-800/50">
+            <div key={name} className="flex items-baseline gap-3  px-2 py-1.5 hover:bg-zinc-800/50">
               <code className="w-20 shrink-0 text-right text-[10px] text-blue-400">{name}</code>
               <span className="flex-1 text-zinc-200" style={{ fontWeight: value }}>
                 The quick brown fox
@@ -471,7 +471,7 @@ function SpacingEditor({ theme }: { theme: any }) {
           <div key={name} className="flex items-center gap-3">
             <span className="w-8 text-right text-[10px] font-mono text-zinc-500">{name}</span>
             <div
-              className="h-4 rounded bg-blue-500/30 border border-blue-500/50 min-w-[2px]"
+              className="h-4  bg-blue-500/30 border border-blue-500/50 min-w-[2px]"
               style={{ width: `min(${value}, 100%)` }}
             />
             <span className="text-[10px] text-zinc-600">{value as string}</span>
@@ -499,7 +499,7 @@ function TokenEditor({
   return (
     <div className="space-y-6">
       {/* Info banner */}
-      <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-3">
+      <div className=" border border-blue-500/20 bg-blue-500/5 p-3">
         <p className="text-[11px] text-blue-300">
           Tokens are synced to your Tailwind config. Color tokens become usable classes
           (e.g., <code className="font-mono">bg-primary</code>, <code className="font-mono">text-error</code>).
@@ -515,16 +515,16 @@ function TokenEditor({
           {Object.entries(tokens.colors).map(([name, value]) => {
             const hex = resolveHex(value);
             return (
-              <div key={name} className="flex items-center gap-2 rounded bg-zinc-800 px-2 py-1.5">
+              <div key={name} className="flex items-center gap-2  bg-zinc-800 px-2 py-1.5">
                 <div
-                  className="h-5 w-5 shrink-0 rounded border border-zinc-600"
+                  className="h-5 w-5 shrink-0  border border-zinc-600"
                   style={{ backgroundColor: hex || "#888" }}
                 />
                 <span className="w-20 shrink-0 text-[10px] font-medium text-zinc-300">{name}</span>
                 <input
                   value={value}
                   onChange={(e) => onUpdate({ ...tokens, colors: { ...tokens.colors, [name]: e.target.value } })}
-                  className="flex-1 rounded bg-zinc-900 border border-zinc-700 px-2 py-0.5 text-[10px] text-zinc-300 outline-none font-mono focus:border-blue-500"
+                  className="flex-1  bg-zinc-900 border border-zinc-700 px-2 py-0.5 text-[10px] text-zinc-300 outline-none font-mono focus:border-blue-500"
                   placeholder="blue-600"
                 />
                 <code className="shrink-0 text-[9px] text-zinc-600">bg-{name}</code>
@@ -547,7 +547,7 @@ function TokenEditor({
             value={newColorName}
             onChange={(e) => setNewColorName(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
             placeholder="token-name"
-            className="rounded bg-zinc-800 border border-zinc-700 px-2 py-1 text-[10px] text-zinc-300 outline-none font-mono focus:border-blue-500"
+            className=" bg-zinc-800 border border-zinc-700 px-2 py-1 text-[10px] text-zinc-300 outline-none font-mono focus:border-blue-500"
             onKeyDown={(e) => {
               if (e.key === "Enter" && newColorName) {
                 onUpdate({ ...tokens, colors: { ...tokens.colors, [newColorName]: "gray-500" } });
@@ -563,7 +563,7 @@ function TokenEditor({
               }
             }}
             disabled={!newColorName}
-            className="flex items-center gap-1 rounded bg-zinc-700 px-2 py-1 text-[10px] text-zinc-300 hover:bg-zinc-600 disabled:opacity-50"
+            className="flex items-center gap-1  bg-zinc-700 px-2 py-1 text-[10px] text-zinc-300 hover:bg-zinc-600 disabled:opacity-50"
           >
             <Plus size={10} /> Add
           </button>
@@ -577,7 +577,7 @@ function TokenEditor({
         </h3>
         <div className="space-y-1.5">
           {Object.entries(tokens.typography.scale).map(([name, style]) => (
-            <div key={name} className="flex items-center gap-1.5 rounded bg-zinc-800 px-2 py-1.5">
+            <div key={name} className="flex items-center gap-1.5  bg-zinc-800 px-2 py-1.5">
               <span className="w-14 shrink-0 text-[10px] font-medium text-zinc-300">{name}</span>
               <input
                 value={style.size}
@@ -586,7 +586,7 @@ function TokenEditor({
                   s[name] = { ...style, size: e.target.value };
                   onUpdate({ ...tokens, typography: { ...tokens.typography, scale: s } });
                 }}
-                className="flex-1 rounded bg-zinc-900 border border-zinc-700 px-1.5 py-0.5 text-[10px] text-zinc-300 outline-none font-mono focus:border-blue-500"
+                className="flex-1  bg-zinc-900 border border-zinc-700 px-1.5 py-0.5 text-[10px] text-zinc-300 outline-none font-mono focus:border-blue-500"
                 placeholder="text-base"
               />
               <input
@@ -596,7 +596,7 @@ function TokenEditor({
                   s[name] = { ...style, weight: e.target.value };
                   onUpdate({ ...tokens, typography: { ...tokens.typography, scale: s } });
                 }}
-                className="w-24 rounded bg-zinc-900 border border-zinc-700 px-1.5 py-0.5 text-[10px] text-zinc-300 outline-none font-mono focus:border-blue-500"
+                className="w-24  bg-zinc-900 border border-zinc-700 px-1.5 py-0.5 text-[10px] text-zinc-300 outline-none font-mono focus:border-blue-500"
                 placeholder="font-bold"
               />
               <input
@@ -606,7 +606,7 @@ function TokenEditor({
                   s[name] = { ...style, lineHeight: e.target.value };
                   onUpdate({ ...tokens, typography: { ...tokens.typography, scale: s } });
                 }}
-                className="w-24 rounded bg-zinc-900 border border-zinc-700 px-1.5 py-0.5 text-[10px] text-zinc-300 outline-none font-mono focus:border-blue-500"
+                className="w-24  bg-zinc-900 border border-zinc-700 px-1.5 py-0.5 text-[10px] text-zinc-300 outline-none font-mono focus:border-blue-500"
                 placeholder="leading-normal"
               />
               <button
@@ -627,7 +627,7 @@ function TokenEditor({
             value={newTypeName}
             onChange={(e) => setNewTypeName(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
             placeholder="style-name"
-            className="rounded bg-zinc-800 border border-zinc-700 px-2 py-1 text-[10px] text-zinc-300 outline-none font-mono focus:border-blue-500"
+            className=" bg-zinc-800 border border-zinc-700 px-2 py-1 text-[10px] text-zinc-300 outline-none font-mono focus:border-blue-500"
             onKeyDown={(e) => {
               if (e.key === "Enter" && newTypeName) {
                 const s = { ...tokens.typography.scale };
@@ -647,7 +647,7 @@ function TokenEditor({
               }
             }}
             disabled={!newTypeName}
-            className="flex items-center gap-1 rounded bg-zinc-700 px-2 py-1 text-[10px] text-zinc-300 hover:bg-zinc-600 disabled:opacity-50"
+            className="flex items-center gap-1  bg-zinc-700 px-2 py-1 text-[10px] text-zinc-300 hover:bg-zinc-600 disabled:opacity-50"
           >
             <Plus size={10} /> Add
           </button>
@@ -661,12 +661,12 @@ function TokenEditor({
         </h3>
         <div className="space-y-1.5">
           {Object.entries(tokens.spacing).map(([name, value]) => (
-            <div key={name} className="flex items-center gap-2 rounded bg-zinc-800 px-2 py-1.5">
+            <div key={name} className="flex items-center gap-2  bg-zinc-800 px-2 py-1.5">
               <span className="w-16 shrink-0 text-[10px] font-medium text-zinc-300">{name}</span>
               <input
                 value={value}
                 onChange={(e) => onUpdate({ ...tokens, spacing: { ...tokens.spacing, [name]: e.target.value } })}
-                className="flex-1 rounded bg-zinc-900 border border-zinc-700 px-2 py-0.5 text-[10px] text-zinc-300 outline-none font-mono focus:border-blue-500"
+                className="flex-1  bg-zinc-900 border border-zinc-700 px-2 py-0.5 text-[10px] text-zinc-300 outline-none font-mono focus:border-blue-500"
               />
               <button
                 onClick={() => {
@@ -686,7 +686,7 @@ function TokenEditor({
             value={newSpacingName}
             onChange={(e) => setNewSpacingName(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
             placeholder="token-name"
-            className="rounded bg-zinc-800 border border-zinc-700 px-2 py-1 text-[10px] text-zinc-300 outline-none font-mono focus:border-blue-500"
+            className=" bg-zinc-800 border border-zinc-700 px-2 py-1 text-[10px] text-zinc-300 outline-none font-mono focus:border-blue-500"
             onKeyDown={(e) => {
               if (e.key === "Enter" && newSpacingName) {
                 onUpdate({ ...tokens, spacing: { ...tokens.spacing, [newSpacingName]: "p-4" } });
@@ -702,7 +702,7 @@ function TokenEditor({
               }
             }}
             disabled={!newSpacingName}
-            className="flex items-center gap-1 rounded bg-zinc-700 px-2 py-1 text-[10px] text-zinc-300 hover:bg-zinc-600 disabled:opacity-50"
+            className="flex items-center gap-1  bg-zinc-700 px-2 py-1 text-[10px] text-zinc-300 hover:bg-zinc-600 disabled:opacity-50"
           >
             <Plus size={10} /> Add
           </button>
@@ -716,12 +716,12 @@ function TokenEditor({
         </h3>
         <div className="space-y-1.5">
           {Object.entries(tokens.radii).map(([name, value]) => (
-            <div key={name} className="flex items-center gap-2 rounded bg-zinc-800 px-2 py-1.5">
+            <div key={name} className="flex items-center gap-2  bg-zinc-800 px-2 py-1.5">
               <span className="w-16 shrink-0 text-[10px] font-medium text-zinc-300">{name}</span>
               <input
                 value={value}
                 onChange={(e) => onUpdate({ ...tokens, radii: { ...tokens.radii, [name]: e.target.value } })}
-                className="flex-1 rounded bg-zinc-900 border border-zinc-700 px-2 py-0.5 text-[10px] text-zinc-300 outline-none font-mono focus:border-blue-500"
+                className="flex-1  bg-zinc-900 border border-zinc-700 px-2 py-0.5 text-[10px] text-zinc-300 outline-none font-mono focus:border-blue-500"
               />
             </div>
           ))}
@@ -735,12 +735,12 @@ function TokenEditor({
         </h3>
         <div className="space-y-1.5">
           {Object.entries(tokens.shadows).map(([name, value]) => (
-            <div key={name} className="flex items-center gap-2 rounded bg-zinc-800 px-2 py-1.5">
+            <div key={name} className="flex items-center gap-2  bg-zinc-800 px-2 py-1.5">
               <span className="w-16 shrink-0 text-[10px] font-medium text-zinc-300">{name}</span>
               <input
                 value={value}
                 onChange={(e) => onUpdate({ ...tokens, shadows: { ...tokens.shadows, [name]: e.target.value } })}
-                className="flex-1 rounded bg-zinc-900 border border-zinc-700 px-2 py-0.5 text-[10px] text-zinc-300 outline-none font-mono focus:border-blue-500"
+                className="flex-1  bg-zinc-900 border border-zinc-700 px-2 py-0.5 text-[10px] text-zinc-300 outline-none font-mono focus:border-blue-500"
               />
             </div>
           ))}

@@ -27,10 +27,10 @@ export function AddElementPanel({ onSelect, onClose }: AddElementPanelProps) {
   const query = search.toLowerCase();
 
   return (
-    <div className="w-64 max-h-96 overflow-auto rounded-lg border border-zinc-700 bg-zinc-800 shadow-xl">
+    <div className="w-64 max-h-96 overflow-auto  border border-zinc-700 bg-zinc-800 shadow-xl">
       {/* Search */}
       <div className="sticky top-0 z-10 border-b border-zinc-700 bg-zinc-800 p-2">
-        <div className="flex items-center gap-1 rounded border border-zinc-600 bg-zinc-900 px-2">
+        <div className="flex items-center gap-1  border border-zinc-600 bg-zinc-900 px-2">
           <Search size={11} className="text-zinc-500" />
           <input
             value={search}
@@ -58,7 +58,7 @@ export function AddElementPanel({ onSelect, onClose }: AddElementPanelProps) {
                   <button
                     key={comp.path}
                     onClick={() => onSelect(`<${name} />`)}
-                    className="flex w-full items-center gap-2 rounded px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-700"
+                    className="flex w-full items-center gap-2  px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-700"
                   >
                     <Component size={11} className="text-cyan-400" />
                     <span className="font-mono">{name}</span>
@@ -85,7 +85,7 @@ export function AddElementPanel({ onSelect, onClose }: AddElementPanelProps) {
                 <button
                   key={template.tag + template.label}
                   onClick={() => onSelect(templateToHtml(template))}
-                  className="flex w-full items-center gap-2 rounded px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-700"
+                  className="flex w-full items-center gap-2  px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-700"
                 >
                   <span className="font-mono text-blue-400">&lt;{template.tag}&gt;</span>
                   <span className="text-zinc-500">{template.label}</span>

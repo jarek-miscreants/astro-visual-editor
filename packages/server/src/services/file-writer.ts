@@ -19,16 +19,24 @@ export async function applyMutation(
         if (!node) return { success: false, error: `Node ${mutation.nodeId} not found` };
 
         const tagStart = node.position.start.offset;
-        const tagSource = source.slice(tagStart);
+        // CRITICAL: Limit search to the opening tag only — find the first `>`
+        // that's not inside a quoted attribute value. Otherwise the regex would
+        // match a child element's class attribute and corrupt the file.
+        const openTagEnd = findOpenTagEnd(source, tagStart);
+        if (openTagEnd === -1) {
+          return { success: false, error: `Could not find opening tag end for ${node.tagName}` };
+        }
+        const openTagSource = source.slice(tagStart, openTagEnd);
 
-        // Find the class attribute in the tag
-        const classMatch = tagSource.match(
-          /class\s*=\s*(?:"([^"]*)"|'([^']*)'|{([^}]*)})/
+        // Find the class attribute within the opening tag only
+        const classMatch = openTagSource.match(
+          /\sclass\s*=\s*(?:"([^"]*)"|'([^']*)'|\{([^}]*)\})/
         );
 
         if (classMatch) {
-          const attrStart = tagStart + classMatch.index!;
-          const fullMatch = classMatch[0];
+          // +1 to skip the leading whitespace we matched
+          const attrStart = tagStart + classMatch.index! + 1;
+          const fullMatch = classMatch[0].trimStart();
           const newAttr = `class="${mutation.classes}"`;
           s.overwrite(attrStart, attrStart + fullMatch.length, newAttr);
         } else {
@@ -156,15 +164,21 @@ export async function applyMutation(
         const node = nodeMap.get(mutation.nodeId);
         if (!node) return { success: false, error: `Node ${mutation.nodeId} not found` };
 
+        // Validate that the node's source actually looks like an HTML element
+        const validatedRange = validateElementRange(source, node);
+        if (!validatedRange) {
+          return { success: false, error: `Could not validate range for ${node.tagName}` };
+        }
+
         // Remove the element including leading whitespace on the line
-        let removeStart = node.position.start.offset;
+        let removeStart = validatedRange.start;
         const lineStart = source.lastIndexOf("\n", removeStart);
         const beforeOnLine = source.slice(lineStart + 1, removeStart);
         if (beforeOnLine.trim() === "") {
           removeStart = lineStart + 1;
         }
 
-        let removeEnd = node.position.end.offset;
+        let removeEnd = validatedRange.end;
         // Also remove trailing newline if present
         if (source[removeEnd] === "\n") {
           removeEnd++;
@@ -180,20 +194,23 @@ export async function applyMutation(
         if (!node) return { success: false, error: `Node ${mutation.nodeId} not found` };
         if (!newParent) return { success: false, error: `Target parent ${mutation.newParentId} not found` };
 
+        // Validate the node's source range before extracting/removing
+        const validatedRange = validateElementRange(source, node);
+        if (!validatedRange) {
+          return { success: false, error: `Could not validate range for ${node.tagName}` };
+        }
+
         // Extract the element text
-        const elementText = source.slice(
-          node.position.start.offset,
-          node.position.end.offset
-        );
+        const elementText = source.slice(validatedRange.start, validatedRange.end);
 
         // Remove from old position
-        let removeStart = node.position.start.offset;
+        let removeStart = validatedRange.start;
         const lineStart = source.lastIndexOf("\n", removeStart);
         const beforeOnLine = source.slice(lineStart + 1, removeStart);
         if (beforeOnLine.trim() === "") {
           removeStart = lineStart + 1;
         }
-        let removeEnd = node.position.end.offset;
+        let removeEnd = validatedRange.end;
         if (source[removeEnd] === "\n") removeEnd++;
         s.remove(removeStart, removeEnd);
 
@@ -238,6 +255,71 @@ export async function applyMutation(
   } catch (err: any) {
     return { success: false, error: err.message };
   }
+}
+
+/**
+ * Validate and correct an element's source range from the AST.
+ * The Astro compiler's position.end can be off by one in some cases,
+ * pointing to characters of the parent's closing tag. This function
+ * verifies the start matches `<{tagName}` and end is `>` or self-closing.
+ */
+function validateElementRange(
+  source: string,
+  node: { tagName: string; position: { start: { offset: number }; end: { offset: number } } }
+): { start: number; end: number } | null {
+  const start = node.position.start.offset;
+  let end = node.position.end.offset;
+
+  // Validate start: must be `<{tagName}` (case-insensitive)
+  const expectedStart = `<${node.tagName}`;
+  const actualStart = source.slice(start, start + expectedStart.length);
+  if (actualStart.toLowerCase() !== expectedStart.toLowerCase()) {
+    // Try to find the actual element start nearby (within 5 chars)
+    for (let offset = -3; offset <= 3; offset++) {
+      const probe = source.slice(start + offset, start + offset + expectedStart.length);
+      if (probe.toLowerCase() === expectedStart.toLowerCase()) {
+        return validateElementRange(source, {
+          tagName: node.tagName,
+          position: { start: { offset: start + offset }, end: { offset: end } },
+        });
+      }
+    }
+    return null;
+  }
+
+  // Validate end: should be the character after `>`
+  // Check the character at end-1 — should be `>`
+  if (source[end - 1] !== ">") {
+    // Search forward for `>` (within 10 chars) or backward
+    let found = false;
+    for (let offset = -2; offset <= 10; offset++) {
+      if (source[end + offset - 1] === ">") {
+        end = end + offset;
+        found = true;
+        break;
+      }
+    }
+    if (!found) return null;
+  }
+
+  // For non-self-closing elements, verify the element ends with `</tagName>`
+  // (unless it's a void element like <img />)
+  const VOID_ELEMENTS = new Set(["img", "input", "br", "hr", "meta", "link", "area", "base", "col", "embed", "source", "track", "wbr", "slot"]);
+  const isVoid = VOID_ELEMENTS.has(node.tagName.toLowerCase());
+  const isSelfClosing = source.slice(end - 2, end) === "/>";
+
+  if (!isVoid && !isSelfClosing) {
+    const expectedClose = `</${node.tagName}>`;
+    const actualClose = source.slice(end - expectedClose.length, end);
+    if (actualClose.toLowerCase() !== expectedClose.toLowerCase()) {
+      // Search nearby for the actual closing tag
+      const idx = source.indexOf(expectedClose, end - expectedClose.length - 5);
+      if (idx === -1 || idx > end + 5) return null;
+      end = idx + expectedClose.length;
+    }
+  }
+
+  return { start, end };
 }
 
 /** Find the end of the opening tag (position of '>') */

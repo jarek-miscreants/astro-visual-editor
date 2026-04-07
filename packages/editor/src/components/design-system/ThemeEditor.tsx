@@ -203,7 +203,7 @@ export function ThemeEditor({ cssTheme, version, onSave }: ThemeEditorProps) {
   return (
     <div className="space-y-6">
       {/* Info */}
-      <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-3">
+      <div className=" border border-blue-500/20 bg-blue-500/5 p-3">
         <div className="flex items-start gap-2">
           <Info size={14} className="shrink-0 text-blue-400 mt-0.5" />
           <div className="text-[11px] text-blue-300 space-y-1">
@@ -234,20 +234,20 @@ export function ThemeEditor({ cssTheme, version, onSave }: ThemeEditorProps) {
               {existing.map(({ key, value }) => {
                 const example = cat.examples.find((e) => e.key === key);
                 return (
-                  <div key={key} className="flex items-center gap-1.5 rounded bg-zinc-800 px-2 py-1.5">
+                  <div key={key} className="flex items-center gap-1.5  bg-zinc-800 px-2 py-1.5">
                     {key.startsWith("color") && (
                       <input
                         type="color"
                         value={value}
                         onChange={(e) => updateVar(key, e.target.value)}
-                        className="h-5 w-5 shrink-0 cursor-pointer rounded border border-zinc-600 bg-transparent p-0"
+                        className="h-5 w-5 shrink-0 cursor-pointer  border border-zinc-600 bg-transparent p-0"
                       />
                     )}
                     <code className="shrink-0 text-[10px] text-zinc-400">--{key}</code>
                     <input
                       value={value}
                       onChange={(e) => updateVar(key, e.target.value)}
-                      className="flex-1 rounded bg-zinc-900 border border-zinc-700 px-1.5 py-0.5 text-[10px] text-zinc-300 outline-none font-mono focus:border-blue-500"
+                      className="flex-1  bg-zinc-900 border border-zinc-700 px-1.5 py-0.5 text-[10px] text-zinc-300 outline-none font-mono focus:border-blue-500"
                     />
                     {example && (
                       <code className="shrink-0 text-[9px] text-zinc-600">{example.hint}</code>
@@ -269,7 +269,7 @@ export function ThemeEditor({ cssTheme, version, onSave }: ThemeEditorProps) {
                     <button
                       key={e.key}
                       onClick={() => addFromExample(e.key, e.value)}
-                      className="rounded bg-zinc-800/60 border border-zinc-700/50 border-dashed px-1.5 py-0.5 text-[9px] text-zinc-500 hover:bg-zinc-800 hover:text-zinc-400 hover:border-zinc-600"
+                      className=" bg-zinc-800/60 border border-zinc-700/50 border-dashed px-1.5 py-0.5 text-[9px] text-zinc-500 hover:bg-zinc-800 hover:text-zinc-400 hover:border-zinc-600"
                     >
                       + {e.key.replace(cat.prefix + "-", "")}
                     </button>
@@ -286,12 +286,12 @@ export function ThemeEditor({ cssTheme, version, onSave }: ThemeEditorProps) {
           <h3 className="mb-2 text-xs font-semibold text-zinc-300">Other</h3>
           <div className="space-y-1">
             {uncategorized.map(({ key, value }) => (
-              <div key={key} className="flex items-center gap-1.5 rounded bg-zinc-800 px-2 py-1.5">
+              <div key={key} className="flex items-center gap-1.5  bg-zinc-800 px-2 py-1.5">
                 <code className="shrink-0 text-[10px] text-zinc-400">--{key}</code>
                 <input
                   value={value}
                   onChange={(e) => updateVar(key, e.target.value)}
-                  className="flex-1 rounded bg-zinc-900 border border-zinc-700 px-1.5 py-0.5 text-[10px] text-zinc-300 outline-none font-mono focus:border-blue-500"
+                  className="flex-1  bg-zinc-900 border border-zinc-700 px-1.5 py-0.5 text-[10px] text-zinc-300 outline-none font-mono focus:border-blue-500"
                 />
                 <button onClick={() => removeVar(key)} className="shrink-0 text-zinc-600 hover:text-red-400">
                   <Trash2 size={10} />
@@ -311,19 +311,19 @@ export function ThemeEditor({ cssTheme, version, onSave }: ThemeEditorProps) {
             value={newKey}
             onChange={(e) => setNewKey(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
             placeholder="variable-name"
-            className="flex-1 rounded bg-zinc-800 border border-zinc-700 px-2 py-1 text-[10px] text-zinc-300 outline-none font-mono focus:border-blue-500"
+            className="flex-1  bg-zinc-800 border border-zinc-700 px-2 py-1 text-[10px] text-zinc-300 outline-none font-mono focus:border-blue-500"
           />
           <input
             value={newValue}
             onChange={(e) => setNewValue(e.target.value)}
             placeholder="value"
-            className="flex-1 rounded bg-zinc-800 border border-zinc-700 px-2 py-1 text-[10px] text-zinc-300 outline-none font-mono focus:border-blue-500"
+            className="flex-1  bg-zinc-800 border border-zinc-700 px-2 py-1 text-[10px] text-zinc-300 outline-none font-mono focus:border-blue-500"
             onKeyDown={(e) => e.key === "Enter" && addVar(newKey, newValue)}
           />
           <button
             onClick={() => addVar(newKey, newValue)}
             disabled={!newKey}
-            className="flex items-center gap-1 rounded bg-zinc-700 px-2 py-1 text-[10px] text-zinc-300 hover:bg-zinc-600 disabled:opacity-50"
+            className="flex items-center gap-1  bg-zinc-700 px-2 py-1 text-[10px] text-zinc-300 hover:bg-zinc-600 disabled:opacity-50"
           >
             <Plus size={10} />
           </button>
@@ -334,7 +334,7 @@ export function ThemeEditor({ cssTheme, version, onSave }: ThemeEditorProps) {
       <button
         onClick={handleSave}
         disabled={saving}
-        className="w-full rounded-lg bg-blue-600 py-2 text-xs font-medium text-white hover:bg-blue-500 disabled:opacity-50 transition-colors"
+        className="w-full  bg-blue-600 py-2 text-xs font-medium text-white hover:bg-blue-500 disabled:opacity-50 transition-colors"
       >
         {saving ? "Saving..." : "Save to Tailwind Config"}
       </button>

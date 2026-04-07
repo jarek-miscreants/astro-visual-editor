@@ -181,7 +181,7 @@ export function ElementTree({ nodes, depth }: ElementTreeProps) {
 
       <DragOverlay dropAnimation={null}>
         {draggedNode && (
-          <div className="rounded bg-blue-600/20 border border-blue-500/40 px-2 py-1 text-xs text-blue-300 font-mono shadow-lg">
+          <div className=" bg-blue-600/20 border border-blue-500/40 px-2 py-1 text-xs text-blue-300 font-mono shadow-lg">
             &lt;{draggedNode.tagName}&gt;
             {draggedNode.classes && (
               <span className="ml-1 text-zinc-500">
@@ -208,7 +208,8 @@ function TreeNode({
   dropTarget: DropTarget | null;
   draggedNodeId: string | null;
 }) {
-  const [expanded, setExpanded] = useState(depth < 2);
+  // Components default to expanded so the slot placeholder is visible
+  const [expanded, setExpanded] = useState(depth < 2 || node.isComponent);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const selectedNodeId = useEditorStore((s) => s.selectedNodeId);
   const hoveredNodeId = useEditorStore((s) => s.hoveredNodeId);
@@ -216,6 +217,9 @@ function TreeNode({
   const setCurrentFile = useEditorStore((s) => s.setCurrentFile);
   const files = useEditorStore((s) => s.files);
   const nodeRef = useRef<HTMLDivElement>(null);
+
+  // Components have a virtual slot child even when empty
+  const hasSlot = node.isComponent && node.children.length === 0;
 
   // Auto-expand if a descendant is selected
   const hasSelectedDescendant = selectedNodeId
@@ -273,7 +277,7 @@ function TreeNode({
       {/* Drop indicator: before */}
       {dropPosition === "before" && (
         <div
-          className="h-0.5 bg-blue-500 rounded-full mx-1"
+          className="h-0.5 bg-blue-500  mx-1"
           style={{ marginLeft: `${depth * 12 + 4}px` }}
         />
       )}
@@ -281,7 +285,7 @@ function TreeNode({
       <div
         ref={nodeRef}
         data-tve-node-id={node.nodeId}
-        className={`group flex cursor-pointer items-center gap-1 rounded px-1 py-0.5 text-xs transition-colors ${
+        className={`group flex cursor-pointer items-center gap-1  px-1 py-0.5 text-xs transition-colors ${
           isDragging
             ? "opacity-30"
             : isSelected
@@ -319,7 +323,7 @@ function TreeNode({
         <DragHandle nodeId={node.nodeId} />
 
         {/* Expand toggle */}
-        {hasChildren ? (
+        {hasChildren || hasSlot ? (
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -348,14 +352,14 @@ function TreeNode({
 
         {/* Dynamic badge */}
         {node.isDynamic && (
-          <span className="ml-auto shrink-0 rounded bg-purple-900/40 px-1 text-[9px] text-purple-400">
+          <span className="ml-auto shrink-0  bg-purple-900/40 px-1 text-[9px] text-purple-400">
             expr
           </span>
         )}
 
         {/* Component badge */}
         {node.isComponent && (
-          <span className="ml-auto shrink-0 rounded bg-cyan-900/40 px-1 text-[9px] text-cyan-400">
+          <span className="ml-auto shrink-0  bg-cyan-900/40 px-1 text-[9px] text-cyan-400">
             comp
           </span>
         )}
@@ -364,7 +368,7 @@ function TreeNode({
       {/* Drop indicator: after */}
       {dropPosition === "after" && (
         <div
-          className="h-0.5 bg-blue-500 rounded-full mx-1"
+          className="h-0.5 bg-blue-500  mx-1"
           style={{ marginLeft: `${depth * 12 + 4}px` }}
         />
       )}
@@ -425,7 +429,7 @@ function SlotPlaceholder({ nodeId, depth, slotName }: { nodeId: string; depth: n
   return (
     <div ref={setNodeRef}>
       <div
-        className="flex cursor-pointer items-center gap-1.5 rounded border border-dashed border-green-500/30 mx-1 my-0.5 px-2 py-1 text-[10px] text-green-500/60 hover:border-green-500/60 hover:text-green-400 transition-colors"
+        className="flex cursor-pointer items-center gap-1.5  border border-dashed border-green-500/30 mx-1 my-0.5 px-2 py-1 text-[10px] text-green-500/60 hover:border-green-500/60 hover:text-green-400 transition-colors"
         style={{ marginLeft: `${depth * 12 + 4}px` }}
         onClick={() => setShowAdd(!showAdd)}
       >

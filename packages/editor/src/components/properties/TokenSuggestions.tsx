@@ -83,7 +83,7 @@ export function TokenSuggestions({ tagName, classes, onClassesChange }: TokenSug
 
       {/* Current match indicator */}
       {matchedTypoToken && (
-        <div className="mb-1.5 rounded bg-amber-500/10 border border-amber-500/20 px-2 py-1 text-[10px] text-amber-300">
+        <div className="mb-1.5  bg-amber-500/10 border border-amber-500/20 px-2 py-1 text-[10px] text-amber-300">
           Matches <span className="font-mono font-bold">{matchedTypoToken[0]}</span> token
         </div>
       )}
@@ -98,7 +98,7 @@ export function TokenSuggestions({ tagName, classes, onClassesChange }: TokenSug
               <button
                 key={t.name}
                 onClick={() => applyTypographyToken(t)}
-                className={`flex w-full items-center gap-2 rounded px-2 py-1 text-left text-[10px] transition-colors ${
+                className={`flex w-full items-center gap-2  px-2 py-1 text-left text-[10px] transition-colors ${
                   isActive
                     ? "bg-amber-500/15 text-amber-300 border border-amber-500/30"
                     : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-300 border border-transparent"
@@ -127,10 +127,10 @@ export function TokenSuggestions({ tagName, classes, onClassesChange }: TokenSug
                   e.preventDefault();
                   applyColorToken("text", value);
                 }}
-                className="flex items-center gap-1 rounded bg-zinc-800 px-1.5 py-0.5 text-[9px] text-zinc-400 hover:bg-zinc-700"
+                className="flex items-center gap-1  bg-zinc-800 px-1.5 py-0.5 text-[9px] text-zinc-400 hover:bg-zinc-700"
                 title={`Left click: bg-${value} | Right click: text-${value}`}
               >
-                <span className="h-2.5 w-2.5 rounded-sm border border-zinc-600" style={{ backgroundColor: hex || "#888" }} />
+                <span className="h-2.5 w-2.5  border border-zinc-600" style={{ backgroundColor: hex || "#888" }} />
                 {name}
               </button>
             );

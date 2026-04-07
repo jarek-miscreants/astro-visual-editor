@@ -16,9 +16,9 @@ interface PropertiesPanelProps {
 type TabId = "style" | "layout" | "text";
 
 const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
-  { id: "style", label: "Style", icon: <Paintbrush size={12} /> },
-  { id: "layout", label: "Layout", icon: <LayoutGrid size={12} /> },
-  { id: "text", label: "Text", icon: <TypeIcon size={12} /> },
+  { id: "style", label: "Style", icon: <Paintbrush size={11} /> },
+  { id: "layout", label: "Layout", icon: <LayoutGrid size={11} /> },
+  { id: "text", label: "Text", icon: <TypeIcon size={11} /> },
 ];
 
 export function PropertiesPanel({ nodeId, elementInfo }: PropertiesPanelProps) {
@@ -28,6 +28,7 @@ export function PropertiesPanel({ nodeId, elementInfo }: PropertiesPanelProps) {
 
   const astNode = nodeMap.get(nodeId);
   const classes = astNode?.classes ?? elementInfo.classes;
+  const isComponent = astNode?.isComponent || /^[A-Z]/.test(elementInfo.tagName);
 
   function handleClassesChange(newClasses: string) {
     applyMutation({ type: "update-classes", nodeId, classes: newClasses });
@@ -36,16 +37,22 @@ export function PropertiesPanel({ nodeId, elementInfo }: PropertiesPanelProps) {
   return (
     <div className="flex h-full flex-col">
       {/* Element header */}
-      <div className="border-b border-zinc-800 px-3 py-2">
-        <div className="flex items-center gap-2">
-          <span className="rounded bg-zinc-800 px-1.5 py-0.5 font-mono text-xs text-blue-400">
+      <div className="border-b border-zinc-800 px-3 py-2.5">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span
+            className={`inline-flex items-center  border px-1.5 py-0.5 font-mono text-[11px] font-medium ${
+              isComponent
+                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+                : "border-blue-500/30 bg-blue-500/10 text-blue-300"
+            }`}
+          >
             {elementInfo.tagName}
           </span>
           {Object.entries(elementInfo.attributes)
             .slice(0, 2)
             .map(([key, value]) => (
-              <span key={key} className="text-[10px] text-zinc-500">
-                {key}=&quot;{value}&quot;
+              <span key={key} className="text-[10px] text-zinc-500 font-mono truncate">
+                {key}=<span className="text-zinc-400">&quot;{value}&quot;</span>
               </span>
             ))}
         </div>
@@ -59,8 +66,8 @@ export function PropertiesPanel({ nodeId, elementInfo }: PropertiesPanelProps) {
       />
 
       {/* Classes — always visible at top */}
-      <div className="border-b border-zinc-800 px-3 py-2">
-        <div className="mb-1.5 text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">
+      <div className="border-b border-zinc-800 px-3 py-2.5">
+        <div className="mb-2 text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">
           Classes
         </div>
         <TailwindClassEditor
@@ -71,19 +78,22 @@ export function PropertiesPanel({ nodeId, elementInfo }: PropertiesPanelProps) {
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-zinc-800">
+      <div className="flex border-b border-zinc-800 bg-zinc-950">
         {TABS.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`flex flex-1 items-center justify-center gap-1 py-2 text-[11px] font-medium transition-colors ${
+            className={`relative flex flex-1 items-center justify-center gap-1.5 py-2.5 text-[11px] font-medium transition-colors ${
               activeTab === tab.id
-                ? "text-blue-400 border-b-2 border-blue-400"
+                ? "text-white"
                 : "text-zinc-500 hover:text-zinc-300"
             }`}
           >
             {tab.icon}
             {tab.label}
+            {activeTab === tab.id && (
+              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500 " />
+            )}
           </button>
         ))}
       </div>

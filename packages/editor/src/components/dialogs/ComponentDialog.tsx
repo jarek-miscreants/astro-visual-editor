@@ -74,7 +74,7 @@ export function ComponentDialog({ mode, nodeId, onClose }: ComponentDialogProps)
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50">
-      <div className="w-96 rounded-xl border border-zinc-700 bg-zinc-800 shadow-2xl">
+      <div className="w-96  border border-zinc-700 bg-zinc-800 shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-zinc-700 px-4 py-3">
           <h2 className="text-sm font-semibold text-zinc-200">
@@ -82,7 +82,7 @@ export function ComponentDialog({ mode, nodeId, onClose }: ComponentDialogProps)
           </h2>
           <button
             onClick={onClose}
-            className="rounded p-1 text-zinc-400 hover:bg-zinc-700 hover:text-white"
+            className=" p-1 text-zinc-400 hover:bg-zinc-700 hover:text-white"
           >
             <X size={14} />
           </button>
@@ -99,7 +99,7 @@ export function ComponentDialog({ mode, nodeId, onClose }: ComponentDialogProps)
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g., Card, HeroSection"
-              className="w-full rounded border border-zinc-600 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 outline-none focus:border-blue-500 placeholder:text-zinc-600"
+              className="w-full  border border-zinc-600 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 outline-none focus:border-blue-500 placeholder:text-zinc-600"
             />
             {error && (
               <p className="mt-1 text-xs text-red-400">{error}</p>
@@ -123,14 +123,14 @@ export function ComponentDialog({ mode, nodeId, onClose }: ComponentDialogProps)
             <button
               type="button"
               onClick={onClose}
-              className="rounded px-3 py-1.5 text-xs text-zinc-400 hover:bg-zinc-700 hover:text-white"
+              className=" px-3 py-1.5 text-xs text-zinc-400 hover:bg-zinc-700 hover:text-white"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading || !name}
-              className="rounded bg-blue-600 px-4 py-1.5 text-xs font-medium text-white hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              className=" bg-blue-600 px-4 py-1.5 text-xs font-medium text-white hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? "Creating..." : mode === "create" ? "Create Component" : "Extract"}
             </button>

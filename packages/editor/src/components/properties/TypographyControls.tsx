@@ -81,11 +81,11 @@ export function TypographyControls({ classes, onClassesChange }: TypographyContr
     <div className="space-y-3">
       {/* Font Family */}
       <div>
-        <div className="mb-1 text-[10px] text-zinc-500">Font Family</div>
+        <div className="mb-1.5 text-[10px] font-medium text-zinc-400">Font Family</div>
         <select
           value={currentFont}
           onChange={(e) => onClassesChange(replaceClassFromSet(classes, allFontClasses, e.target.value))}
-          className="w-full rounded bg-zinc-800 border border-zinc-700 px-2 py-1 text-[11px] text-zinc-300 outline-none focus:border-blue-500"
+          className="h-7 w-full  border border-zinc-800 bg-zinc-900 px-2.5 text-[11px] text-zinc-200 outline-none focus:border-blue-500 hover:border-zinc-700 transition-colors cursor-pointer"
         >
           <option value="">default</option>
           {allFontFamilies.map((f) => (
@@ -98,11 +98,11 @@ export function TypographyControls({ classes, onClassesChange }: TypographyContr
 
       {/* Font Size */}
       <div>
-        <div className="mb-1 text-[10px] text-zinc-500">Size</div>
+        <div className="mb-1.5 text-[10px] font-medium text-zinc-400">Size</div>
         <select
           value={currentSize}
           onChange={(e) => onClassesChange(replaceClassFromSet(classes, allSizes, e.target.value))}
-          className="w-full rounded bg-zinc-800 border border-zinc-700 px-2 py-1 text-[11px] text-zinc-300 outline-none focus:border-blue-500"
+          className="h-7 w-full  border border-zinc-800 bg-zinc-900 px-2.5 text-[11px] text-zinc-200 outline-none focus:border-blue-500 hover:border-zinc-700 transition-colors cursor-pointer"
         >
           <option value="">default</option>
           {FONT_SIZES.map((s) => (
@@ -115,11 +115,11 @@ export function TypographyControls({ classes, onClassesChange }: TypographyContr
 
       {/* Font Weight */}
       <div>
-        <div className="mb-1 text-[10px] text-zinc-500">Weight</div>
+        <div className="mb-1.5 text-[10px] font-medium text-zinc-400">Weight</div>
         <select
           value={currentWeight}
           onChange={(e) => onClassesChange(replaceClassFromSet(classes, allWeights, e.target.value))}
-          className="w-full rounded bg-zinc-800 border border-zinc-700 px-2 py-1 text-[11px] text-zinc-300 outline-none focus:border-blue-500"
+          className="h-7 w-full  border border-zinc-800 bg-zinc-900 px-2.5 text-[11px] text-zinc-200 outline-none focus:border-blue-500 hover:border-zinc-700 transition-colors cursor-pointer"
         >
           <option value="">default</option>
           {FONT_WEIGHTS.map((w) => (
@@ -132,13 +132,13 @@ export function TypographyControls({ classes, onClassesChange }: TypographyContr
 
       {/* Text Align */}
       <div>
-        <div className="mb-1 text-[10px] text-zinc-500">Align</div>
+        <div className="mb-1.5 text-[10px] font-medium text-zinc-400">Align</div>
         <div className="flex gap-0.5">
           {TEXT_ALIGN.map((a, i) => (
             <button
               key={a}
               onClick={() => onClassesChange(replaceClassFromSet(classes, TEXT_ALIGN, a === currentAlign ? "" : a))}
-              className={`flex-1 rounded py-0.5 text-[10px] transition-colors ${
+              className={`flex-1  py-0.5 text-[10px] transition-colors ${
                 a === currentAlign
                   ? "bg-blue-600/30 text-blue-300 border border-blue-500/40"
                   : "bg-zinc-800 text-zinc-400 border border-transparent hover:bg-zinc-700"
@@ -152,11 +152,11 @@ export function TypographyControls({ classes, onClassesChange }: TypographyContr
 
       {/* Line Height */}
       <div>
-        <div className="mb-1 text-[10px] text-zinc-500">Line Height</div>
+        <div className="mb-1.5 text-[10px] font-medium text-zinc-400">Line Height</div>
         <select
           value={LINE_HEIGHT.find((l) => hasClass(classes, l)) || ""}
           onChange={(e) => onClassesChange(replaceClassFromSet(classes, LINE_HEIGHT, e.target.value))}
-          className="w-full rounded bg-zinc-800 border border-zinc-700 px-2 py-1 text-[11px] text-zinc-300 outline-none focus:border-blue-500"
+          className="h-7 w-full  border border-zinc-800 bg-zinc-900 px-2.5 text-[11px] text-zinc-200 outline-none focus:border-blue-500 hover:border-zinc-700 transition-colors cursor-pointer"
         >
           <option value="">default</option>
           {LINE_HEIGHT.map((l) => (
@@ -167,11 +167,11 @@ export function TypographyControls({ classes, onClassesChange }: TypographyContr
 
       {/* Letter Spacing */}
       <div>
-        <div className="mb-1 text-[10px] text-zinc-500">Letter Spacing</div>
+        <div className="mb-1.5 text-[10px] font-medium text-zinc-400">Letter Spacing</div>
         <select
           value={LETTER_SPACING.find((l) => hasClass(classes, l)) || ""}
           onChange={(e) => onClassesChange(replaceClassFromSet(classes, LETTER_SPACING, e.target.value))}
-          className="w-full rounded bg-zinc-800 border border-zinc-700 px-2 py-1 text-[11px] text-zinc-300 outline-none focus:border-blue-500"
+          className="h-7 w-full  border border-zinc-800 bg-zinc-900 px-2.5 text-[11px] text-zinc-200 outline-none focus:border-blue-500 hover:border-zinc-700 transition-colors cursor-pointer"
         >
           <option value="">default</option>
           {LETTER_SPACING.map((l) => (
@@ -182,7 +182,7 @@ export function TypographyControls({ classes, onClassesChange }: TypographyContr
 
       {/* Transform & Decoration */}
       <div>
-        <div className="mb-1 text-[10px] text-zinc-500">Style</div>
+        <div className="mb-1.5 text-[10px] font-medium text-zinc-400">Style</div>
         <div className="flex flex-wrap gap-0.5">
           {[...TEXT_TRANSFORM, ...TEXT_DECORATION].map((cls) => (
             <button
@@ -192,7 +192,7 @@ export function TypographyControls({ classes, onClassesChange }: TypographyContr
                 const isActive = hasClass(classes, cls);
                 onClassesChange(replaceClassFromSet(classes, set, isActive ? "" : cls));
               }}
-              className={`rounded px-1.5 py-0.5 text-[10px] transition-colors ${
+              className={` px-1.5 py-0.5 text-[10px] transition-colors ${
                 hasClass(classes, cls)
                   ? "bg-blue-600/30 text-blue-300 border border-blue-500/40"
                   : "bg-zinc-800 text-zinc-400 border border-transparent hover:bg-zinc-700"

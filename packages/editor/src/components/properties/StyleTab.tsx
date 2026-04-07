@@ -57,7 +57,7 @@ export function StyleTab({ classes, onClassesChange }: StyleTabProps) {
             <select
               value={BORDER_RADIUS.find((r) => hasClass(classes, r)) || ""}
               onChange={(e) => onClassesChange(replaceClassFromSet(classes, BORDER_RADIUS, e.target.value))}
-              className="w-full rounded bg-zinc-800 border border-zinc-700 px-2 py-1 text-[11px] text-zinc-300 outline-none focus:border-blue-500"
+              className="h-7 w-full  border border-zinc-800 bg-zinc-900 px-2.5 text-[11px] text-zinc-200 outline-none focus:border-blue-500 hover:border-zinc-700 transition-colors cursor-pointer"
             >
               <option value="">none</option>
               {BORDER_RADIUS.map((r) => (
@@ -75,7 +75,7 @@ export function StyleTab({ classes, onClassesChange }: StyleTabProps) {
             <select
               value={SHADOW.find((s) => hasClass(classes, s)) || ""}
               onChange={(e) => onClassesChange(replaceClassFromSet(classes, SHADOW, e.target.value))}
-              className="w-full rounded bg-zinc-800 border border-zinc-700 px-2 py-1 text-[11px] text-zinc-300 outline-none focus:border-blue-500"
+              className="h-7 w-full  border border-zinc-800 bg-zinc-900 px-2.5 text-[11px] text-zinc-200 outline-none focus:border-blue-500 hover:border-zinc-700 transition-colors cursor-pointer"
             >
               <option value="">none</option>
               {SHADOW.map((s) => (
@@ -87,7 +87,7 @@ export function StyleTab({ classes, onClassesChange }: StyleTabProps) {
             <select
               value={OPACITY.find((o) => hasClass(classes, o)) || ""}
               onChange={(e) => onClassesChange(replaceClassFromSet(classes, OPACITY, e.target.value))}
-              className="w-full rounded bg-zinc-800 border border-zinc-700 px-2 py-1 text-[11px] text-zinc-300 outline-none focus:border-blue-500"
+              className="h-7 w-full  border border-zinc-800 bg-zinc-900 px-2.5 text-[11px] text-zinc-200 outline-none focus:border-blue-500 hover:border-zinc-700 transition-colors cursor-pointer"
             >
               <option value="">100%</option>
               {OPACITY.map((o) => (
@@ -107,10 +107,10 @@ function Section({ title, children }: { title: string; children: React.ReactNode
     <div className="border-b border-zinc-800">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="flex w-full items-center justify-between px-3 py-2 text-[10px] font-semibold text-zinc-500 uppercase tracking-wider hover:text-zinc-400"
+        className="flex w-full items-center justify-between px-3 py-2.5 text-[10px] font-semibold text-zinc-400 uppercase tracking-wider hover:text-zinc-200 transition-colors"
       >
         {title}
-        <span className="text-zinc-600">{expanded ? "−" : "+"}</span>
+        <span className="text-zinc-600 text-xs leading-none">{expanded ? "−" : "+"}</span>
       </button>
       {expanded && <div className="px-3 pb-3">{children}</div>}
     </div>
@@ -120,7 +120,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function ControlRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <div className="mb-1 text-[10px] text-zinc-500">{label}</div>
+      <div className="mb-1.5 text-[10px] font-medium text-zinc-400">{label}</div>
       {children}
     </div>
   );
@@ -146,7 +146,7 @@ function ButtonRow({
         <button
           key={opt}
           onClick={() => onClassesChange(replaceClassFromSet(classes, set, opt === current ? "" : opt))}
-          className={`flex-1 rounded py-0.5 text-[10px] transition-colors ${
+          className={`flex-1  py-0.5 text-[10px] transition-colors ${
             opt === current
               ? "bg-blue-600/30 text-blue-300 border border-blue-500/40"
               : "bg-zinc-800 text-zinc-400 border border-transparent hover:bg-zinc-700"
