@@ -1,4 +1,6 @@
 import { Router } from "express";
+import fs from "fs/promises";
+import path from "path";
 import {
   readTailwindConfig,
   readDesignTokens,
@@ -9,6 +11,29 @@ import {
 } from "../services/tailwind-config.js";
 
 export const configRouter = Router();
+
+/** GET /api/config/tve — Project-level TVE config (default mode, etc.) */
+configRouter.get("/tve", async (req, res) => {
+  try {
+    const projectPath = req.app.locals.projectPath as string;
+    const configPath = path.join(projectPath, "tve.config.json");
+    try {
+      const raw = await fs.readFile(configPath, "utf-8");
+      const parsed = JSON.parse(raw);
+      const defaultMode =
+        parsed.defaultMode === "marketer" ? "marketer" : "dev";
+      res.json({ defaultMode });
+    } catch (err: any) {
+      if (err.code === "ENOENT") {
+        res.json({ defaultMode: "dev" });
+        return;
+      }
+      throw err;
+    }
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 /** GET /api/config/theme — Returns the project's Tailwind theme config */
 configRouter.get("/theme", async (req, res) => {

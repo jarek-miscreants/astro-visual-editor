@@ -4,12 +4,14 @@ import { Plus, Trash2 } from "lucide-react";
 import { ElementTree } from "../tree/ElementTree";
 import { AddElementPanel } from "../tree/AddElementPanel";
 import { useEditorStore } from "../../store/editor-store";
+import { useModeStore } from "../../store/mode-store";
 
 export function LeftSidebar() {
   const ast = useEditorStore((s) => s.ast);
   const currentFile = useEditorStore((s) => s.currentFile);
   const selectedNodeId = useEditorStore((s) => s.selectedNodeId);
   const applyMutation = useEditorStore((s) => s.applyMutation);
+  const userMode = useModeStore((s) => s.userMode);
   const [showAddPanel, setShowAddPanel] = useState(false);
   const addBtnRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -61,14 +63,16 @@ export function LeftSidebar() {
         });
       }
 
-      // Ctrl+E — open add element panel
-      if (e.ctrlKey && e.key === "e") {
+      const mode = useModeStore.getState().userMode;
+
+      // Ctrl+E — open add element panel (dev only)
+      if (e.ctrlKey && e.key === "e" && mode === "dev") {
         e.preventDefault();
         setShowAddPanel((prev) => !prev);
       }
 
-      // Ctrl+Alt+G — wrap in div
-      if (e.ctrlKey && e.altKey && e.key === "g") {
+      // Ctrl+Alt+G — wrap in div (dev only)
+      if (e.ctrlKey && e.altKey && e.key === "g" && mode === "dev") {
         e.preventDefault();
         state.applyMutation({
           type: "wrap-element",
@@ -97,22 +101,24 @@ export function LeftSidebar() {
     <div className="flex h-full flex-col bg-zinc-950 border-r border-zinc-800">
       <div className="flex h-10 items-center justify-between border-b border-zinc-800 px-3">
         <span className="text-[11px] font-semibold text-zinc-200 tracking-tight">
-          Elements
+          {userMode === "marketer" ? "Blocks" : "Elements"}
         </span>
         <div className="flex items-center gap-0.5">
-          <button
-            ref={addBtnRef}
-            onClick={() => setShowAddPanel(!showAddPanel)}
-            disabled={!selectedNodeId}
-            className={`flex h-6 w-6 items-center justify-center  transition-colors ${
-              selectedNodeId
-                ? "text-zinc-400 hover:bg-zinc-900 hover:text-white"
-                : "text-zinc-700 cursor-not-allowed"
-            }`}
-            title="Add child element (Ctrl+E)"
-          >
-            <Plus size={13} />
-          </button>
+          {userMode === "dev" && (
+            <button
+              ref={addBtnRef}
+              onClick={() => setShowAddPanel(!showAddPanel)}
+              disabled={!selectedNodeId}
+              className={`flex h-6 w-6 items-center justify-center  transition-colors ${
+                selectedNodeId
+                  ? "text-zinc-400 hover:bg-zinc-900 hover:text-white"
+                  : "text-zinc-700 cursor-not-allowed"
+              }`}
+              title="Add child element (Ctrl+E)"
+            >
+              <Plus size={13} />
+            </button>
+          )}
           {showAddPanel && addBtnRef.current && createPortal(
             <div
               ref={panelRef}

@@ -77,6 +77,11 @@ export const api = {
     });
   },
 
+  /** Get TVE project config (defaultMode, etc.) */
+  getTveConfig(): Promise<{ defaultMode: "dev" | "marketer" }> {
+    return fetchJson("/config/tve");
+  },
+
   /** Get project Tailwind theme config */
   getTheme(): Promise<{ extend: Record<string, any>; content: string[] }> {
     return fetchJson("/config/theme");

@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { Paintbrush, LayoutGrid, Type as TypeIcon } from "lucide-react";
+import { Paintbrush, LayoutGrid, Type as TypeIcon, Sparkles } from "lucide-react";
 import type { ElementInfo } from "@tve/shared";
 import { useEditorStore } from "../../store/editor-store";
+import { useModeStore } from "../../store/mode-store";
 import { TailwindClassEditor } from "./TailwindClassEditor";
 import { AttributesPanel } from "./AttributesPanel";
 import { TokenSuggestions } from "./TokenSuggestions";
@@ -26,6 +27,7 @@ export function PropertiesPanel({ nodeId, elementInfo }: PropertiesPanelProps) {
   const [activeTab, setActiveTab] = useState<TabId>("style");
   const applyMutation = useEditorStore((s) => s.applyMutation);
   const nodeMap = useEditorStore((s) => s.nodeMap);
+  const userMode = useModeStore((s) => s.userMode);
 
   const astNode = nodeMap.get(nodeId);
   const classExpression = astNode?.classExpression ?? null;
@@ -66,84 +68,120 @@ export function PropertiesPanel({ nodeId, elementInfo }: PropertiesPanelProps) {
         </div>
       </div>
 
-      {/* Token suggestions */}
-      <TokenSuggestions
-        tagName={elementInfo.tagName}
-        classes={classes}
-        onClassesChange={handleClassesChange}
-      />
-
-      {/* Classes — always visible at top */}
-      <div className="border-b border-zinc-800 px-3 py-2.5">
-        <div className="mb-2 text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">
-          Classes
-        </div>
-        {classExpression ? (
-          <div className="border border-amber-500/30 bg-amber-500/5 p-2 text-[10px] text-amber-300/80">
-            <div className="mb-1 font-semibold text-amber-300">
-              JSX expression binding
-            </div>
-            <div className="mb-1 font-mono text-amber-200/70">
-              class={classExpression}
-            </div>
-            <div className="text-amber-300/60">
-              Class is bound to a variable. Editing here is disabled to avoid
-              breaking the component. Edit the source, or set the class via
-              this component's parent prop.
-            </div>
-          </div>
-        ) : (
-          <TailwindClassEditor
-            nodeId={nodeId}
+      {userMode === "marketer" ? (
+        <MarketerPlaceholder
+          isComponent={isComponent}
+          tagName={elementInfo.tagName}
+        />
+      ) : (
+        <>
+          {/* Token suggestions */}
+          <TokenSuggestions
+            tagName={elementInfo.tagName}
             classes={classes}
             onClassesChange={handleClassesChange}
           />
-        )}
-      </div>
 
-      {/* Attributes — read/write all non-class attrs */}
-      <AttributesPanel nodeId={nodeId} attributes={attributes} />
-
-      {/* Tabs */}
-      <div className="flex border-b border-zinc-800 bg-zinc-950">
-        {TABS.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`relative flex flex-1 items-center justify-center gap-1.5 py-2.5 text-[11px] font-medium transition-colors ${
-              activeTab === tab.id
-                ? "text-white"
-                : "text-zinc-500 hover:text-zinc-300"
-            }`}
-          >
-            {tab.icon}
-            {tab.label}
-            {activeTab === tab.id && (
-              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500 " />
+          {/* Classes — always visible at top */}
+          <div className="border-b border-zinc-800 px-3 py-2.5">
+            <div className="mb-2 text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">
+              Classes
+            </div>
+            {classExpression ? (
+              <div className="border border-amber-500/30 bg-amber-500/5 p-2 text-[10px] text-amber-300/80">
+                <div className="mb-1 font-semibold text-amber-300">
+                  JSX expression binding
+                </div>
+                <div className="mb-1 font-mono text-amber-200/70">
+                  class={classExpression}
+                </div>
+                <div className="text-amber-300/60">
+                  Class is bound to a variable. Editing here is disabled to avoid
+                  breaking the component. Edit the source, or set the class via
+                  this component's parent prop.
+                </div>
+              </div>
+            ) : (
+              <TailwindClassEditor
+                nodeId={nodeId}
+                classes={classes}
+                onClassesChange={handleClassesChange}
+              />
             )}
-          </button>
-        ))}
-      </div>
+          </div>
 
-      {/* Tab content */}
-      <div className="flex-1 overflow-auto">
-        {activeTab === "style" && (
-          <StyleTab classes={classes} onClassesChange={handleClassesChange} />
-        )}
-        {activeTab === "layout" && (
-          <LayoutTab classes={classes} onClassesChange={handleClassesChange} />
-        )}
-        {activeTab === "text" && (
-          <TextTab
-            nodeId={nodeId}
-            classes={classes}
-            textContent={astNode?.textContent ?? elementInfo.textContent}
-            onClassesChange={handleClassesChange}
-            onTextChange={(text) => {
-              applyMutation({ type: "update-text", nodeId, text });
-            }}
-          />
-        )}
+          {/* Attributes — read/write all non-class attrs */}
+          <AttributesPanel nodeId={nodeId} attributes={attributes} />
+
+          {/* Tabs */}
+          <div className="flex border-b border-zinc-800 bg-zinc-950">
+            {TABS.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`relative flex flex-1 items-center justify-center gap-1.5 py-2.5 text-[11px] font-medium transition-colors ${
+                  activeTab === tab.id
+                    ? "text-white"
+                    : "text-zinc-500 hover:text-zinc-300"
+                }`}
+              >
+                {tab.icon}
+                {tab.label}
+                {activeTab === tab.id && (
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500 " />
+                )}
+              </button>
+            ))}
+          </div>
+
+          {/* Tab content */}
+          <div className="flex-1 overflow-auto">
+            {activeTab === "style" && (
+              <StyleTab classes={classes} onClassesChange={handleClassesChange} />
+            )}
+            {activeTab === "layout" && (
+              <LayoutTab classes={classes} onClassesChange={handleClassesChange} />
+            )}
+            {activeTab === "text" && (
+              <TextTab
+                nodeId={nodeId}
+                classes={classes}
+                textContent={astNode?.textContent ?? elementInfo.textContent}
+                onClassesChange={handleClassesChange}
+                onTextChange={(text) => {
+                  applyMutation({ type: "update-text", nodeId, text });
+                }}
+              />
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function MarketerPlaceholder({
+  isComponent,
+  tagName,
+}: {
+  isComponent: boolean;
+  tagName: string;
+}) {
+  return (
+    <div className="flex-1 overflow-auto px-4 py-6">
+      <div className="border border-zinc-800 bg-zinc-900/40 p-4">
+        <div className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold text-zinc-200">
+          <Sparkles size={12} className="text-emerald-400" />
+          {isComponent ? `${tagName} — no marketer controls yet` : "No marketer controls"}
+        </div>
+        <p className="text-[11px] leading-relaxed text-zinc-400">
+          {isComponent
+            ? "This component doesn't have a .tve.ts schema defining marketer-editable props yet."
+            : "Raw HTML elements aren't directly editable in marketer mode — use pre-built components instead."}
+        </p>
+        <p className="mt-2 text-[11px] leading-relaxed text-zinc-500">
+          Switch to <span className="font-semibold text-zinc-300">Dev</span> mode in the top bar to edit classes and attributes directly.
+        </p>
       </div>
     </div>
   );

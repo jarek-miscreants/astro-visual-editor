@@ -3,18 +3,21 @@ import { EditorLayout } from "./components/layout/EditorLayout";
 import { useEditorStore } from "./store/editor-store";
 import { useHistoryStore } from "./store/history-store";
 import { useThemeStore } from "./store/theme-store";
+import { useModeStore } from "./store/mode-store";
 
 export default function App() {
   const initProject = useEditorStore((s) => s.initProject);
   const applyMutation = useEditorStore((s) => s.applyMutation);
   const loadTheme = useThemeStore((s) => s.loadTheme);
   const loadTokens = useThemeStore((s) => s.loadTokens);
+  const loadMode = useModeStore((s) => s.loadMode);
 
   useEffect(() => {
     initProject();
     loadTheme();
     loadTokens();
-  }, [initProject, loadTheme, loadTokens]);
+    loadMode();
+  }, [initProject, loadTheme, loadTokens, loadMode]);
 
   // Global keyboard shortcuts
   useEffect(() => {

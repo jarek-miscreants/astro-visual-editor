@@ -12,9 +12,12 @@ import {
   Redo2,
   Plus,
   Palette,
+  Code2,
+  Sparkles,
 } from "lucide-react";
 import { useEditorStore } from "../../store/editor-store";
 import { useHistoryStore } from "../../store/history-store";
+import { useModeStore } from "../../store/mode-store";
 import { PageSelector } from "../page-selector/PageSelector";
 import { ComponentDialog } from "../dialogs/ComponentDialog";
 import { DesignSystemPanel } from "../design-system/DesignSystemPanel";
@@ -32,6 +35,8 @@ export function Toolbar() {
   const devServerStatus = useEditorStore((s) => s.devServerStatus);
   const startDevServer = useEditorStore((s) => s.startDevServer);
   const projectName = useEditorStore((s) => s.projectName);
+  const userMode = useModeStore((s) => s.userMode);
+  const setUserMode = useModeStore((s) => s.setUserMode);
 
   return (
     <div className="flex h-12 items-center gap-2 border-b border-zinc-800 bg-zinc-950 px-3">
@@ -39,6 +44,20 @@ export function Toolbar() {
       <span className="text-[11px] font-semibold text-zinc-200 tracking-tight">
         {projectName || "TVE"}
       </span>
+
+      <Divider />
+
+      {/* User mode: Dev / Marketer */}
+      <div className="inline-flex items-center gap-0.5 border border-zinc-800 bg-zinc-900 p-0.5 shadow-sm">
+        <SegmentButton active={userMode === "dev"} onClick={() => setUserMode("dev")}>
+          <Code2 size={11} />
+          Dev
+        </SegmentButton>
+        <SegmentButton active={userMode === "marketer"} onClick={() => setUserMode("marketer")}>
+          <Sparkles size={11} />
+          Marketer
+        </SegmentButton>
+      </div>
 
       <Divider />
 
@@ -99,31 +118,35 @@ export function Toolbar() {
 
       <Divider />
 
-      {/* New Component */}
-      <button
-        onClick={() => setShowNewComponent(true)}
-        className="inline-flex h-7 items-center gap-1.5  border border-zinc-800 bg-zinc-900 px-2.5 text-xs font-medium text-zinc-300 shadow-sm hover:bg-zinc-800 hover:text-white hover:border-zinc-700 transition-colors"
-        title="Create new component"
-      >
-        <Plus size={11} />
-        Component
-      </button>
+      {/* Dev-only: New Component + Design System */}
+      {userMode === "dev" && (
+        <>
+          <button
+            onClick={() => setShowNewComponent(true)}
+            className="inline-flex h-7 items-center gap-1.5  border border-zinc-800 bg-zinc-900 px-2.5 text-xs font-medium text-zinc-300 shadow-sm hover:bg-zinc-800 hover:text-white hover:border-zinc-700 transition-colors"
+            title="Create new component"
+          >
+            <Plus size={11} />
+            Component
+          </button>
 
-      {showNewComponent && (
-        <ComponentDialog mode="create" onClose={() => setShowNewComponent(false)} />
-      )}
+          {showNewComponent && (
+            <ComponentDialog mode="create" onClose={() => setShowNewComponent(false)} />
+          )}
 
-      <button
-        onClick={() => setShowDesignSystem(true)}
-        className="inline-flex h-7 items-center gap-1.5  border border-zinc-800 bg-zinc-900 px-2.5 text-xs font-medium text-zinc-300 shadow-sm hover:bg-zinc-800 hover:text-white hover:border-zinc-700 transition-colors"
-        title="Design System"
-      >
-        <Palette size={11} />
-        Design
-      </button>
+          <button
+            onClick={() => setShowDesignSystem(true)}
+            className="inline-flex h-7 items-center gap-1.5  border border-zinc-800 bg-zinc-900 px-2.5 text-xs font-medium text-zinc-300 shadow-sm hover:bg-zinc-800 hover:text-white hover:border-zinc-700 transition-colors"
+            title="Design System"
+          >
+            <Palette size={11} />
+            Design
+          </button>
 
-      {showDesignSystem && (
-        <DesignSystemPanel onClose={() => setShowDesignSystem(false)} />
+          {showDesignSystem && (
+            <DesignSystemPanel onClose={() => setShowDesignSystem(false)} />
+          )}
+        </>
       )}
 
       <div className="flex-1" />
