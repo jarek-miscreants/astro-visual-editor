@@ -6,6 +6,7 @@ import type {
   ContentFileInfo,
   ContentFile,
   ComponentPropSchema,
+  RecentProject,
 } from "@tve/shared";
 
 const API_BASE = "/api";
@@ -26,6 +27,21 @@ export const api = {
   /** Get project info */
   getProjectInfo(): Promise<ProjectInfo> {
     return fetchJson("/project/info");
+  },
+
+  /** List recent projects */
+  getRecentProjects(): Promise<{ projects: RecentProject[] }> {
+    return fetchJson("/project/recent");
+  },
+
+  /** Switch to a different local Astro project */
+  switchProject(
+    path: string
+  ): Promise<{ path: string; name: string; hasNodeModules: boolean }> {
+    return fetchJson("/project/switch", {
+      method: "POST",
+      body: JSON.stringify({ path }),
+    });
   },
 
   /** List all .astro files */

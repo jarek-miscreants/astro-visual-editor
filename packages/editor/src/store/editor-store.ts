@@ -43,6 +43,7 @@ interface EditorState {
 
   // Actions
   initProject: () => Promise<void>;
+  resetProject: () => void;
   loadFiles: () => Promise<void>;
   setCurrentFile: (path: string) => Promise<void>;
   selectNode: (nodeId: string | null, info?: ElementInfo | null) => void;
@@ -80,6 +81,25 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   devServerStatus: "stopped",
   devServerUrl: null,
   iframeReady: false,
+
+  resetProject() {
+    // Clear all project-scoped state so the editor can load a fresh project.
+    // Does not touch user preferences (mode, devicePreset) or WebSocket listeners.
+    set({
+      projectPath: null,
+      projectName: null,
+      files: [],
+      currentFile: null,
+      ast: null,
+      nodeMap: new Map(),
+      selectedNodeId: null,
+      selectedElementInfo: null,
+      hoveredNodeId: null,
+      devServerStatus: "stopped",
+      devServerUrl: null,
+      iframeReady: false,
+    });
+  },
 
   async initProject() {
     try {

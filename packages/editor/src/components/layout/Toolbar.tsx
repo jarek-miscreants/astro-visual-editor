@@ -14,17 +14,20 @@ import {
   Palette,
   Code2,
   Sparkles,
+  FolderOpen,
 } from "lucide-react";
 import { useEditorStore } from "../../store/editor-store";
 import { useHistoryStore } from "../../store/history-store";
 import { useModeStore } from "../../store/mode-store";
 import { PageSelector } from "../page-selector/PageSelector";
 import { ComponentDialog } from "../dialogs/ComponentDialog";
+import { ProjectPickerDialog } from "../dialogs/ProjectPickerDialog";
 import { DesignSystemPanel } from "../design-system/DesignSystemPanel";
 
 export function Toolbar() {
   const [showNewComponent, setShowNewComponent] = useState(false);
   const [showDesignSystem, setShowDesignSystem] = useState(false);
+  const [showProjectPicker, setShowProjectPicker] = useState(false);
   const mode = useEditorStore((s) => s.mode);
   const applyMutation = useEditorStore((s) => s.applyMutation);
   const canUndo = useHistoryStore((s) => s.canUndo);
@@ -35,15 +38,35 @@ export function Toolbar() {
   const devServerStatus = useEditorStore((s) => s.devServerStatus);
   const startDevServer = useEditorStore((s) => s.startDevServer);
   const projectName = useEditorStore((s) => s.projectName);
+  const resetProject = useEditorStore((s) => s.resetProject);
+  const initProject = useEditorStore((s) => s.initProject);
   const userMode = useModeStore((s) => s.userMode);
   const setUserMode = useModeStore((s) => s.setUserMode);
 
+  async function handleProjectSwitched() {
+    setShowProjectPicker(false);
+    resetProject();
+    await initProject();
+  }
+
   return (
     <div className="flex h-12 items-center gap-2 border-b border-zinc-800 bg-zinc-950 px-3">
-      {/* Project name */}
-      <span className="text-[11px] font-semibold text-zinc-200 tracking-tight">
-        {projectName || "TVE"}
-      </span>
+      {/* Project name — click to switch project */}
+      <button
+        onClick={() => setShowProjectPicker(true)}
+        className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-zinc-200 tracking-tight hover:text-white"
+        title="Open another project"
+      >
+        <FolderOpen size={11} className="text-zinc-500" />
+        {projectName || "Open project…"}
+      </button>
+
+      {showProjectPicker && (
+        <ProjectPickerDialog
+          onClose={() => setShowProjectPicker(false)}
+          onSwitched={handleProjectSwitched}
+        />
+      )}
 
       <Divider />
 

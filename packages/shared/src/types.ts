@@ -118,10 +118,15 @@ export type DevServerStatus = "stopped" | "starting" | "running" | "error";
 
 /** Project info returned by the API */
 export interface ProjectInfo {
+  path: string | null;
+  name: string | null;
+  hasAstro?: boolean;
+  hasTailwind?: boolean;
+}
+
+export interface RecentProject {
   path: string;
   name: string;
-  hasAstro: boolean;
-  hasTailwind: boolean;
 }
 
 /** Typed prop extracted from a component's TypeScript Props interface */

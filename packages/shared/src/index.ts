@@ -11,6 +11,7 @@ export type {
   ContentFile,
   ComponentPropField,
   ComponentPropSchema,
+  RecentProject,
 } from "./types.js";
 
 export type {

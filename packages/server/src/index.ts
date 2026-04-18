@@ -11,7 +11,10 @@ import { devServerRouter, startDevServerProxy, setupPreviewWebSocketProxy } from
 import { componentsRouter } from "./routes/components.js";
 import { configRouter } from "./routes/config.js";
 import { contentRouter } from "./routes/content.js";
+import { projectRouter } from "./routes/project.js";
 import { setupFileWatcher } from "./services/file-watcher.js";
+import { stopDevServer } from "./services/astro-dev-server.js";
+import type { FSWatcher } from "chokidar";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -20,30 +23,55 @@ const server = createServer(app);
 const wss = new WebSocketServer({ server, path: "/ws" });
 
 const PORT = Number(process.env.PORT) || 3011;
-const PROJECT_PATH = process.env.TVE_PROJECT_PATH || process.argv[2] || "";
+const INITIAL_PROJECT_PATH = process.env.TVE_PROJECT_PATH || process.argv[2] || "";
 
-if (!PROJECT_PATH) {
-  console.error(
-    "Error: No project path specified.\nUsage: tve-server <path-to-astro-project>"
-  );
-  process.exit(1);
+const resolvedInitialPath = INITIAL_PROJECT_PATH
+  ? path.resolve(INITIAL_PROJECT_PATH)
+  : null;
+
+if (resolvedInitialPath) {
+  console.log(`[TVE Server] Project path: ${resolvedInitialPath}`);
+} else {
+  console.log(`[TVE Server] No project path — open one from the editor UI`);
 }
-
-const resolvedProjectPath = path.resolve(PROJECT_PATH);
-console.log(`[TVE Server] Project path: ${resolvedProjectPath}`);
 
 // Middleware
 app.use(cors());
 app.use(express.json());
 
-// Make project path available to routes
-app.locals.projectPath = resolvedProjectPath;
+// Mutable project path + file watcher handle. Stored on app.locals so routes
+// can read the current project path, and switched at runtime via project/switch.
+app.locals.projectPath = resolvedInitialPath;
 app.locals.wss = wss;
+
+let fileWatcher: FSWatcher | null = null;
+
+async function attachWatcher(projectPath: string | null) {
+  if (fileWatcher) {
+    await fileWatcher.close();
+    fileWatcher = null;
+  }
+  if (projectPath) {
+    fileWatcher = setupFileWatcher(projectPath, broadcast);
+  }
+}
+
+async function switchProject(newPath: string) {
+  // Stop any running Astro dev server in the old project
+  stopDevServer();
+  // Rebuild file watcher for the new path
+  await attachWatcher(newPath);
+  app.locals.projectPath = newPath;
+  console.log(`[TVE Server] Switched project to: ${newPath}`);
+}
+
+app.locals.switchProject = switchProject;
 
 // Serve injected script
 app.use("/api/injected", express.static(path.join(__dirname, "../public")));
 
 // API routes
+app.use("/api/project", projectRouter);
 app.use("/api/files", filesRouter);
 app.use("/api/ast", astRouter);
 app.use("/api/mutations", mutationsRouter);
@@ -51,14 +79,6 @@ app.use("/api/dev-server", devServerRouter);
 app.use("/api/components", componentsRouter);
 app.use("/api/config", configRouter);
 app.use("/api/content", contentRouter);
-
-// Project info
-app.get("/api/project/info", (_req, res) => {
-  res.json({
-    path: resolvedProjectPath,
-    name: path.basename(resolvedProjectPath),
-  });
-});
 
 // WebSocket connections
 const wsClients = new Set<WebSocket>();
@@ -83,11 +103,15 @@ export function broadcast(message: object) {
   }
 }
 
-// Setup file watcher
-setupFileWatcher(resolvedProjectPath, broadcast);
+// Initial watcher if started with a CLI path
+if (resolvedInitialPath) {
+  attachWatcher(resolvedInitialPath);
+}
 
-// Setup dev server proxy (HTTP + WebSocket for Vite HMR)
-startDevServerProxy(app, resolvedProjectPath, broadcast);
+// Dev server proxy is path-agnostic (it reads current dev-server URL at request time)
+// The proxy's projectPath/broadcast args are unused — startDevServer reads from the
+// /api/dev-server/start request which picks up app.locals.projectPath at that time.
+startDevServerProxy(app, resolvedInitialPath ?? "", broadcast);
 setupPreviewWebSocketProxy(server);
 
 server.listen(PORT, () => {
