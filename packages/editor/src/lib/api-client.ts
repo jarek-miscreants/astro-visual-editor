@@ -1,4 +1,11 @@
-import type { FileInfo, ASTNode, Mutation, ProjectInfo } from "@tve/shared";
+import type {
+  FileInfo,
+  ASTNode,
+  Mutation,
+  ProjectInfo,
+  ContentFileInfo,
+  ContentFile,
+} from "@tve/shared";
 
 const API_BASE = "/api";
 
@@ -105,6 +112,28 @@ export const api = {
     return fetchJson("/config/tokens", {
       method: "POST",
       body: JSON.stringify({ tokens }),
+    });
+  },
+
+  /** List .md/.mdx files in the project */
+  getContentFiles(): Promise<{ files: ContentFileInfo[] }> {
+    return fetchJson("/content/list");
+  },
+
+  /** Read a markdown file into { frontmatter, body } */
+  readContentFile(path: string): Promise<ContentFile> {
+    return fetchJson(`/content/read/${path}`);
+  },
+
+  /** Write { frontmatter, body } back to disk */
+  writeContentFile(
+    path: string,
+    frontmatter: Record<string, any>,
+    body: string
+  ): Promise<{ success: boolean }> {
+    return fetchJson(`/content/write/${path}`, {
+      method: "POST",
+      body: JSON.stringify({ frontmatter, body }),
     });
   },
 

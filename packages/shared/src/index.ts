@@ -7,6 +7,8 @@ export type {
   MutationWithInverse,
   DevServerStatus,
   ProjectInfo,
+  ContentFileInfo,
+  ContentFile,
 } from "./types.js";
 
 export type {

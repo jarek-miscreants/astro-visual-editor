@@ -10,6 +10,7 @@ import { mutationsRouter } from "./routes/mutations.js";
 import { devServerRouter, startDevServerProxy, setupPreviewWebSocketProxy } from "./routes/dev-server.js";
 import { componentsRouter } from "./routes/components.js";
 import { configRouter } from "./routes/config.js";
+import { contentRouter } from "./routes/content.js";
 import { setupFileWatcher } from "./services/file-watcher.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -49,6 +50,7 @@ app.use("/api/mutations", mutationsRouter);
 app.use("/api/dev-server", devServerRouter);
 app.use("/api/components", componentsRouter);
 app.use("/api/config", configRouter);
+app.use("/api/content", contentRouter);
 
 // Project info
 app.get("/api/project/info", (_req, res) => {

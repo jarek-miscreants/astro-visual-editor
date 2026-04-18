@@ -4,6 +4,7 @@ import { useEditorStore } from "./store/editor-store";
 import { useHistoryStore } from "./store/history-store";
 import { useThemeStore } from "./store/theme-store";
 import { useModeStore } from "./store/mode-store";
+import { useContentStore } from "./store/content-store";
 
 export default function App() {
   const initProject = useEditorStore((s) => s.initProject);
@@ -11,13 +12,15 @@ export default function App() {
   const loadTheme = useThemeStore((s) => s.loadTheme);
   const loadTokens = useThemeStore((s) => s.loadTokens);
   const loadMode = useModeStore((s) => s.loadMode);
+  const loadContentFiles = useContentStore((s) => s.loadFiles);
 
   useEffect(() => {
     initProject();
     loadTheme();
     loadTokens();
     loadMode();
-  }, [initProject, loadTheme, loadTokens, loadMode]);
+    loadContentFiles();
+  }, [initProject, loadTheme, loadTokens, loadMode, loadContentFiles]);
 
   // Global keyboard shortcuts
   useEffect(() => {

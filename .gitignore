@@ -13,3 +13,4 @@ tve-preview.astro
 # Editor settings
 .vscode/
 .idea/
+.claude/

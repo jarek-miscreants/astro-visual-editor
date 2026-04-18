@@ -96,3 +96,239 @@ code,
   font-family: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
   font-feature-settings: "calt" 0;
 }
+
+/* Markdown preview — minimal dark-themed styles to avoid pulling in @tailwindcss/typography */
+.markdown-preview {
+  color: #e4e4e7;
+  font-size: 13px;
+  line-height: 1.65;
+}
+.markdown-preview h1,
+.markdown-preview h2,
+.markdown-preview h3,
+.markdown-preview h4,
+.markdown-preview h5,
+.markdown-preview h6 {
+  color: #fafafa;
+  font-weight: 600;
+  margin-top: 1.2em;
+  margin-bottom: 0.5em;
+  line-height: 1.25;
+}
+.markdown-preview h1 { font-size: 1.6em; border-bottom: 1px solid #27272a; padding-bottom: 0.3em; }
+.markdown-preview h2 { font-size: 1.35em; border-bottom: 1px solid #27272a; padding-bottom: 0.25em; }
+.markdown-preview h3 { font-size: 1.15em; }
+.markdown-preview h4 { font-size: 1.0em; }
+.markdown-preview p { margin: 0.7em 0; }
+.markdown-preview a { color: #60a5fa; text-decoration: underline; text-underline-offset: 2px; }
+.markdown-preview a:hover { color: #93c5fd; }
+.markdown-preview strong { color: #fafafa; font-weight: 600; }
+.markdown-preview em { font-style: italic; }
+.markdown-preview ul,
+.markdown-preview ol { padding-left: 1.4em; margin: 0.7em 0; }
+.markdown-preview ul { list-style: disc; }
+.markdown-preview ol { list-style: decimal; }
+.markdown-preview li { margin: 0.25em 0; }
+.markdown-preview blockquote {
+  border-left: 3px solid #3f3f46;
+  padding: 0.25em 0.8em;
+  margin: 0.8em 0;
+  color: #a1a1aa;
+}
+.markdown-preview code {
+  background: #27272a;
+  padding: 0.1em 0.4em;
+  border-radius: 3px;
+  font-size: 0.9em;
+  color: #fca5a5;
+}
+.markdown-preview pre {
+  background: #18181b;
+  border: 1px solid #27272a;
+  padding: 0.8em 1em;
+  border-radius: 4px;
+  overflow-x: auto;
+  margin: 0.8em 0;
+}
+.markdown-preview pre code {
+  background: transparent;
+  padding: 0;
+  color: #e4e4e7;
+  font-size: 0.88em;
+}
+.markdown-preview img { max-width: 100%; border-radius: 4px; }
+.markdown-preview hr { border: 0; border-top: 1px solid #27272a; margin: 1.5em 0; }
+.markdown-preview table { border-collapse: collapse; margin: 0.8em 0; width: 100%; }
+.markdown-preview th,
+.markdown-preview td { border: 1px solid #27272a; padding: 0.4em 0.8em; }
+.markdown-preview th { background: #18181b; font-weight: 600; color: #fafafa; }
+.markdown-preview input[type="checkbox"] { margin-right: 0.4em; }
+
+/* MDXEditor — match zinc-950 dark theme */
+.tve-mdx {
+  --baseBg: #09090b;
+  --baseBgSubtle: #18181b;
+  --baseBgHover: #27272a;
+  --baseBgActive: #3f3f46;
+  --baseBorder: #27272a;
+  --baseBorderHover: #3f3f46;
+  --baseLine: #27272a;
+  --baseText: #fafafa;
+  --baseTextContrast: #fafafa;
+  --accentBase: #1e293b;
+  --accentBgSubtle: #1e293b;
+  --accentBg: #2563eb;
+  --accentBgHover: #3b82f6;
+  --accentBorder: #3b82f6;
+  --accentText: #93c5fd;
+  --accentTextContrast: #ffffff;
+  background: #09090b;
+  color: #fafafa;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.tve-mdx [class*="_toolbarRoot"] {
+  background: #0f0f11;
+  border-bottom: 1px solid #27272a;
+  border-radius: 0;
+}
+.tve-mdx [class*="_rootContentEditableWrapper"] {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.tve-mdx-content {
+  padding: 1rem 1.5rem;
+  font-size: 13px;
+  line-height: 1.65;
+  color: #e4e4e7;
+  min-height: 100%;
+}
+.tve-mdx-content:focus { outline: none; }
+.tve-mdx-content h1 { font-size: 1.8em; font-weight: 700; margin: 0.6em 0 0.4em; color: #fafafa; }
+.tve-mdx-content h2 { font-size: 1.4em; font-weight: 600; margin: 1em 0 0.4em; color: #fafafa; }
+.tve-mdx-content h3 { font-size: 1.15em; font-weight: 600; margin: 1em 0 0.3em; color: #fafafa; }
+.tve-mdx-content p { margin: 0.5em 0; }
+.tve-mdx-content a { color: #60a5fa; text-decoration: underline; }
+.tve-mdx-content code {
+  background: #18181b;
+  padding: 0.12em 0.35em;
+  border-radius: 3px;
+  font-size: 0.88em;
+  color: #fca5a5;
+}
+.tve-mdx-content pre {
+  background: #0f0f11 !important;
+  border: 1px solid #27272a;
+  padding: 0.8em 1em;
+  border-radius: 4px;
+  overflow-x: auto;
+}
+.tve-mdx-content blockquote {
+  border-left: 3px solid #3f3f46;
+  padding-left: 1em;
+  color: #a1a1aa;
+  margin: 0.6em 0;
+}
+.tve-mdx-content table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.8em 0;
+}
+.tve-mdx-content th,
+.tve-mdx-content td {
+  border: 1px solid #27272a;
+  padding: 0.4em 0.8em;
+}
+.tve-mdx-content th { background: #18181b; font-weight: 600; }
+.tve-mdx-content hr { border: 0; border-top: 1px solid #27272a; margin: 1.5em 0; }
+.tve-mdx-content ul, .tve-mdx-content ol { padding-left: 1.4em; margin: 0.5em 0; }
+.tve-mdx [class*="_selectTrigger"],
+.tve-mdx [class*="_toolbarToggleItem"],
+.tve-mdx [class*="_toolbarButton"] {
+  color: #e4e4e7;
+}
+.tve-mdx [class*="_toolbarToggleItem"][data-state="on"] {
+  background: #27272a;
+  color: #fafafa;
+}
+
+/* Portaled popups (table toolbar, link dialog, selects) — MDXEditor uses Radix portals
+   outside .tve-mdx so we target global class fragments. */
+.mdxeditor-popup-container,
+.mdxeditor-popup-container [class*="_tableColumnEditorPopoverContent"],
+.mdxeditor-popup-container [class*="_linkDialogPopoverContent"],
+.mdxeditor-popup-container [class*="_dialogContent"],
+.mdxeditor-popup-container [class*="_selectContent"] {
+  background: #0f0f11 !important;
+  color: #e4e4e7 !important;
+  border: 1px solid #27272a !important;
+  border-radius: 4px;
+}
+.mdxeditor-popup-container button,
+.mdxeditor-popup-container [class*="_iconButton"],
+.mdxeditor-popup-container [class*="_toolbarToggleItem"] {
+  color: #e4e4e7 !important;
+}
+.mdxeditor-popup-container button:hover,
+.mdxeditor-popup-container [class*="_iconButton"]:hover {
+  background: #27272a !important;
+  color: #fafafa !important;
+}
+.mdxeditor-popup-container [class*="_toolbarToggleItem"][data-state="on"] {
+  background: #27272a !important;
+  color: #fafafa !important;
+}
+.mdxeditor-popup-container input[type="text"],
+.mdxeditor-popup-container input[type="url"],
+.mdxeditor-popup-container textarea,
+.mdxeditor-popup-container [class*="_textInput"] {
+  background: #09090b !important;
+  color: #fafafa !important;
+  border: 1px solid #27272a !important;
+}
+.mdxeditor-popup-container input::placeholder {
+  color: #71717a !important;
+}
+
+/* Select triggers (block type, code language) */
+[class*="_selectTrigger"] {
+  background: #18181b !important;
+  color: #e4e4e7 !important;
+  border: 1px solid #27272a !important;
+}
+[class*="_selectTrigger"]:hover {
+  background: #27272a !important;
+}
+[class*="_selectContent"] {
+  background: #0f0f11 !important;
+  color: #e4e4e7 !important;
+  border: 1px solid #27272a !important;
+}
+[class*="_selectItem"] {
+  color: #e4e4e7 !important;
+}
+[class*="_selectItem"][data-highlighted],
+[class*="_selectItem"]:hover {
+  background: #27272a !important;
+  color: #fafafa !important;
+}
+
+/* CodeMirror inside code blocks */
+.tve-mdx .cm-editor {
+  background: #0f0f11 !important;
+  color: #e4e4e7 !important;
+}
+.tve-mdx .cm-editor .cm-gutters {
+  background: #0f0f11 !important;
+  border-right: 1px solid #27272a !important;
+  color: #52525b !important;
+}
+.tve-mdx .cm-editor .cm-activeLineGutter,
+.tve-mdx .cm-editor .cm-activeLine {
+  background: #18181b !important;
+}
+.tve-mdx .cm-editor .cm-content { caret-color: #fafafa; }
+.tve-mdx .cm-editor .cm-cursor { border-left-color: #fafafa !important; }
+.tve-mdx .cm-editor.cm-focused { outline: none !important; }

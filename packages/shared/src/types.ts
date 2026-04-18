@@ -97,6 +97,22 @@ export type MutationWithInverse = {
   inverse: Mutation;
 };
 
+/** Info about a markdown/mdx content file */
+export interface ContentFileInfo {
+  path: string;
+  collection: string;
+  format: "md" | "mdx";
+  lastModified: number;
+}
+
+/** A parsed markdown/mdx file */
+export interface ContentFile {
+  path: string;
+  frontmatter: Record<string, any>;
+  body: string;
+  format: "md" | "mdx";
+}
+
 /** Dev server status */
 export type DevServerStatus = "stopped" | "starting" | "running" | "error";
 
