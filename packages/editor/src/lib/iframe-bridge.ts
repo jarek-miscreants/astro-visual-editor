@@ -80,7 +80,12 @@ export function updateTextInIframe(nodeId: string, text: string) {
   sendToIframe({ type: "tve:update-text", nodeId, text });
 }
 
-/** Highlight a node in the iframe */
+/** Highlight a node in the iframe (hover-style outline) */
 export function highlightNodeInIframe(nodeId: string | null) {
   sendToIframe({ type: "tve:highlight-node", nodeId });
+}
+
+/** Set the iframe's selected element (persistent selection outline) */
+export function selectNodeInIframe(nodeId: string | null) {
+  sendToIframe({ type: "tve:select-node", nodeId });
 }

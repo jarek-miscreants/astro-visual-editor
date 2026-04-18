@@ -9,6 +9,8 @@ export type {
   ProjectInfo,
   ContentFileInfo,
   ContentFile,
+  ComponentPropField,
+  ComponentPropSchema,
 } from "./types.js";
 
 export type {

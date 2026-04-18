@@ -11,6 +11,7 @@ import {
   provideAstToIframe,
   updateClassesInIframe,
   updateTextInIframe,
+  selectNodeInIframe,
 } from "../lib/iframe-bridge";
 import { connectWebSocket, onWsMessage } from "../lib/ws-client";
 import { useHistoryStore, computeInverse } from "./history-store";
@@ -140,6 +141,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   selectNode(nodeId, info = null) {
     set({ selectedNodeId: nodeId, selectedElementInfo: info ?? null });
+    selectNodeInIframe(nodeId);
   },
 
   hoverNode(nodeId) {

@@ -123,3 +123,44 @@ export interface ProjectInfo {
   hasAstro: boolean;
   hasTailwind: boolean;
 }
+
+/** Typed prop extracted from a component's TypeScript Props interface */
+export type ComponentPropField =
+  | {
+      kind: "enum";
+      name: string;
+      required: boolean;
+      options: string[];
+      default?: string;
+    }
+  | {
+      kind: "boolean";
+      name: string;
+      required: boolean;
+      default?: boolean;
+    }
+  | {
+      kind: "string";
+      name: string;
+      required: boolean;
+      default?: string;
+    }
+  | {
+      kind: "number";
+      name: string;
+      required: boolean;
+      default?: number;
+    }
+  | {
+      kind: "unknown";
+      name: string;
+      required: boolean;
+      typeText: string;
+    };
+
+export interface ComponentPropSchema {
+  /** Relative path to the component file */
+  componentPath: string;
+  /** Ordered list of props */
+  fields: ComponentPropField[];
+}

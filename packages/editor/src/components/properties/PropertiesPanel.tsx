@@ -5,6 +5,7 @@ import { useEditorStore } from "../../store/editor-store";
 import { useModeStore } from "../../store/mode-store";
 import { TailwindClassEditor } from "./TailwindClassEditor";
 import { AttributesPanel } from "./AttributesPanel";
+import { ComponentPropsPanel } from "./ComponentPropsPanel";
 import { TokenSuggestions } from "./TokenSuggestions";
 import { StyleTab } from "./StyleTab";
 import { LayoutTab } from "./LayoutTab";
@@ -69,12 +70,66 @@ export function PropertiesPanel({ nodeId, elementInfo }: PropertiesPanelProps) {
       </div>
 
       {userMode === "marketer" ? (
-        <MarketerPlaceholder
-          isComponent={isComponent}
-          tagName={elementInfo.tagName}
-        />
+        <div className="flex-1 overflow-auto">
+          {isComponent ? (
+            <>
+              <ComponentPropsPanel
+                nodeId={nodeId}
+                tagName={elementInfo.tagName}
+                attributes={attributes}
+              />
+              <ComponentContentField
+                existingText={astNode?.textContent ?? null}
+                hasChildren={(astNode?.children.length ?? 0) > 0}
+                onUpdate={(text) => applyMutation({ type: "update-text", nodeId, text })}
+                onAdd={(text) =>
+                  applyMutation({
+                    type: "add-element",
+                    parentNodeId: nodeId,
+                    position: 0,
+                    html: text,
+                  })
+                }
+              />
+            </>
+          ) : (
+            <MarketerPlaceholder
+              isComponent={isComponent}
+              tagName={elementInfo.tagName}
+            />
+          )}
+        </div>
       ) : (
         <>
+          {/* Component-level typed props (variants, etc.) — dev mode */}
+          {isComponent && (
+            <ComponentPropsPanel
+              nodeId={nodeId}
+              tagName={elementInfo.tagName}
+              attributes={attributes}
+            />
+          )}
+
+          {/* For empty components only: affordance to add initial slot content.
+              Non-empty components get their Content editor from TextTab below. */}
+          {isComponent &&
+            astNode?.textContent == null &&
+            (astNode?.children.length ?? 0) === 0 && (
+              <ComponentContentField
+                existingText={null}
+                hasChildren={false}
+                onUpdate={(text) => applyMutation({ type: "update-text", nodeId, text })}
+                onAdd={(text) =>
+                  applyMutation({
+                    type: "add-element",
+                    parentNodeId: nodeId,
+                    position: 0,
+                    html: text,
+                  })
+                }
+              />
+            )}
+
           {/* Token suggestions */}
           <TokenSuggestions
             tagName={elementInfo.tagName}
@@ -155,6 +210,71 @@ export function PropertiesPanel({ nodeId, elementInfo }: PropertiesPanelProps) {
             )}
           </div>
         </>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Slot-content editor for components in marketer mode. Handles three cases:
+ *  1. Empty self-closing component (`<Cta />`) — inserting text converts it to
+ *     `<Cta>text</Cta>` via add-element mutation.
+ *  2. Existing text content — update-text mutation.
+ *  3. Component with non-text children (e.g. <Cta><Icon /></Cta>) — shows a
+ *     read-only hint directing the user to the tree for structural editing.
+ */
+function ComponentContentField({
+  existingText,
+  hasChildren,
+  onUpdate,
+  onAdd,
+}: {
+  existingText: string | null;
+  hasChildren: boolean;
+  onUpdate: (text: string) => void;
+  onAdd: (text: string) => void;
+}) {
+  const hasNonTextChildren = hasChildren && existingText == null;
+
+  if (hasNonTextChildren) {
+    return (
+      <div className="border-b border-zinc-800 px-3 py-2.5">
+        <div className="mb-2 text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">
+          Content
+        </div>
+        <p className="text-[11px] text-zinc-500 italic">
+          This component contains nested elements. Edit them in the tree view (Dev mode).
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="border-b border-zinc-800 px-3 py-2.5">
+      <div className="mb-2 text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">
+        Content
+      </div>
+      <textarea
+        key={existingText ?? "__empty__"}
+        defaultValue={existingText ?? ""}
+        placeholder={existingText == null ? "Add slot content…" : ""}
+        onBlur={(e) => {
+          const next = e.target.value;
+          const prev = existingText ?? "";
+          if (next === prev) return;
+          if (existingText == null) {
+            if (next.trim()) onAdd(next);
+          } else {
+            onUpdate(next);
+          }
+        }}
+        rows={3}
+        className="w-full resize-y border border-zinc-800 bg-zinc-900 px-2 py-1.5 text-[11px] text-zinc-200 outline-none focus:border-blue-500 placeholder:text-zinc-600"
+      />
+      {existingText == null && (
+        <p className="mt-1 text-[10px] text-zinc-600">
+          Type text and click outside to insert it into this component's slot.
+        </p>
       )}
     </div>
   );

@@ -5,6 +5,7 @@ import type {
   ProjectInfo,
   ContentFileInfo,
   ContentFile,
+  ComponentPropSchema,
 } from "@tve/shared";
 
 const API_BASE = "/api";
@@ -82,6 +83,12 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ componentPath }),
     });
+  },
+
+  /** Fetch the typed Props schema for a component by path */
+  getComponentProps(componentPath: string): Promise<ComponentPropSchema> {
+    const qs = encodeURIComponent(componentPath);
+    return fetchJson(`/components/props?path=${qs}`);
   },
 
   /** Get TVE project config (defaultMode, etc.) */

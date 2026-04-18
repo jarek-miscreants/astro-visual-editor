@@ -2,8 +2,33 @@ import { Router } from "express";
 import fs from "fs/promises";
 import path from "path";
 import { parseAstroFileAsync, buildNodeMap } from "../services/astro-parser.js";
+import { getComponentPropSchema } from "../services/component-props.js";
 
 export const componentsRouter = Router();
+
+/** GET /api/components/props?path=<relPath> — Return typed Props schema for a component */
+componentsRouter.get("/props", async (req, res) => {
+  try {
+    const projectPath = req.app.locals.projectPath as string;
+    const relPath = (req.query.path as string | undefined)?.replace(/\\/g, "/");
+    if (!relPath) {
+      res.status(400).json({ error: "path query param is required" });
+      return;
+    }
+    if (relPath.includes("..")) {
+      res.status(400).json({ error: "invalid path" });
+      return;
+    }
+    const schema = await getComponentPropSchema(projectPath, relPath);
+    res.json(schema);
+  } catch (err: any) {
+    if (err?.code === "ENOENT") {
+      res.status(404).json({ error: "component not found" });
+      return;
+    }
+    res.status(500).json({ error: err?.message || "failed to parse props" });
+  }
+});
 
 const PREVIEW_PAGE = "tve-preview.astro";
 

@@ -6,6 +6,9 @@ import { useEditorStore } from "../../store/editor-store";
 interface AddElementPanelProps {
   onSelect: (html: string) => void;
   onClose: () => void;
+  /** If true, only show project components — hide raw HTML element templates.
+   *  Used in marketer mode where the authoring surface is pre-built blocks. */
+  componentsOnly?: boolean;
 }
 
 const GROUP_ICONS: Record<string, React.ReactNode> = {
@@ -17,7 +20,7 @@ const GROUP_ICONS: Record<string, React.ReactNode> = {
   Astro: <Layers size={11} />,
 };
 
-export function AddElementPanel({ onSelect, onClose }: AddElementPanelProps) {
+export function AddElementPanel({ onSelect, onClose, componentsOnly = false }: AddElementPanelProps) {
   const [search, setSearch] = useState("");
   const files = useEditorStore((s) => s.files);
 
@@ -25,6 +28,9 @@ export function AddElementPanel({ onSelect, onClose }: AddElementPanelProps) {
   const components = files.filter((f) => f.type === "component");
 
   const query = search.toLowerCase();
+  const filteredComponents = components.filter(
+    (c) => !query || c.path.toLowerCase().includes(query)
+  );
 
   return (
     <div className="w-64 max-h-96 overflow-auto  border border-zinc-700 bg-zinc-800 shadow-xl">
@@ -50,26 +56,35 @@ export function AddElementPanel({ onSelect, onClose }: AddElementPanelProps) {
               <Component size={10} />
               Components
             </div>
-            {components
-              .filter((c) => !query || c.path.toLowerCase().includes(query))
-              .map((comp) => {
-                const name = comp.path.split("/").pop()?.replace(".astro", "") || comp.path;
-                return (
-                  <button
-                    key={comp.path}
-                    onClick={() => onSelect(`<${name} />`)}
-                    className="flex w-full items-center gap-2  px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-700"
-                  >
-                    <Component size={11} className="text-cyan-400" />
-                    <span className="font-mono">{name}</span>
-                  </button>
-                );
-              })}
+            {filteredComponents.map((comp) => {
+              const name = comp.path.split("/").pop()?.replace(".astro", "") || comp.path;
+              return (
+                <button
+                  key={comp.path}
+                  onClick={() => onSelect(`<${name} />`)}
+                  className="flex w-full items-center gap-2  px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-700"
+                >
+                  <Component size={11} className="text-cyan-400" />
+                  <span className="font-mono">{name}</span>
+                </button>
+              );
+            })}
           </div>
         )}
 
-        {/* HTML element groups */}
-        {ELEMENT_TEMPLATES.map((group) => {
+        {componentsOnly && components.length === 0 && (
+          <div className="px-2 py-4 text-center text-[11px] text-zinc-500">
+            No components found in this project.
+          </div>
+        )}
+        {componentsOnly && components.length > 0 && filteredComponents.length === 0 && (
+          <div className="px-2 py-3 text-center text-[11px] text-zinc-500">
+            No components match "{search}".
+          </div>
+        )}
+
+        {/* HTML element groups — hidden in componentsOnly mode */}
+        {!componentsOnly && ELEMENT_TEMPLATES.map((group) => {
           const filtered = group.templates.filter(
             (t) => !query || t.tag.includes(query) || t.label.toLowerCase().includes(query)
           );

@@ -209,6 +209,23 @@ export function setupInteraction(
         overlay.clearHover();
       }
     }
+
+    if (message.type === "tve:select-node") {
+      if (!message.nodeId) {
+        selectedElement = null;
+        overlay.clear();
+        return;
+      }
+      const el = domMapper.getElementByNodeId(message.nodeId);
+      if (!el) return;
+      if (selectedElement === el) return; // idempotent — avoids loop with tve:select round-trip
+      selectedElement = el;
+      const rect = el.getBoundingClientRect();
+      const cs = getComputedStyle(el);
+      overlay.clearHover();
+      overlay.showSelected(rect, cs);
+      el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
   });
 }
 

@@ -10,6 +10,7 @@ import {
   type DragOverEvent,
 } from "@dnd-kit/core";
 import { ChevronRight, ChevronDown, Box, Type, Image, Component, Code, GripVertical, Layers } from "lucide-react";
+import { useDraggable, useDroppable } from "@dnd-kit/core";
 import type { ASTNode } from "@tve/shared";
 import { useEditorStore } from "../../store/editor-store";
 import { highlightNodeInIframe } from "../../lib/iframe-bridge";
@@ -37,8 +38,10 @@ export function ElementTree({ nodes, depth }: ElementTreeProps) {
   const applyMutation = useEditorStore((s) => s.applyMutation);
   const ast = useEditorStore((s) => s.ast);
 
+  // distance: 8px threshold lets plain clicks through without starting a drag,
+  // without adding delay (which would make the drag feel sluggish, not snappier).
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
   );
 
   function findParent(
@@ -100,7 +103,10 @@ export function ElementTree({ nodes, depth }: ElementTreeProps) {
       position = "inside";
     }
 
-    setDropTarget({ nodeId: overId, position });
+    setDropTarget((prev) => {
+      if (prev && prev.nodeId === overId && prev.position === position) return prev;
+      return { nodeId: overId, position };
+    });
   }
 
   function handleDragEnd(event: DragEndEvent) {
@@ -234,6 +240,19 @@ function TreeNode({
   const hasChildren = node.children.length > 0;
   const isDragging = draggedNodeId === node.nodeId;
 
+  // Drag + drop wired to the whole row — click passes through thanks to
+  // the 8px activation distance set on the PointerSensor.
+  const { attributes, listeners, setNodeRef: setDragRef } = useDraggable({ id: node.nodeId });
+  const { setNodeRef: setDropRef } = useDroppable({ id: node.nodeId });
+  const setRowRef = useCallback(
+    (el: HTMLDivElement | null) => {
+      (nodeRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
+      setDragRef(el);
+      setDropRef(el);
+    },
+    [setDragRef, setDropRef]
+  );
+
   // Scroll into view when selected from iframe
   if (isSelected && nodeRef.current) {
     nodeRef.current.scrollIntoView({ block: "nearest", behavior: "smooth" });
@@ -283,9 +302,11 @@ function TreeNode({
       )}
 
       <div
-        ref={nodeRef}
+        ref={setRowRef}
         data-tve-node-id={node.nodeId}
-        className={`group flex cursor-pointer items-center gap-1  px-1 py-0.5 text-xs transition-colors ${
+        {...listeners}
+        {...attributes}
+        className={`group flex cursor-pointer items-center gap-1 px-1 text-xs leading-6 transition-colors ${
           isDragging
             ? "opacity-30"
             : isSelected
@@ -316,11 +337,11 @@ function TreeNode({
         onContextMenu={handleContextMenu}
         onMouseEnter={() => highlightNodeInIframe(node.nodeId)}
         onMouseLeave={() => highlightNodeInIframe(null)}
-        // Make this a drag source + drop target using data attributes
-        // (we'll use a custom sensor approach below)
       >
-        {/* Drag handle */}
-        <DragHandle nodeId={node.nodeId} />
+        {/* Visual drag-affordance — no longer a drag source; the whole row is draggable */}
+        <span className="shrink-0 text-zinc-600 opacity-0 group-hover:opacity-100">
+          <GripVertical size={10} />
+        </span>
 
         {/* Expand toggle */}
         {hasChildren || hasSlot ? (
@@ -429,7 +450,7 @@ function SlotPlaceholder({ nodeId, depth, slotName }: { nodeId: string; depth: n
   return (
     <div ref={setNodeRef}>
       <div
-        className="flex cursor-pointer items-center gap-1.5  border border-dashed border-green-500/30 mx-1 my-0.5 px-2 py-1 text-[10px] text-green-500/60 hover:border-green-500/60 hover:text-green-400 transition-colors"
+        className="flex cursor-pointer items-center gap-1.5  border border-dashed border-green-500/30 mx-1 my-0.5 px-2 py-1 text-[10px] leading-5 text-green-500/60 hover:border-green-500/60 hover:text-green-400 transition-colors"
         style={{ marginLeft: `${depth * 12 + 4}px` }}
         onClick={() => setShowAdd(!showAdd)}
       >
@@ -454,36 +475,6 @@ function SlotPlaceholder({ nodeId, depth, slotName }: { nodeId: string; depth: n
         </div>
       )}
     </div>
-  );
-}
-
-// ── Drag handle using @dnd-kit's useDraggable ──────────────────
-
-import { useDraggable, useDroppable } from "@dnd-kit/core";
-
-function DragHandle({ nodeId }: { nodeId: string }) {
-  const { attributes, listeners, setNodeRef } = useDraggable({ id: nodeId });
-  const { setNodeRef: setDropRef } = useDroppable({ id: nodeId });
-
-  // Combine refs
-  const combinedRef = useCallback(
-    (el: HTMLElement | null) => {
-      setNodeRef(el);
-      setDropRef(el);
-    },
-    [setNodeRef, setDropRef]
-  );
-
-  return (
-    <span
-      ref={combinedRef}
-      {...listeners}
-      {...attributes}
-      className="shrink-0 cursor-grab text-zinc-600 opacity-0 group-hover:opacity-100 active:cursor-grabbing"
-      onClick={(e) => e.stopPropagation()}
-    >
-      <GripVertical size={10} />
-    </span>
   );
 }
 

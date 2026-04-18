@@ -318,6 +318,22 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
           overlay.clearHover();
         }
       }
+      if (message.type === "tve:select-node") {
+        if (!message.nodeId) {
+          selectedElement = null;
+          overlay.clear();
+          return;
+        }
+        const el = domMapper.getElementByNodeId(message.nodeId);
+        if (!el) return;
+        if (selectedElement === el) return;
+        selectedElement = el;
+        const rect = el.getBoundingClientRect();
+        const cs = getComputedStyle(el);
+        overlay.clearHover();
+        overlay.showSelected(rect, cs);
+        el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
     });
   }
   function getDirectTextContent(element) {

@@ -104,21 +104,23 @@ export function LeftSidebar() {
           {userMode === "marketer" ? "Blocks" : "Elements"}
         </span>
         <div className="flex items-center gap-0.5">
-          {userMode === "dev" && (
-            <button
-              ref={addBtnRef}
-              onClick={() => setShowAddPanel(!showAddPanel)}
-              disabled={!selectedNodeId}
-              className={`flex h-6 w-6 items-center justify-center  transition-colors ${
-                selectedNodeId
-                  ? "text-zinc-400 hover:bg-zinc-900 hover:text-white"
-                  : "text-zinc-700 cursor-not-allowed"
-              }`}
-              title="Add child element (Ctrl+E)"
-            >
-              <Plus size={13} />
-            </button>
-          )}
+          <button
+            ref={addBtnRef}
+            onClick={() => setShowAddPanel(!showAddPanel)}
+            disabled={!selectedNodeId}
+            className={`flex h-6 w-6 items-center justify-center  transition-colors ${
+              selectedNodeId
+                ? "text-zinc-400 hover:bg-zinc-900 hover:text-white"
+                : "text-zinc-700 cursor-not-allowed"
+            }`}
+            title={
+              userMode === "marketer"
+                ? "Add component block"
+                : "Add child element (Ctrl+E)"
+            }
+          >
+            <Plus size={13} />
+          </button>
           {showAddPanel && addBtnRef.current && createPortal(
             <div
               ref={panelRef}
@@ -131,6 +133,7 @@ export function LeftSidebar() {
               <AddElementPanel
                 onSelect={handleAddElement}
                 onClose={() => setShowAddPanel(false)}
+                componentsOnly={userMode === "marketer"}
               />
             </div>,
             document.body

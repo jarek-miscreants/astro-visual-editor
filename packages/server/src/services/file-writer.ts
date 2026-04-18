@@ -128,25 +128,33 @@ export async function applyMutation(
         );
         const childIndent = parentIndent + "  ";
 
-        // Check if parent is self-closing (e.g., <Component /> or <slot />)
-        // Search for /> within the element's source range
+        // Check if parent is self-closing (e.g., <Component /> or <slot />).
+        // The Astro parser sometimes reports an end offset that doesn't include
+        // the trailing `>` for self-closing tags, so extend the search by a
+        // couple of bytes to reliably find `/>`.
+        const selfCloseSearchEnd = Math.min(
+          parentNode.position.end.offset + 2,
+          source.length
+        );
         const parentSource = source.slice(
           parentNode.position.start.offset,
-          parentNode.position.end.offset
+          selfCloseSearchEnd
         );
-        // Find the last occurrence of /> in the element source
-        const selfCloseIdx = parentSource.lastIndexOf("/>");
-        const isSelfClosing = selfCloseIdx !== -1 && parentNode.children.length === 0;
+        const selfCloseMatch = parentSource.match(/\/\s*>/);
+        const isSelfClosing =
+          selfCloseMatch !== null && parentNode.children.length === 0;
 
         if (isSelfClosing) {
           // Convert self-closing to open/close: <Tag /> → <Tag>\n  child\n</Tag>
+          const matchIdx = selfCloseMatch!.index!;
+          const matchLen = selfCloseMatch![0].length;
           // Find the space before /> to trim it
-          let trimStart = selfCloseIdx;
+          let trimStart = matchIdx;
           while (trimStart > 0 && parentSource[trimStart - 1] === " ") {
             trimStart--;
           }
           const absStart = parentNode.position.start.offset + trimStart;
-          const absEnd = parentNode.position.start.offset + selfCloseIdx + 2; // +2 for />
+          const absEnd = parentNode.position.start.offset + matchIdx + matchLen;
           const replacement = `>\n${childIndent}${mutation.html}\n${parentIndent}</${parentNode.tagName}>`;
           s.overwrite(absStart, absEnd, replacement);
         } else if (
