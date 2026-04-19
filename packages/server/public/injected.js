@@ -419,8 +419,7 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
       const body = document.body;
       if (!body) return;
       const bodyElements = this.getContentElements(body);
-      const flatRoots = this.flattenComponents(this.ast);
-      this.matchChildren(flatRoots, bodyElements);
+      this.matchChildren(this.ast, bodyElements);
       this.mapComponentsToDOM(this.ast);
       console.log(
         `[TVE DOM Mapper] Mapped ${this.elementToNodeId.size} elements (${this.nodeIdToInstances.size} dynamic templates)`
@@ -428,16 +427,16 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
     }
     /**
      * Match a list of AST nodes against a list of DOM elements.
-     * Handles dynamic nodes by matching multiple consecutive DOM elements
-     * against a single AST template node.
+     * Handles components (which render their own wrapper DOM element) by
+     * consuming the next DOM element as the component's wrapper and searching
+     * inside its subtree for slot content matches.
      */
     matchChildren(astNodes, domElements) {
       let domIndex = 0;
       for (const astNode of astNodes) {
         if (domIndex >= domElements.length) break;
         if (astNode.isComponent || this.isPascalCase(astNode.tagName)) {
-          const flatChildren = this.flattenComponents(astNode.children);
-          const consumed = this.matchChildren(flatChildren, domElements.slice(domIndex));
+          const consumed = this.matchComponent(astNode, domElements, domIndex);
           domIndex += consumed;
           continue;
         }
@@ -461,6 +460,111 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
       return domIndex;
     }
     /**
+     * Match an AST component node against DOM.
+     * Two modes:
+     *  - Transparent: the component renders its children inline (no wrapper).
+     *    Detected when the next DOM element's tag+classes match the component's
+     *    first non-component descendant.
+     *  - Wrapping: the component renders its own wrapper around the slot.
+     *    Consume the next DOM element as the wrapper, then search inside it
+     *    for the best subtree to host the component's AST children.
+     */
+    matchComponent(astNode, domElements, startIndex) {
+      if (startIndex >= domElements.length) return 0;
+      const children = astNode.children;
+      const nextDom = domElements[startIndex];
+      const firstRealChild = this.firstNonComponentDescendant(children);
+      let bestScore = 0;
+      if (firstRealChild) {
+        for (let i = startIndex; i < domElements.length; i++) {
+          const s = this.scoreMatch(firstRealChild, domElements[i]);
+          if (s > bestScore) bestScore = s;
+        }
+      }
+      if (bestScore >= 2) {
+        const beforeCount = this.elementToNodeId.size;
+        const consumed = this.matchChildren(children, domElements.slice(startIndex));
+        if (this.elementToNodeId.size > beforeCount && !this.nodeIdToElement.has(astNode.nodeId)) {
+          const firstMapped = this.findFirstMappedDescendantEl(children);
+          if (firstMapped) this.nodeIdToElement.set(astNode.nodeId, firstMapped);
+        }
+        return consumed;
+      }
+      this.elementToNodeId.set(nextDom, astNode.nodeId);
+      this.nodeIdToElement.set(astNode.nodeId, nextDom);
+      if (children.length > 0) {
+        this.findAndMatchInSubtree(children, nextDom);
+      }
+      return 1;
+    }
+    /** BFS the wrapper's subtree for the best set of siblings to host astChildren. */
+    findAndMatchInSubtree(astChildren, root) {
+      const firstAst = this.firstNonComponentDescendant(astChildren);
+      if (!firstAst) {
+        const direct = this.getContentElements(root);
+        if (direct.length > 0) this.matchChildren(astChildren, direct);
+        return;
+      }
+      let bestChildren = null;
+      let bestScore = 0;
+      const walk = (el, depth) => {
+        if (depth > 8) return;
+        const siblings = this.getContentElements(el);
+        if (siblings.length > 0) {
+          const score = this.scoreMatch(firstAst, siblings[0]);
+          if (score > bestScore) {
+            bestScore = score;
+            bestChildren = siblings;
+          }
+        }
+        for (const child of siblings) walk(child, depth + 1);
+      };
+      walk(root, 0);
+      if (bestChildren) {
+        this.matchChildren(astChildren, bestChildren);
+      }
+    }
+    /** First AST node in the subtree that isn't a component (i.e. renders as a DOM element). */
+    firstNonComponentDescendant(nodes) {
+      for (const node of nodes) {
+        if (node.isComponent || this.isPascalCase(node.tagName)) {
+          const found = this.firstNonComponentDescendant(node.children);
+          if (found) return found;
+        } else {
+          return node;
+        }
+      }
+      return null;
+    }
+    /** First DOM element reachable through already-mapped descendants. */
+    findFirstMappedDescendantEl(nodes) {
+      for (const node of nodes) {
+        const el = this.nodeIdToElement.get(node.nodeId);
+        if (el) return el;
+        const deeper = this.findFirstMappedDescendantEl(node.children);
+        if (deeper) return deeper;
+      }
+      return null;
+    }
+    /** Score a tag+class+attribute overlap. 0 means tag mismatch (reject). */
+    scoreMatch(astNode, domEl) {
+      if (astNode.tagName.toLowerCase() !== domEl.tagName.toLowerCase()) return 0;
+      let score = 1;
+      const astClasses = (astNode.classes || "").split(/\s+/).filter(Boolean);
+      const domClassAttr = typeof domEl.className === "string" ? domEl.className : "";
+      const domClassSet = new Set(domClassAttr.split(/\s+/).filter(Boolean));
+      for (const cls of astClasses) {
+        if (domClassSet.has(cls)) score += 2;
+      }
+      if (astNode.attributes) {
+        for (const [key, val] of Object.entries(astNode.attributes)) {
+          if (key === "class") continue;
+          if (domEl.getAttribute(key) === val) score += 2;
+        }
+      }
+      return score;
+    }
+    /**
      * Try to match a dynamic template node against multiple consecutive DOM elements.
      * Returns the number of DOM elements consumed.
      */
@@ -479,9 +583,8 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
         this.nodeIdToElement.set(astNode.nodeId, instances[0]);
         this.nodeIdToInstances.set(astNode.nodeId, instances);
         const childElements = this.getContentElements(instances[0]);
-        const flatChildren = this.flattenComponents(astNode.children);
-        if (flatChildren.length > 0 && childElements.length > 0) {
-          this.matchChildren(flatChildren, childElements);
+        if (astNode.children.length > 0 && childElements.length > 0) {
+          this.matchChildren(astNode.children, childElements);
         }
       }
       return instances.length;
@@ -499,9 +602,8 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
         this.elementToNodeId.set(domEl, astNode.nodeId);
         this.nodeIdToElement.set(astNode.nodeId, domEl);
         const childElements = this.getContentElements(domEl);
-        const flatChildren = this.flattenComponents(astNode.children);
-        if (flatChildren.length > 0 && childElements.length > 0) {
-          this.matchChildren(flatChildren, childElements);
+        if (astNode.children.length > 0 && childElements.length > 0) {
+          this.matchChildren(astNode.children, childElements);
         }
         return { success: true, nextIndex: startIndex + 1 };
       }
