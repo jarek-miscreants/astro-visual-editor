@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Paintbrush, LayoutGrid, Type as TypeIcon, Sparkles } from "lucide-react";
-import type { ElementInfo } from "@tve/shared";
+import type { ElementInfo, ASTNode } from "@tve/shared";
 import { useEditorStore } from "../../store/editor-store";
 import { useModeStore } from "../../store/mode-store";
 import { TailwindClassEditor } from "./TailwindClassEditor";
@@ -78,9 +78,18 @@ export function PropertiesPanel({ nodeId, elementInfo }: PropertiesPanelProps) {
                 tagName={elementInfo.tagName}
                 attributes={attributes}
               />
+              {astNode && (
+                <SlotContentEditor
+                  children={astNode.children}
+                  onUpdate={(childId, text) =>
+                    applyMutation({ type: "update-text", nodeId: childId, text })
+                  }
+                />
+              )}
               <ComponentContentField
                 existingText={astNode?.textContent ?? null}
                 hasChildren={(astNode?.children.length ?? 0) > 0}
+                hasTextEditableSlots={hasAnyTextEditableSlot(astNode?.children ?? [])}
                 onUpdate={(text) => applyMutation({ type: "update-text", nodeId, text })}
                 onAdd={(text) =>
                   applyMutation({
@@ -226,17 +235,22 @@ export function PropertiesPanel({ nodeId, elementInfo }: PropertiesPanelProps) {
 function ComponentContentField({
   existingText,
   hasChildren,
+  hasTextEditableSlots,
   onUpdate,
   onAdd,
 }: {
   existingText: string | null;
   hasChildren: boolean;
+  hasTextEditableSlots?: boolean;
   onUpdate: (text: string) => void;
   onAdd: (text: string) => void;
 }) {
   const hasNonTextChildren = hasChildren && existingText == null;
 
   if (hasNonTextChildren) {
+    // If SlotContentEditor already exposed something editable, don't show a
+    // redundant "contains nested elements" hint.
+    if (hasTextEditableSlots) return null;
     return (
       <div className="border-b border-zinc-800 px-3 py-2.5">
         <div className="mb-2 text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">
@@ -276,6 +290,87 @@ function ComponentContentField({
           Type text and click outside to insert it into this component's slot.
         </p>
       )}
+    </div>
+  );
+}
+
+/** True when the child has direct text content and no structural children. */
+function isTextLeaf(child: ASTNode): boolean {
+  if (child.isComponent) return false;
+  if (/^[A-Z]/.test(child.tagName)) return false;
+  if (child.children.length > 0) return false;
+  return typeof child.textContent === "string" && child.textContent.length > 0;
+}
+
+/** A child is a marketer-editable slot entry when it has a slot attribute or
+ *  it's a simple text leaf directly under the component. */
+function isEditableSlotChild(child: ASTNode): boolean {
+  if (!isTextLeaf(child)) return false;
+  // Any direct text leaf qualifies; named slots get a nicer label.
+  return true;
+}
+
+function hasAnyTextEditableSlot(children: ASTNode[]): boolean {
+  return children.some(isEditableSlotChild);
+}
+
+function formatSlotLabel(child: ASTNode): string {
+  const slot = child.attributes?.slot;
+  if (slot) return slot.charAt(0).toUpperCase() + slot.slice(1);
+  // No slot attribute — label by tag (p → "Paragraph", h2 → "Heading 2")
+  const tag = child.tagName.toLowerCase();
+  const map: Record<string, string> = {
+    p: "Paragraph",
+    span: "Text",
+    h1: "Heading 1",
+    h2: "Heading 2",
+    h3: "Heading 3",
+    h4: "Heading 4",
+    h5: "Heading 5",
+    h6: "Heading 6",
+    a: "Link",
+    li: "List item",
+  };
+  return map[tag] || tag;
+}
+
+function SlotContentEditor({
+  children,
+  onUpdate,
+}: {
+  children: ASTNode[];
+  onUpdate: (childId: string, text: string) => void;
+}) {
+  const editable = children.filter(isEditableSlotChild);
+  if (editable.length === 0) return null;
+
+  return (
+    <div className="border-b border-zinc-800 px-3 py-2.5">
+      <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
+        Slot content
+      </div>
+      <div className="space-y-3">
+        {editable.map((child) => (
+          <div key={child.nodeId} className="flex flex-col gap-1">
+            <label className="text-[10px] font-medium text-zinc-300 capitalize">
+              {formatSlotLabel(child)}
+            </label>
+            <textarea
+              key={child.textContent ?? "__empty__"}
+              defaultValue={child.textContent ?? ""}
+              rows={Math.min(
+                6,
+                Math.max(2, Math.ceil((child.textContent?.length ?? 0) / 48))
+              )}
+              onBlur={(e) => {
+                const next = e.target.value;
+                if (next !== (child.textContent ?? "")) onUpdate(child.nodeId, next);
+              }}
+              className="w-full resize-y border border-zinc-800 bg-zinc-900 px-2 py-1.5 text-[12px] text-zinc-100 outline-none focus:border-blue-500 placeholder:text-zinc-600"
+            />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
