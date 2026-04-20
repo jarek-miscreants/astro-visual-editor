@@ -244,8 +244,23 @@ export async function applyMutation(
         );
         const childIndent = parentIndent + "  ";
 
+        // Find current parent and current index so we can detect
+        // same-parent forward moves (where naive appendLeft on the target's
+        // pre-move offset lands adjacent to the removed source and produces
+        // a no-op).
+        const parentInfo = findParentIndex(ast, mutation.nodeId);
+        const isSameParent =
+          parentInfo != null && parentInfo.parent.nodeId === newParent.nodeId;
+        const currentIndex = parentInfo?.index ?? -1;
+        // For same-parent forward moves, bump newPosition by 1 so we insert
+        // AFTER the swap target rather than before it.
+        let effectivePosition = mutation.newPosition;
+        if (isSameParent && currentIndex >= 0 && effectivePosition > currentIndex) {
+          effectivePosition = effectivePosition + 1;
+        }
+
         if (
-          mutation.newPosition >= newParent.children.length ||
+          effectivePosition >= newParent.children.length ||
           newParent.children.length === 0
         ) {
           const closeTagStart = findCloseTagStart(
@@ -255,9 +270,26 @@ export async function applyMutation(
           );
           s.appendLeft(closeTagStart, `\n${childIndent}${elementText}`);
         } else {
-          const targetChild = newParent.children[mutation.newPosition];
+          const targetChild = newParent.children[effectivePosition];
+          // If the target child is the moved node itself (no-op path after
+          // idx adjustments) skip writing — otherwise magic-string would
+          // overwrite inside the removed range.
+          if (targetChild.nodeId === mutation.nodeId) {
+            break;
+          }
+          // CRITICAL: the Astro compiler reports off-by-2/3 start offsets for
+          // some elements (most notably <span>), landing INSIDE the tag name.
+          // If we appendLeft at that raw offset we wedge the moved element
+          // into the middle of the target's opening tag. Validate first.
+          const targetRange = validateElementRange(source, targetChild);
+          if (!targetRange) {
+            return {
+              success: false,
+              error: `Could not validate target position for <${targetChild.tagName}>`,
+            };
+          }
           s.appendLeft(
-            targetChild.position.start.offset,
+            targetRange.start,
             `${elementText}\n${childIndent}`
           );
         }
@@ -329,8 +361,21 @@ export async function applyMutation(
         return { success: false, error: `Unknown mutation type` };
     }
 
+    // Pre-flight safety: reject output that obviously mangles source.
+    // A pattern like `<Tag<OtherTag` means we inserted a tag *inside* another
+    // tag's name — classic symptom of a stale offset. Bail before touching
+    // disk so we never persist a broken file.
+    const nextSource = s.toString();
+    const corruption = detectTagSplit(nextSource);
+    if (corruption) {
+      return {
+        success: false,
+        error: `Mutation would corrupt source at offset ${corruption.offset}: "${corruption.snippet}". Likely caused by a stale element reference — try re-selecting the element and retrying.`,
+      };
+    }
+
     // Write the modified source back
-    await fs.writeFile(filePath, s.toString(), "utf-8");
+    await fs.writeFile(filePath, nextSource, "utf-8");
 
     // Re-parse to return updated AST
     const { ast: newAst } = await parseAstroFileAsync(filePath);
@@ -338,6 +383,35 @@ export async function applyMutation(
   } catch (err: any) {
     return { success: false, error: err.message };
   }
+}
+
+/**
+ * Detect corruption patterns where a mutation wedged a tag inside another.
+ * Covers two variants observed in practice:
+ *   `<Word<OtherTag`   — tag immediately inside another's name
+ *   `<Word   <Other`   — same, with whitespace between (still invalid, an
+ *                        opening tag never gets another `<` before `>`)
+ * Ignores CDATA / comments / closing tags — we only flag unambiguous
+ * opening-tag boundaries being re-entered.
+ */
+function detectTagSplit(source: string): { offset: number; snippet: string } | null {
+  // `<` + identifier chars + (optional) whitespace + `<` not followed by `/`
+  // A well-formed opening tag must reach `>` (or `/>`) before any `<`.
+  const re = /<([A-Za-z][A-Za-z0-9]*)[^<>]*?<(?!\/)/g;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(source)) !== null) {
+    const chunk = match[0];
+    // Reject matches where the span between the two `<` contains a `>` —
+    // that would mean the first tag closed legitimately.
+    if (chunk.indexOf(">", 1) !== -1) continue;
+    // Reject if it contains `=` on an unclosed attribute — that's the
+    // rare case of a stray `<` inside an attribute value without quotes,
+    // which is its own problem but not what we're trying to catch here.
+    const offset = match.index;
+    const snippet = source.slice(Math.max(0, offset - 5), offset + 30).replace(/\s+/g, " ");
+    return { offset, snippet };
+  }
+  return null;
 }
 
 /**
@@ -538,4 +612,21 @@ function findCloseTagStart(
   const closeTag = `</${tagName}>`;
   const idx = source.lastIndexOf(closeTag, endOffset);
   return idx !== -1 ? idx : endOffset;
+}
+
+/** Walk the AST looking for the parent of a node. Returns null at the root. */
+function findParentIndex(
+  nodes: ASTNode[],
+  targetId: string
+): { parent: ASTNode; index: number } | null {
+  for (const n of nodes) {
+    for (let i = 0; i < n.children.length; i++) {
+      if (n.children[i].nodeId === targetId) {
+        return { parent: n, index: i };
+      }
+    }
+    const found = findParentIndex(n.children, targetId);
+    if (found) return found;
+  }
+  return null;
 }

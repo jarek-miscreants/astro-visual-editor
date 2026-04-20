@@ -73,6 +73,8 @@ export function SelectionToolbar({ iframeRef }: Props) {
   function moveSibling(direction: -1 | 1) {
     if (!parentInfo || !selectedNodeId) return;
     const newPosition = parentInfo.index + direction;
+    if (newPosition < 0 || newPosition >= parentInfo.parent.children.length) return;
+    if (newPosition === parentInfo.index) return;
     applyMutation({
       type: "move-element",
       nodeId: selectedNodeId,

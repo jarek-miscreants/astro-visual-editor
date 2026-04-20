@@ -139,7 +139,25 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         if (msg.type === "file:changed") {
           const state = get();
           if (state.currentFile === msg.path) {
-            set({ ast: msg.ast, nodeMap: buildNodeMap(msg.ast) });
+            const newMap = buildNodeMap(msg.ast);
+            const patch: Partial<EditorState> = {
+              ast: msg.ast,
+              nodeMap: newMap,
+            };
+            // The file was edited outside of a user mutation (manual save,
+            // formatter run, another tool). Positional nodeIds may now point
+            // at different elements than what the user had selected. If the
+            // selection would end up on something with a different tag, drop
+            // it so the next action can't operate on the wrong target.
+            if (state.selectedNodeId) {
+              const stillThere = newMap.get(state.selectedNodeId);
+              const prevTag = state.selectedElementInfo?.tagName;
+              if (!stillThere || (prevTag && stillThere.tagName !== prevTag)) {
+                patch.selectedNodeId = null;
+                patch.selectedElementInfo = null;
+              }
+            }
+            set(patch);
             provideAstToIframe(msg.ast);
           }
         }
@@ -244,21 +262,55 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     try {
       const result = await api.applyMutation(state.currentFile, mutation);
       if (result.success && result.ast) {
+        const newNodeMap = buildNodeMap(result.ast);
         const nextState: Partial<EditorState> = {
           ast: result.ast,
-          nodeMap: buildNodeMap(result.ast),
+          nodeMap: newNodeMap,
         };
-        // After a structural mutation, the previous selectedNodeId is stale —
-        // nodeIds are positional (`tve-{hash}-{index}`), so deletes/inserts
-        // shift them. Clear selection so the next action doesn't operate on
-        // a different element that happened to land on the old index.
+
+        // Positional nodeIds (`tve-{hash}-{index}`) shift on structural edits.
+        // Keep selection pointed at something sensible.
         if (
           mutation.type === "remove-element" &&
           state.selectedNodeId === mutation.nodeId
         ) {
           nextState.selectedNodeId = null;
           nextState.selectedElementInfo = null;
+        } else if (mutation.type === "move-element") {
+          // Re-locate the moved element. newParentId is stable (we only move
+          // children, not their parent). After the server applies the move,
+          // the moved element sits at mutation.newPosition in the new AST.
+          const newParent = newNodeMap.get(mutation.newParentId);
+          const reselected = newParent?.children[mutation.newPosition];
+          if (reselected) {
+            nextState.selectedNodeId = reselected.nodeId;
+            nextState.selectedElementInfo = {
+              nodeId: reselected.nodeId,
+              tagName: reselected.tagName,
+              classes: reselected.classes,
+              textContent: reselected.textContent,
+              attributes: reselected.attributes,
+              rect: state.selectedElementInfo?.rect ?? { x: 0, y: 0, width: 0, height: 0 },
+              computedStyles: state.selectedElementInfo?.computedStyles ?? {
+                display: "", position: "", padding: "", margin: "",
+                fontSize: "", color: "", backgroundColor: "",
+              },
+            };
+          } else {
+            nextState.selectedNodeId = null;
+            nextState.selectedElementInfo = null;
+          }
+        } else if (
+          mutation.type === "duplicate-element" ||
+          mutation.type === "wrap-element" ||
+          mutation.type === "add-element"
+        ) {
+          // These all shift indices downstream. Dropping selection is safer
+          // than risking a subsequent action on the wrong element.
+          nextState.selectedNodeId = null;
+          nextState.selectedElementInfo = null;
         }
+
         set(nextState);
         toast.success(describeMutation(mutation), state.currentFile);
       } else if (!result.success) {
