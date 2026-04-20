@@ -42,6 +42,7 @@ export function PropertiesPanel({ nodeId, elementInfo }: PropertiesPanelProps) {
     : astNode?.classes ?? elementInfo.classes;
   const attributes = astNode?.attributes ?? elementInfo.attributes;
   const isComponent = astNode?.isComponent || /^[A-Z]/.test(elementInfo.tagName);
+  const textContent = astNode?.textContent ?? elementInfo.textContent;
 
   function handleClassesChange(newClasses: string) {
     applyMutation({ type: "update-classes", nodeId, classes: newClasses });
@@ -106,6 +107,11 @@ export function PropertiesPanel({ nodeId, elementInfo }: PropertiesPanelProps) {
                 }
               />
             </>
+          ) : textContent !== null ? (
+            <InlineTextContentField
+              text={textContent}
+              onUpdate={(text) => applyMutation({ type: "update-text", nodeId, text })}
+            />
           ) : (
             <MarketerPlaceholder
               isComponent={isComponent}
@@ -373,6 +379,37 @@ function SlotContentEditor({
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Marketer-mode Content editor for raw text elements (h1, p, span, …). Mirrors
+ * the ComponentContentField style but targets an existing text node directly
+ * instead of component slots.
+ */
+function InlineTextContentField({
+  text,
+  onUpdate,
+}: {
+  text: string;
+  onUpdate: (text: string) => void;
+}) {
+  return (
+    <div className="border-b border-zinc-800 px-3 py-2.5">
+      <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
+        Content
+      </div>
+      <textarea
+        key={text}
+        defaultValue={text}
+        placeholder="Empty — type to add text"
+        onBlur={(e) => {
+          if (e.target.value !== text) onUpdate(e.target.value);
+        }}
+        rows={Math.min(6, Math.max(2, Math.ceil(text.length / 48)))}
+        className="w-full resize-y border border-zinc-800 bg-zinc-900 px-2 py-1.5 text-[12px] text-zinc-100 outline-none focus:border-blue-500 placeholder:text-zinc-600"
+      />
     </div>
   );
 }
