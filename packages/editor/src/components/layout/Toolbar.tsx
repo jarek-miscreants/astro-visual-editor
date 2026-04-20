@@ -1,7 +1,6 @@
 import { useState } from "react";
 import {
   Play,
-  Square,
   Monitor,
   Tablet,
   Smartphone,
@@ -15,6 +14,7 @@ import {
   Code2,
   Sparkles,
   FolderOpen,
+  Keyboard,
 } from "lucide-react";
 import { useEditorStore } from "../../store/editor-store";
 import { useHistoryStore } from "../../store/history-store";
@@ -23,6 +23,8 @@ import { PageSelector } from "../page-selector/PageSelector";
 import { ComponentDialog } from "../dialogs/ComponentDialog";
 import { ProjectPickerDialog } from "../dialogs/ProjectPickerDialog";
 import { DesignSystemPanel } from "../design-system/DesignSystemPanel";
+import { Tooltip } from "../ui/Tooltip";
+import { openShortcutsDialog } from "../ui/ShortcutsDialog";
 
 export function Toolbar() {
   const [showNewComponent, setShowNewComponent] = useState(false);
@@ -52,14 +54,15 @@ export function Toolbar() {
   return (
     <div className="flex h-12 items-center gap-2 border-b border-zinc-800 bg-zinc-950 px-3">
       {/* Project name — click to switch project */}
-      <button
-        onClick={() => setShowProjectPicker(true)}
-        className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-zinc-200 tracking-tight hover:text-white"
-        title="Open another project"
-      >
-        <FolderOpen size={11} className="text-zinc-500" />
-        {projectName || "Open project…"}
-      </button>
+      <Tooltip content="Open another project">
+        <button
+          onClick={() => setShowProjectPicker(true)}
+          className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-[11px] font-semibold text-zinc-200 tracking-tight hover:bg-zinc-900 hover:text-white"
+        >
+          <FolderOpen size={11} className="text-zinc-500" />
+          {projectName || "Open project…"}
+        </button>
+      </Tooltip>
 
       {showProjectPicker && (
         <ProjectPickerDialog
@@ -71,7 +74,7 @@ export function Toolbar() {
       <Divider />
 
       {/* User mode: Dev / Marketer */}
-      <div className="inline-flex items-center gap-0.5 border border-zinc-800 bg-zinc-900 p-0.5 shadow-sm">
+      <div className="inline-flex items-center gap-0.5 rounded-md border border-zinc-800 bg-zinc-900 p-0.5 shadow-sm">
         <SegmentButton active={userMode === "dev"} onClick={() => setUserMode("dev")}>
           <Code2 size={11} />
           Dev
@@ -88,7 +91,7 @@ export function Toolbar() {
       {devServerStatus === "stopped" || devServerStatus === "error" ? (
         <button
           onClick={startDevServer}
-          className="inline-flex h-7 items-center gap-1.5  bg-emerald-500 px-2.5 text-xs font-medium text-white shadow-sm hover:bg-emerald-400 transition-colors"
+          className="inline-flex h-7 items-center gap-1.5 rounded-md bg-emerald-500 px-2.5 text-xs font-medium text-white shadow-sm hover:bg-emerald-400 transition-colors"
         >
           <Play size={11} />
           Start
@@ -117,26 +120,28 @@ export function Toolbar() {
 
       {/* Undo/Redo */}
       <div className="flex items-center gap-0.5">
-        <IconButton
-          onClick={() => {
-            const entry = useHistoryStore.getState().undo();
-            if (entry) applyMutation(entry.inverse, true);
-          }}
-          disabled={!canUndo}
-          title="Undo (Ctrl+Z)"
-        >
-          <Undo2 size={13} />
-        </IconButton>
-        <IconButton
-          onClick={() => {
-            const entry = useHistoryStore.getState().redo();
-            if (entry) applyMutation(entry.mutation, true);
-          }}
-          disabled={!canRedo}
-          title="Redo (Ctrl+Shift+Z)"
-        >
-          <Redo2 size={13} />
-        </IconButton>
+        <Tooltip content="Undo" shortcut="Ctrl+Z">
+          <IconButton
+            onClick={() => {
+              const entry = useHistoryStore.getState().undo();
+              if (entry) applyMutation(entry.inverse, true);
+            }}
+            disabled={!canUndo}
+          >
+            <Undo2 size={13} />
+          </IconButton>
+        </Tooltip>
+        <Tooltip content="Redo" shortcut="Ctrl+Shift+Z">
+          <IconButton
+            onClick={() => {
+              const entry = useHistoryStore.getState().redo();
+              if (entry) applyMutation(entry.mutation, true);
+            }}
+            disabled={!canRedo}
+          >
+            <Redo2 size={13} />
+          </IconButton>
+        </Tooltip>
       </div>
 
       <Divider />
@@ -144,27 +149,29 @@ export function Toolbar() {
       {/* Dev-only: New Component + Design System */}
       {userMode === "dev" && (
         <>
-          <button
-            onClick={() => setShowNewComponent(true)}
-            className="inline-flex h-7 items-center gap-1.5  border border-zinc-800 bg-zinc-900 px-2.5 text-xs font-medium text-zinc-300 shadow-sm hover:bg-zinc-800 hover:text-white hover:border-zinc-700 transition-colors"
-            title="Create new component"
-          >
-            <Plus size={11} />
-            Component
-          </button>
+          <Tooltip content="Create new component">
+            <button
+              onClick={() => setShowNewComponent(true)}
+              className="inline-flex h-7 items-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-900 px-2.5 text-xs font-medium text-zinc-300 shadow-sm hover:bg-zinc-800 hover:text-white hover:border-zinc-700 transition-colors"
+            >
+              <Plus size={11} />
+              Component
+            </button>
+          </Tooltip>
 
           {showNewComponent && (
             <ComponentDialog mode="create" onClose={() => setShowNewComponent(false)} />
           )}
 
-          <button
-            onClick={() => setShowDesignSystem(true)}
-            className="inline-flex h-7 items-center gap-1.5  border border-zinc-800 bg-zinc-900 px-2.5 text-xs font-medium text-zinc-300 shadow-sm hover:bg-zinc-800 hover:text-white hover:border-zinc-700 transition-colors"
-            title="Design System"
-          >
-            <Palette size={11} />
-            Design
-          </button>
+          <Tooltip content="Design system tokens">
+            <button
+              onClick={() => setShowDesignSystem(true)}
+              className="inline-flex h-7 items-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-900 px-2.5 text-xs font-medium text-zinc-300 shadow-sm hover:bg-zinc-800 hover:text-white hover:border-zinc-700 transition-colors"
+            >
+              <Palette size={11} />
+              Design
+            </button>
+          </Tooltip>
 
           {showDesignSystem && (
             <DesignSystemPanel onClose={() => setShowDesignSystem(false)} />
@@ -174,8 +181,15 @@ export function Toolbar() {
 
       <div className="flex-1" />
 
+      {/* Keyboard shortcuts */}
+      <Tooltip content="Keyboard shortcuts" shortcut="?">
+        <IconButton onClick={openShortcutsDialog}>
+          <Keyboard size={13} />
+        </IconButton>
+      </Tooltip>
+
       {/* Mode toggle */}
-      <div className="inline-flex items-center gap-0.5  border border-zinc-800 bg-zinc-900 p-0.5 shadow-sm">
+      <div className="inline-flex items-center gap-0.5 rounded-md border border-zinc-800 bg-zinc-900 p-0.5 shadow-sm">
         <SegmentButton active={mode === "edit"} onClick={() => setMode("edit")}>
           <Pencil size={11} />
           Edit
@@ -187,24 +201,24 @@ export function Toolbar() {
       </div>
 
       {/* Device presets */}
-      <div className="inline-flex items-center gap-0.5  border border-zinc-800 bg-zinc-900 p-0.5 shadow-sm">
+      <div className="inline-flex items-center gap-0.5 rounded-md border border-zinc-800 bg-zinc-900 p-0.5 shadow-sm">
         {([
           { key: "desktop" as const, icon: <Monitor size={12} />, label: "Desktop" },
           { key: "tablet" as const, icon: <Tablet size={12} />, label: "Tablet (768px)" },
           { key: "mobile" as const, icon: <Smartphone size={12} />, label: "Mobile (375px)" },
         ]).map(({ key, icon, label }) => (
-          <button
-            key={key}
-            onClick={() => setDevicePreset(key)}
-            className={`flex h-6 w-6 items-center justify-center  transition-colors ${
-              devicePreset === key
-                ? "bg-zinc-800 text-white shadow-sm"
-                : "text-zinc-500 hover:text-zinc-300"
-            }`}
-            title={label}
-          >
-            {icon}
-          </button>
+          <Tooltip key={key} content={label}>
+            <button
+              onClick={() => setDevicePreset(key)}
+              className={`flex h-6 w-6 items-center justify-center rounded transition-colors ${
+                devicePreset === key
+                  ? "bg-zinc-800 text-white shadow-sm"
+                  : "text-zinc-500 hover:text-zinc-300"
+              }`}
+            >
+              {icon}
+            </button>
+          </Tooltip>
         ))}
       </div>
     </div>
@@ -219,19 +233,16 @@ function IconButton({
   children,
   onClick,
   disabled,
-  title,
 }: {
   children: React.ReactNode;
   onClick: () => void;
   disabled?: boolean;
-  title?: string;
 }) {
   return (
     <button
       onClick={onClick}
       disabled={disabled}
-      title={title}
-      className={`flex h-7 w-7 items-center justify-center  transition-colors ${
+      className={`flex h-7 w-7 items-center justify-center rounded transition-colors ${
         disabled
           ? "text-zinc-700 cursor-not-allowed"
           : "text-zinc-400 hover:bg-zinc-900 hover:text-white"
@@ -254,7 +265,7 @@ function SegmentButton({
   return (
     <button
       onClick={onClick}
-      className={`inline-flex h-6 items-center gap-1  px-2 text-[11px] font-medium transition-colors ${
+      className={`inline-flex h-6 items-center gap-1 rounded px-2 text-[11px] font-medium transition-colors ${
         active
           ? "bg-zinc-800 text-white shadow-sm"
           : "text-zinc-500 hover:text-zinc-300"

@@ -1,7 +1,8 @@
-import { useEffect, useCallback, useState } from "react";
+import { useEffect, useCallback, useState, useRef } from "react";
 import { useEditorStore } from "../../store/editor-store";
 import { onIframeMessage, provideAstToIframe } from "../../lib/iframe-bridge";
 import { api } from "../../lib/api-client";
+import { SelectionToolbar } from "./SelectionToolbar";
 
 export function IframeCanvas() {
   const devServerStatus = useEditorStore((s) => s.devServerStatus);
@@ -12,6 +13,7 @@ export function IframeCanvas() {
   const devicePreset = useEditorStore((s) => s.devicePreset);
   const [componentPreviewUrl, setComponentPreviewUrl] = useState<string | null>(null);
 
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const deviceWidth = devicePreset === "mobile" ? 375 : devicePreset === "tablet" ? 768 : undefined;
 
   const isComponent = currentFile?.startsWith("src/components/");
@@ -142,12 +144,14 @@ export function IframeCanvas() {
         style={{ width: deviceWidth ? `${deviceWidth}px` : "100%", maxWidth: "100%" }}
       >
         <iframe
+          ref={iframeRef}
           src={previewUrl}
           className="h-full w-full border-0"
           title="Page Preview"
           onLoad={handleIframeLoad}
         />
       </div>
+      <SelectionToolbar iframeRef={iframeRef} />
     </div>
   );
 }

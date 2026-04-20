@@ -1,6 +1,6 @@
 export interface Overlay {
-  showHover(rect: DOMRect): void;
-  showSelected(rect: DOMRect, computedStyle: CSSStyleDeclaration): void;
+  showHover(rect: DOMRect, label?: string): void;
+  showSelected(rect: DOMRect, computedStyle: CSSStyleDeclaration, label?: string): void;
   showDropIndicator(rect: DOMRect, position: "before" | "after"): void;
   clear(): void;
   clearHover(): void;
@@ -52,23 +52,41 @@ export function createOverlay(): Overlay {
   `;
   container.appendChild(dropIndicatorEl);
 
-  // Label showing tag name
+  // Label showing tag name above the selection
   const labelEl = document.createElement("div");
   labelEl.id = "tve-label";
   labelEl.style.cssText = `
     position: fixed;
     background: #3b82f6;
     color: white;
-    font-size: 11px;
-    font-family: system-ui, sans-serif;
-    padding: 1px 6px;
-    border-radius: 0 0 4px 0;
+    font: 500 10px/1.4 ui-sans-serif, system-ui, -apple-system, sans-serif;
+    padding: 2px 6px;
+    border-radius: 4px 4px 0 0;
     display: none;
     pointer-events: none;
     z-index: 999999;
     white-space: nowrap;
+    letter-spacing: 0.01em;
   `;
   container.appendChild(labelEl);
+
+  // Hover label (slightly transparent, matches hover outline)
+  const hoverLabelEl = document.createElement("div");
+  hoverLabelEl.id = "tve-hover-label";
+  hoverLabelEl.style.cssText = `
+    position: fixed;
+    background: rgba(59, 130, 246, 0.85);
+    color: white;
+    font: 500 10px/1.4 ui-sans-serif, system-ui, -apple-system, sans-serif;
+    padding: 2px 6px;
+    border-radius: 4px 4px 0 0;
+    display: none;
+    pointer-events: none;
+    z-index: 999999;
+    white-space: nowrap;
+    letter-spacing: 0.01em;
+  `;
+  container.appendChild(hoverLabelEl);
 
   // Update overlay positions on scroll/resize
   let currentSelectedElement: Element | null = null;
@@ -117,20 +135,39 @@ export function createOverlay(): Overlay {
     }
   }
 
+  function placeLabel(el: HTMLElement, rect: DOMRect, text: string) {
+    if (!text) {
+      el.style.display = "none";
+      return;
+    }
+    el.textContent = text;
+    el.style.display = "block";
+    // Measure after content assignment so height/width reflect the final text
+    const labelH = el.offsetHeight || 18;
+    const labelW = el.offsetWidth;
+    // Default: sit above the selection, snapped to its left edge. Drop it
+    // below if there's no space at the top.
+    const aboveTop = rect.top - labelH;
+    const top = aboveTop < 0 ? rect.top : aboveTop;
+    // Keep the label within the viewport horizontally.
+    const maxLeft = Math.max(0, window.innerWidth - labelW - 4);
+    const left = Math.min(Math.max(0, rect.left), maxLeft);
+    el.style.top = `${top}px`;
+    el.style.left = `${left}px`;
+  }
+
   return {
-    showHover(rect: DOMRect) {
+    showHover(rect: DOMRect, label?: string) {
       positionBox(hoverEl, rect);
       hoverEl.style.display = "block";
+      placeLabel(hoverLabelEl, rect, label ?? "");
     },
 
-    showSelected(rect: DOMRect, computedStyle: CSSStyleDeclaration) {
+    showSelected(rect: DOMRect, computedStyle: CSSStyleDeclaration, label?: string) {
       positionBox(selectedEl, rect);
       selectedEl.style.display = "block";
       showGuides(rect, computedStyle);
-
-      labelEl.style.display = "block";
-      labelEl.style.top = `${rect.top}px`;
-      labelEl.style.left = `${rect.left}px`;
+      placeLabel(labelEl, rect, label ?? "");
     },
 
     showDropIndicator(rect: DOMRect, position: "before" | "after") {
@@ -145,6 +182,7 @@ export function createOverlay(): Overlay {
 
     clear() {
       hoverEl.style.display = "none";
+      hoverLabelEl.style.display = "none";
       selectedEl.style.display = "none";
       marginEl.style.display = "none";
       paddingEl.style.display = "none";
@@ -155,6 +193,7 @@ export function createOverlay(): Overlay {
 
     clearHover() {
       hoverEl.style.display = "none";
+      hoverLabelEl.style.display = "none";
     },
 
     clearSelected() {

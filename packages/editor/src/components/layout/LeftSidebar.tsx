@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Search, Focus, X } from "lucide-react";
 import { ElementTree } from "../tree/ElementTree";
 import { AddElementPanel } from "../tree/AddElementPanel";
 import { useEditorStore } from "../../store/editor-store";
 import { useModeStore } from "../../store/mode-store";
+import { useTreeUIStore } from "../../store/tree-ui-store";
+import { Tooltip } from "../ui/Tooltip";
 
 export function LeftSidebar() {
   const ast = useEditorStore((s) => s.ast);
@@ -97,6 +99,11 @@ export function LeftSidebar() {
     setShowAddPanel(false);
   }
 
+  const query = useTreeUIStore((s) => s.query);
+  const setQuery = useTreeUIStore((s) => s.setQuery);
+  const marketerZoom = useTreeUIStore((s) => s.marketerZoom);
+  const toggleMarketerZoom = useTreeUIStore((s) => s.toggleMarketerZoom);
+
   return (
     <div className="flex h-full flex-col bg-zinc-950 border-r border-zinc-800">
       <div className="flex h-10 items-center justify-between border-b border-zinc-800 px-3">
@@ -104,23 +111,37 @@ export function LeftSidebar() {
           {userMode === "marketer" ? "Blocks" : "Elements"}
         </span>
         <div className="flex items-center gap-0.5">
-          <button
-            ref={addBtnRef}
-            onClick={() => setShowAddPanel(!showAddPanel)}
-            disabled={!selectedNodeId}
-            className={`flex h-6 w-6 items-center justify-center  transition-colors ${
-              selectedNodeId
-                ? "text-zinc-400 hover:bg-zinc-900 hover:text-white"
-                : "text-zinc-700 cursor-not-allowed"
-            }`}
-            title={
-              userMode === "marketer"
-                ? "Add component block"
-                : "Add child element (Ctrl+E)"
-            }
+          {userMode === "marketer" && (
+            <Tooltip content={marketerZoom ? "Show full tree" : "Collapse to blocks only"}>
+              <button
+                onClick={toggleMarketerZoom}
+                className={`flex h-6 w-6 items-center justify-center rounded transition-colors ${
+                  marketerZoom
+                    ? "bg-emerald-500/15 text-emerald-300"
+                    : "text-zinc-400 hover:bg-zinc-900 hover:text-white"
+                }`}
+              >
+                <Focus size={12} />
+              </button>
+            </Tooltip>
+          )}
+          <Tooltip
+            content={userMode === "marketer" ? "Add component block" : "Add child element"}
+            shortcut={userMode === "dev" ? "Ctrl+E" : undefined}
           >
-            <Plus size={13} />
-          </button>
+            <button
+              ref={addBtnRef}
+              onClick={() => setShowAddPanel(!showAddPanel)}
+              disabled={!selectedNodeId}
+              className={`flex h-6 w-6 items-center justify-center rounded transition-colors ${
+                selectedNodeId
+                  ? "text-zinc-400 hover:bg-zinc-900 hover:text-white"
+                  : "text-zinc-700 cursor-not-allowed"
+              }`}
+            >
+              <Plus size={13} />
+            </button>
+          </Tooltip>
           {showAddPanel && addBtnRef.current && createPortal(
             <div
               ref={panelRef}
@@ -138,24 +159,49 @@ export function LeftSidebar() {
             </div>,
             document.body
           )}
-          <button
-            onClick={() => {
-              if (selectedNodeId) {
-                applyMutation({ type: "remove-element", nodeId: selectedNodeId });
-              }
-            }}
-            disabled={!selectedNodeId}
-            className={`flex h-6 w-6 items-center justify-center  transition-colors ${
-              selectedNodeId
-                ? "text-zinc-400 hover:bg-zinc-900 hover:text-red-400"
-                : "text-zinc-700 cursor-not-allowed"
-            }`}
-            title="Delete element (Del)"
-          >
-            <Trash2 size={13} />
-          </button>
+          <Tooltip content="Delete element" shortcut="Del">
+            <button
+              onClick={() => {
+                if (selectedNodeId) {
+                  applyMutation({ type: "remove-element", nodeId: selectedNodeId });
+                }
+              }}
+              disabled={!selectedNodeId}
+              className={`flex h-6 w-6 items-center justify-center rounded transition-colors ${
+                selectedNodeId
+                  ? "text-zinc-400 hover:bg-zinc-900 hover:text-red-400"
+                  : "text-zinc-700 cursor-not-allowed"
+              }`}
+            >
+              <Trash2 size={13} />
+            </button>
+          </Tooltip>
         </div>
       </div>
+
+      {/* Search input */}
+      <div className="border-b border-zinc-800 px-2 py-1.5">
+        <div className="relative flex items-center">
+          <Search size={11} className="absolute left-2 text-zinc-600" />
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search tree…"
+            className="w-full rounded border border-zinc-800 bg-zinc-900 pl-7 pr-6 py-1 text-[11px] text-zinc-200 outline-none placeholder:text-zinc-600 focus:border-blue-500"
+          />
+          {query && (
+            <button
+              onClick={() => setQuery("")}
+              className="absolute right-1.5 text-zinc-600 hover:text-zinc-300"
+              aria-label="Clear search"
+            >
+              <X size={11} />
+            </button>
+          )}
+        </div>
+      </div>
+
       <div className="flex-1 overflow-auto p-1.5">
         {!currentFile ? (
           <p className="px-2 py-6 text-xs text-zinc-500 text-center">

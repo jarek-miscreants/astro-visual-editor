@@ -6,6 +6,8 @@ import { IframeCanvas } from "../canvas/IframeCanvas";
 import { MarkdownEditor } from "../markdown/MarkdownEditor";
 import { useEditorStore } from "../../store/editor-store";
 import { useContentStore } from "../../store/content-store";
+import { Toaster } from "../ui/Toaster";
+import { ShortcutsDialog, useShortcutsHotkey } from "../ui/ShortcutsDialog";
 
 export function EditorLayout() {
   const mode = useEditorStore((s) => s.mode);
@@ -13,6 +15,7 @@ export function EditorLayout() {
   const contentPath = useContentStore((s) => s.currentPath);
   const isContent = !!contentPath;
 
+  useShortcutsHotkey();
   return (
     <div className="flex h-screen flex-col">
       <Toolbar />
@@ -39,6 +42,8 @@ export function EditorLayout() {
           </Panel>
         </PanelGroup>
       )}
+      <Toaster />
+      <ShortcutsDialog />
     </div>
   );
 }

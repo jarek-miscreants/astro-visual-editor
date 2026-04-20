@@ -15,6 +15,28 @@ import {
 } from "../lib/iframe-bridge";
 import { connectWebSocket, onWsMessage } from "../lib/ws-client";
 import { useHistoryStore, computeInverse } from "./history-store";
+import { toast } from "./toast-store";
+
+function describeMutation(mutation: Mutation): string {
+  switch (mutation.type) {
+    case "update-classes":
+      return "Classes updated";
+    case "update-attribute":
+      return `${mutation.attr} updated`;
+    case "update-text":
+      return "Text updated";
+    case "add-element":
+      return "Element added";
+    case "remove-element":
+      return "Element removed";
+    case "move-element":
+      return "Element moved";
+    case "wrap-element":
+      return "Element wrapped";
+    default:
+      return "Saved";
+  }
+}
 
 interface EditorState {
   // Project
@@ -238,11 +260,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           nextState.selectedElementInfo = null;
         }
         set(nextState);
+        toast.success(describeMutation(mutation), state.currentFile);
       } else if (!result.success) {
         console.error("Mutation failed:", result.error);
+        toast.error("Couldn't save", result.error || "The mutation was rejected.");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to apply mutation:", err);
+      toast.error("Couldn't save", err?.message ?? "Unknown error");
     }
   },
 

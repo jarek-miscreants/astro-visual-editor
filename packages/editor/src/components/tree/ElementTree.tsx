@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useMemo } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -9,10 +9,12 @@ import {
   type DragEndEvent,
   type DragOverEvent,
 } from "@dnd-kit/core";
-import { ChevronRight, ChevronDown, Box, Type, Image, Component, Code, GripVertical, Layers } from "lucide-react";
+import { ChevronRight, ChevronDown, Box, Type, Image, Component, Code, GripVertical } from "lucide-react";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import type { ASTNode } from "@tve/shared";
 import { useEditorStore } from "../../store/editor-store";
+import { useModeStore } from "../../store/mode-store";
+import { useTreeUIStore } from "../../store/tree-ui-store";
 import { highlightNodeInIframe } from "../../lib/iframe-bridge";
 import { ContextMenu } from "./ContextMenu";
 import { AddElementPanel } from "./AddElementPanel";
@@ -32,11 +34,66 @@ interface DropTarget {
 
 // ── Root wrapper with DnD context ──────────────────────────────
 
+/** First ~30 chars of direct text inside an element (not descendants). */
+function getTextPreview(node: ASTNode): string | null {
+  if (node.textContent && node.textContent.trim()) {
+    const t = node.textContent.trim().replace(/\s+/g, " ");
+    return t.length > 40 ? t.slice(0, 40) + "…" : t;
+  }
+  return null;
+}
+
+/** Does the node's subtree contain a direct-text element we'd show? */
+function hasMeaningfulDescendant(node: ASTNode): boolean {
+  if (isMeaningful(node)) return true;
+  for (const child of node.children) {
+    if (hasMeaningfulDescendant(child)) return true;
+  }
+  return false;
+}
+
+/** "Meaningful" nodes that are worth showing in marketer zoom. */
+function isMeaningful(node: ASTNode): boolean {
+  if (node.isComponent || /^[A-Z]/.test(node.tagName)) return true;
+  if (node.tagName === "slot") return true;
+  const tag = node.tagName.toLowerCase();
+  if (["h1", "h2", "h3", "h4", "h5", "h6", "p", "span", "a", "li", "img", "picture", "video", "button"].includes(tag)) {
+    return true;
+  }
+  return false;
+}
+
+/** Does the node or any ancestor/descendant match the search query? */
+function matchesSearch(node: ASTNode, q: string): boolean {
+  const needle = q.toLowerCase();
+  const hay = [
+    node.tagName,
+    node.classes,
+    node.textContent ?? "",
+    ...Object.entries(node.attributes || {}).map(([k, v]) => `${k}=${v}`),
+  ]
+    .join(" ")
+    .toLowerCase();
+  return hay.includes(needle);
+}
+
+function subtreeMatchesSearch(node: ASTNode, q: string): boolean {
+  if (matchesSearch(node, q)) return true;
+  for (const child of node.children) {
+    if (subtreeMatchesSearch(child, q)) return true;
+  }
+  return false;
+}
+
 export function ElementTree({ nodes, depth }: ElementTreeProps) {
   const [draggedNodeId, setDraggedNodeId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
   const applyMutation = useEditorStore((s) => s.applyMutation);
   const ast = useEditorStore((s) => s.ast);
+  const userMode = useModeStore((s) => s.userMode);
+  const query = useTreeUIStore((s) => s.query).trim();
+  const marketerZoom = useTreeUIStore((s) => s.marketerZoom);
+  const zoomActive = userMode === "marketer" && marketerZoom;
 
   // distance: 8px threshold lets plain clicks through without starting a drag,
   // without adding delay (which would make the drag feel sluggish, not snappier).
@@ -182,6 +239,8 @@ export function ElementTree({ nodes, depth }: ElementTreeProps) {
           depth={depth}
           dropTarget={dropTarget}
           draggedNodeId={draggedNodeId}
+          zoomActive={zoomActive}
+          query={query}
         />
       ))}
 
@@ -208,14 +267,47 @@ function TreeNode({
   depth,
   dropTarget,
   draggedNodeId,
+  zoomActive,
+  query,
 }: {
   node: ASTNode;
   depth: number;
   dropTarget: DropTarget | null;
   draggedNodeId: string | null;
+  zoomActive: boolean;
+  query: string;
 }) {
-  // Components default to expanded so the slot placeholder is visible
+  // Zoom: when the node isn't "meaningful" (structural wrapper), don't render its
+  // own row — flatten by rendering its children at the same depth. Keep rendering
+  // if the subtree has no meaningful descendants either (fallback to something).
+  if (zoomActive && !isMeaningful(node) && hasMeaningfulDescendant(node)) {
+    return (
+      <>
+        {node.children.map((child) => (
+          <TreeNode
+            key={child.nodeId}
+            node={child}
+            depth={depth}
+            dropTarget={dropTarget}
+            draggedNodeId={draggedNodeId}
+            zoomActive={zoomActive}
+            query={query}
+          />
+        ))}
+      </>
+    );
+  }
+
+  // Search: filter by subtree match. Expand matching paths.
+  if (query && !subtreeMatchesSearch(node, query)) {
+    return null;
+  }
+  // Components default to expanded so the slot placeholder is visible. When
+  // searching, auto-expand any node whose subtree matches.
   const [expanded, setExpanded] = useState(depth < 2 || node.isComponent);
+  if (query && !expanded && subtreeMatchesSearch(node, query)) {
+    setExpanded(true);
+  }
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const selectedNodeId = useEditorStore((s) => s.selectedNodeId);
   const hoveredNodeId = useEditorStore((s) => s.hoveredNodeId);
@@ -268,6 +360,7 @@ function TreeNode({
     ? node.classes.split(" ").slice(0, 3).join(" ") +
       (node.classes.split(" ").length > 3 ? "..." : "")
     : "";
+  const textPreview = getTextPreview(node);
 
   function makeElementInfo() {
     return {
@@ -364,8 +457,15 @@ function TreeNode({
         {/* Tag name */}
         <span className="shrink-0 font-mono">{label}</span>
 
-        {/* Class preview */}
-        {classPreview && (
+        {/* Text content preview — most useful identifier for marketers */}
+        {textPreview && (
+          <span className="min-w-0 truncate text-zinc-300 italic">
+            "{textPreview}"
+          </span>
+        )}
+
+        {/* Class preview (suppressed when there's already a text preview, to reduce noise) */}
+        {!textPreview && classPreview && (
           <span className="min-w-0 truncate text-zinc-600 font-mono">
             .{classPreview}
           </span>
@@ -414,6 +514,8 @@ function TreeNode({
               depth={depth + 1}
               dropTarget={dropTarget}
               draggedNodeId={draggedNodeId}
+              zoomActive={zoomActive}
+              query={query}
             />
           ))}
         </div>

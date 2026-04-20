@@ -37,7 +37,7 @@ export function setupInteraction(
       const cs = getComputedStyle(mappedEl);
 
       overlay.clearHover();
-      overlay.showSelected(rect, cs);
+      overlay.showSelected(rect, cs, formatElementLabel(mappedEl));
 
       bridge.sendToEditor({
         type: "tve:select",
@@ -89,7 +89,7 @@ export function setupInteraction(
       }
 
       const rect = mappedEl.getBoundingClientRect();
-      overlay.showHover(rect);
+      overlay.showHover(rect, formatElementLabel(mappedEl));
 
       bridge.sendToEditor({
         type: "tve:hover",
@@ -223,10 +223,28 @@ export function setupInteraction(
       const rect = el.getBoundingClientRect();
       const cs = getComputedStyle(el);
       overlay.clearHover();
-      overlay.showSelected(rect, cs);
+      overlay.showSelected(rect, cs, formatElementLabel(el));
       el.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
   });
+}
+
+/** Build a user-facing label for an overlay pill:
+ *   <Component>                   → "Component"
+ *   <p slot="content">            → "p · slot:content"
+ *   <h1 class="hero-title">       → "h1 · hero-title"
+ *   <div class="x y z">           → "div · x"
+ */
+function formatElementLabel(el: Element): string {
+  const isComponent = /^[A-Z]/.test(el.tagName);
+  const tag = isComponent ? el.tagName : el.tagName.toLowerCase();
+  const slot = el.getAttribute("slot");
+  if (slot) return `${tag} · slot:${slot}`;
+  const cls = (typeof el.className === "string" ? el.className : "")
+    .split(/\s+/)
+    .filter(Boolean)[0];
+  if (cls) return `${tag} · ${cls}`;
+  return tag;
 }
 
 /** Get direct text content of an element (only if it has no child elements) */

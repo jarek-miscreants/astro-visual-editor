@@ -10,6 +10,8 @@ import { TokenSuggestions } from "./TokenSuggestions";
 import { StyleTab } from "./StyleTab";
 import { LayoutTab } from "./LayoutTab";
 import { TextTab } from "./TextTab";
+import { Breadcrumb } from "./Breadcrumb";
+import { CollapsibleSection } from "../ui/Collapsible";
 
 interface PropertiesPanelProps {
   nodeId: string;
@@ -47,11 +49,14 @@ export function PropertiesPanel({ nodeId, elementInfo }: PropertiesPanelProps) {
 
   return (
     <div className="flex h-full flex-col">
+      {/* Breadcrumb — ancestor path */}
+      <Breadcrumb nodeId={nodeId} />
+
       {/* Element header */}
       <div className="border-b border-zinc-800 px-3 py-2.5">
         <div className="flex items-center gap-2 flex-wrap">
           <span
-            className={`inline-flex items-center  border px-1.5 py-0.5 font-mono text-[11px] font-medium ${
+            className={`inline-flex items-center rounded-md border px-1.5 py-0.5 font-mono text-[11px] font-medium ${
               isComponent
                 ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
                 : "border-blue-500/30 bg-blue-500/10 text-blue-300"
@@ -146,13 +151,10 @@ export function PropertiesPanel({ nodeId, elementInfo }: PropertiesPanelProps) {
             onClassesChange={handleClassesChange}
           />
 
-          {/* Classes — always visible at top */}
-          <div className="border-b border-zinc-800 px-3 py-2.5">
-            <div className="mb-2 text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">
-              Classes
-            </div>
+          {/* Classes — remembered-open collapsible */}
+          <CollapsibleSection storageKey="tve:props:classes" title="Classes">
             {classExpression ? (
-              <div className="border border-amber-500/30 bg-amber-500/5 p-2 text-[10px] text-amber-300/80">
+              <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-2 text-[10px] text-amber-300/80">
                 <div className="mb-1 font-semibold text-amber-300">
                   JSX expression binding
                 </div>
@@ -172,7 +174,7 @@ export function PropertiesPanel({ nodeId, elementInfo }: PropertiesPanelProps) {
                 onClassesChange={handleClassesChange}
               />
             )}
-          </div>
+          </CollapsibleSection>
 
           {/* Attributes — read/write all non-class attrs */}
           <AttributesPanel nodeId={nodeId} attributes={attributes} />

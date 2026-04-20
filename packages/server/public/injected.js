@@ -41,16 +41,32 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
     position: fixed;
     background: #3b82f6;
     color: white;
-    font-size: 11px;
-    font-family: system-ui, sans-serif;
-    padding: 1px 6px;
-    border-radius: 0 0 4px 0;
+    font: 500 10px/1.4 ui-sans-serif, system-ui, -apple-system, sans-serif;
+    padding: 2px 6px;
+    border-radius: 4px 4px 0 0;
     display: none;
     pointer-events: none;
     z-index: 999999;
     white-space: nowrap;
+    letter-spacing: 0.01em;
   `;
     container.appendChild(labelEl);
+    const hoverLabelEl = document.createElement("div");
+    hoverLabelEl.id = "tve-hover-label";
+    hoverLabelEl.style.cssText = `
+    position: fixed;
+    background: rgba(59, 130, 246, 0.85);
+    color: white;
+    font: 500 10px/1.4 ui-sans-serif, system-ui, -apple-system, sans-serif;
+    padding: 2px 6px;
+    border-radius: 4px 4px 0 0;
+    display: none;
+    pointer-events: none;
+    z-index: 999999;
+    white-space: nowrap;
+    letter-spacing: 0.01em;
+  `;
+    container.appendChild(hoverLabelEl);
     let currentSelectedElement = null;
     function updatePositions() {
       if (currentSelectedElement) {
@@ -90,18 +106,33 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
         paddingEl.style.display = "none";
       }
     }
+    function placeLabel(el, rect, text) {
+      if (!text) {
+        el.style.display = "none";
+        return;
+      }
+      el.textContent = text;
+      el.style.display = "block";
+      const labelH = el.offsetHeight || 18;
+      const labelW = el.offsetWidth;
+      const aboveTop = rect.top - labelH;
+      const top = aboveTop < 0 ? rect.top : aboveTop;
+      const maxLeft = Math.max(0, window.innerWidth - labelW - 4);
+      const left = Math.min(Math.max(0, rect.left), maxLeft);
+      el.style.top = `${top}px`;
+      el.style.left = `${left}px`;
+    }
     return {
-      showHover(rect) {
+      showHover(rect, label) {
         positionBox(hoverEl, rect);
         hoverEl.style.display = "block";
+        placeLabel(hoverLabelEl, rect, label ?? "");
       },
-      showSelected(rect, computedStyle) {
+      showSelected(rect, computedStyle, label) {
         positionBox(selectedEl, rect);
         selectedEl.style.display = "block";
         showGuides(rect, computedStyle);
-        labelEl.style.display = "block";
-        labelEl.style.top = `${rect.top}px`;
-        labelEl.style.left = `${rect.left}px`;
+        placeLabel(labelEl, rect, label ?? "");
       },
       showDropIndicator(rect, position) {
         dropIndicatorEl.style.display = "block";
@@ -111,6 +142,7 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
       },
       clear() {
         hoverEl.style.display = "none";
+        hoverLabelEl.style.display = "none";
         selectedEl.style.display = "none";
         marginEl.style.display = "none";
         paddingEl.style.display = "none";
@@ -120,6 +152,7 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
       },
       clearHover() {
         hoverEl.style.display = "none";
+        hoverLabelEl.style.display = "none";
       },
       clearSelected() {
         selectedEl.style.display = "none";
@@ -174,7 +207,7 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
         const rect = mappedEl.getBoundingClientRect();
         const cs = getComputedStyle(mappedEl);
         overlay.clearHover();
-        overlay.showSelected(rect, cs);
+        overlay.showSelected(rect, cs, formatElementLabel(mappedEl));
         bridge.sendToEditor({
           type: "tve:select",
           nodeId,
@@ -219,7 +252,7 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
           return;
         }
         const rect = mappedEl.getBoundingClientRect();
-        overlay.showHover(rect);
+        overlay.showHover(rect, formatElementLabel(mappedEl));
         bridge.sendToEditor({
           type: "tve:hover",
           nodeId,
@@ -331,10 +364,19 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
         const rect = el.getBoundingClientRect();
         const cs = getComputedStyle(el);
         overlay.clearHover();
-        overlay.showSelected(rect, cs);
+        overlay.showSelected(rect, cs, formatElementLabel(el));
         el.scrollIntoView({ behavior: "smooth", block: "nearest" });
       }
     });
+  }
+  function formatElementLabel(el) {
+    const isComponent = /^[A-Z]/.test(el.tagName);
+    const tag = isComponent ? el.tagName : el.tagName.toLowerCase();
+    const slot = el.getAttribute("slot");
+    if (slot) return `${tag} · slot:${slot}`;
+    const cls = (typeof el.className === "string" ? el.className : "").split(/\s+/).filter(Boolean)[0];
+    if (cls) return `${tag} · ${cls}`;
+    return tag;
   }
   function getDirectTextContent(element) {
     var _a;
