@@ -26,3 +26,9 @@ export const useTreeUIStore = create<TreeUIStore>((set) => ({
       return { marketerZoom: next };
     }),
 }));
+
+if (import.meta.hot) {
+  import.meta.hot.accept(() => {
+    import.meta.hot!.invalidate();
+  });
+}

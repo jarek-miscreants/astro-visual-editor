@@ -341,3 +341,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     provideAstToIframe(ast);
   },
 }));
+
+if (import.meta.hot) {
+  import.meta.hot.accept(() => {
+    import.meta.hot!.invalidate();
+  });
+}

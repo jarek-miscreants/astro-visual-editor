@@ -27,3 +27,9 @@ export const useModeStore = create<ModeState>((set) => ({
     set({ userMode: mode });
   },
 }));
+
+if (import.meta.hot) {
+  import.meta.hot.accept(() => {
+    import.meta.hot!.invalidate();
+  });
+}

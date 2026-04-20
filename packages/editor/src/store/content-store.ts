@@ -98,3 +98,12 @@ export const useContentStore = create<ContentState>((set, get) => ({
     }
   },
 }));
+
+// Force a full reload on HMR — without this, editing any store dependency
+// leaves some consumers bound to the old store instance while others import
+// a fresh one, which silently splits the app's state in two.
+if (import.meta.hot) {
+  import.meta.hot.accept(() => {
+    import.meta.hot!.invalidate();
+  });
+}

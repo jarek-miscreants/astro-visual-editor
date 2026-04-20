@@ -40,3 +40,9 @@ export const toast = {
   error: (message: string, description?: string) =>
     useToastStore.getState().push({ message, description, variant: "error" }),
 };
+
+if (import.meta.hot) {
+  import.meta.hot.accept(() => {
+    import.meta.hot!.invalidate();
+  });
+}

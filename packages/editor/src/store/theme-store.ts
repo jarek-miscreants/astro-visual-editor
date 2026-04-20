@@ -123,3 +123,9 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
     return shades?.[shade] || null;
   },
 }));
+
+if (import.meta.hot) {
+  import.meta.hot.accept(() => {
+    import.meta.hot!.invalidate();
+  });
+}
