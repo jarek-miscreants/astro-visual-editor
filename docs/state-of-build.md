@@ -275,6 +275,27 @@ Built once with `pnpm --filter @tve/injected build`. Loaded into the iframe via 
 | `Ctrl+E` | Toggle Add Element panel (dev mode) |
 | `Ctrl+Alt+G` | Wrap selected element in div (dev mode) |
 
+## Tests
+
+```bash
+pnpm test              # whole repo (server + editor)
+pnpm --filter @tve/server test         # server only
+pnpm --filter @tve/server test:watch   # watch mode
+```
+
+Vitest covers the high-stakes modules: 136 tests across 8 files. Coverage focus:
+
+- **`server/src/lib/path-guard.test.ts`** (15 tests) — path traversal security, sibling-prefix attacks
+- **`server/src/services/astro-parser.test.ts`** (9 tests) — element + component parsing, JSX class expression detection, source positions, nodeId stability
+- **`server/src/services/file-writer.test.ts`** (12 tests) — every mutation type with fixture .astro files. Catches the opening-tag-only regression, refuses to overwrite JSX expression bindings.
+- **`server/src/services/git.test.ts`** (20 tests) — real-git in tmpdirs. Mode detection, status, commit, ensureStaging idempotency, promote FF + non-FF + conflict abort + structured error codes
+- **`server/src/services/tailwind-config.test.ts`** (13 tests) — v3 vs v4 detection, theme read/write, CSS @theme block edits, design-tokens sync
+- **`editor/src/lib/class-utils.test.ts`** (33 tests) — Tailwind class parse / join / replace / toggle
+- **`editor/src/lib/class-alternatives.test.ts`** (16 tests) — alternatives generation including responsive prefixes
+- **`editor/src/store/history-store.test.ts`** (18 tests) — `computeInverse` per mutation type, undo/redo state machine
+
+Real-git tests spawn fresh repos via `git init` in tmpdir per test (~50-200ms each). Acceptable for a focused suite. Editor tests are sub-second.
+
 ## Known issues
 
 - **`tsc -b` editor build fails** on 18 pre-existing `import.meta.hot` errors in store files. The actual `vite build` succeeds and `vite dev` works fine. Fix is a tsconfig adjustment (add `vite/client` to `types`); deferred since it doesn't block development.

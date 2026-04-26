@@ -10,7 +10,8 @@
     "start": "node bin/tve.mjs",
     "dev": "concurrently -n server,editor -c blue,green \"pnpm --filter @tve/server dev\" \"pnpm --filter @tve/editor dev\"",
     "build": "pnpm --filter @tve/shared build && pnpm --filter @tve/injected build && pnpm --filter @tve/server build && pnpm --filter @tve/editor build",
-    "build:injected": "pnpm --filter @tve/injected build"
+    "build:injected": "pnpm --filter @tve/injected build",
+    "test": "npx -y pnpm -r run test"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",
