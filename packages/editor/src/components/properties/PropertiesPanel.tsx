@@ -12,6 +12,7 @@ import { LayoutTab } from "./LayoutTab";
 import { TextTab } from "./TextTab";
 import { Breadcrumb } from "./Breadcrumb";
 import { CollapsibleSection } from "../ui/Collapsible";
+import { LinkSection } from "./LinkSection";
 
 interface PropertiesPanelProps {
   nodeId: string;
@@ -107,16 +108,33 @@ export function PropertiesPanel({ nodeId, elementInfo }: PropertiesPanelProps) {
                 }
               />
             </>
-          ) : textContent !== null ? (
-            <InlineTextContentField
-              text={textContent}
-              onUpdate={(text) => applyMutation({ type: "update-text", nodeId, text })}
-            />
           ) : (
-            <MarketerPlaceholder
-              isComponent={isComponent}
-              tagName={elementInfo.tagName}
-            />
+            <>
+              {/* Raw <a> tags: surface the link editor regardless of whether
+                  there's text content (anchors with element children also need
+                  href editing). */}
+              {elementInfo.tagName.toLowerCase() === "a" && (
+                <LinkSection
+                  href={attributes.href ?? ""}
+                  target={attributes.target}
+                  rel={attributes.rel}
+                  onAttrChange={(attr, value) =>
+                    applyMutation({ type: "update-attribute", nodeId, attr, value })
+                  }
+                />
+              )}
+              {textContent !== null ? (
+                <InlineTextContentField
+                  text={textContent}
+                  onUpdate={(text) => applyMutation({ type: "update-text", nodeId, text })}
+                />
+              ) : elementInfo.tagName.toLowerCase() !== "a" ? (
+                <MarketerPlaceholder
+                  isComponent={isComponent}
+                  tagName={elementInfo.tagName}
+                />
+              ) : null}
+            </>
           )}
         </div>
       ) : (

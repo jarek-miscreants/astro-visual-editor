@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { Sparkles, Code2, ChevronDown, ChevronRight } from "lucide-react";
+import { Sparkles, Code2, ChevronDown, ChevronRight, Link as LinkIcon } from "lucide-react";
 import type { ComponentPropSchema, ComponentPropField } from "@tve/shared";
 import { useEditorStore } from "../../store/editor-store";
 import { api } from "../../lib/api-client";
+import { LinkSection } from "./LinkSection";
 
 interface Props {
   nodeId: string;
@@ -13,6 +14,12 @@ interface Props {
 /** Prop names that almost always hold user-facing copy. */
 const CONTENT_NAME_RE =
   /^(title|heading|headline|subtitle|subheading|description|body|text|content|label|cta|caption|excerpt|quote|author|eyebrow|message)$/i;
+
+/** Prop names that almost always hold a URL or link target. */
+const LINK_NAME_RE = /^(href|url|link|to|cta_?url|cta_?href)$/i;
+
+/** Prop names paired with href to control whether the link opens in a new tab. */
+const NEW_TAB_NAME_RE = /^(target|new_?tab|external)$/i;
 
 /** A value looks like prose when it reads like a sentence: spaces + length, or sentence punctuation. */
 function looksLikeProse(value: string | undefined): boolean {
@@ -25,10 +32,20 @@ function looksLikeProse(value: string | undefined): boolean {
 
 function isContentField(field: ComponentPropField, currentValue: string | undefined): boolean {
   if (field.kind !== "string" && field.kind !== "unknown") return false;
+  if (LINK_NAME_RE.test(field.name)) return false; // Link fields go to their own section
   if (CONTENT_NAME_RE.test(field.name)) return true;
   if (looksLikeProse(currentValue)) return true;
   if (looksLikeProse(field.kind === "string" ? field.default : undefined)) return true;
   return false;
+}
+
+function isLinkField(field: ComponentPropField): boolean {
+  if (field.kind !== "string" && field.kind !== "unknown") return false;
+  return LINK_NAME_RE.test(field.name);
+}
+
+function isNewTabField(field: ComponentPropField): boolean {
+  return NEW_TAB_NAME_RE.test(field.name);
 }
 
 /** Synthesise a schema from the element's own attributes when the component has no Props interface. */
@@ -107,10 +124,25 @@ export function ComponentPropsPanel({ nodeId, tagName, attributes }: Props) {
   if (fields.length === 0) return null;
 
   const contentFields: ComponentPropField[] = [];
+  const linkFields: ComponentPropField[] = [];
   const advancedFields: ComponentPropField[] = [];
   for (const f of fields) {
-    if (isContentField(f, attributes[f.name])) contentFields.push(f);
+    if (isLinkField(f)) linkFields.push(f);
+    else if (isContentField(f, attributes[f.name])) contentFields.push(f);
     else advancedFields.push(f);
+  }
+
+  // Detect a "new tab" companion prop (target, newTab, external) so we can
+  // pair it with the primary href via LinkSection's checkbox UX. The companion
+  // is removed from Advanced when promoted.
+  const newTabField = advancedFields.find(isNewTabField);
+  const primaryLinkField = linkFields[0];
+  const usePairedLink =
+    !!primaryLinkField && !!newTabField && newTabField.name.toLowerCase() === "target";
+
+  if (usePairedLink && newTabField) {
+    const idx = advancedFields.indexOf(newTabField);
+    if (idx >= 0) advancedFields.splice(idx, 1);
   }
 
   function commit(attr: string, value: string | null) {
@@ -138,12 +170,52 @@ export function ComponentPropsPanel({ nodeId, tagName, attributes }: Props) {
           </div>
         </div>
       )}
+
+      {/* Link section — primary href-style prop with URL/Page toggle. The
+          new-tab checkbox is shown only when the component declares a target
+          prop (paired link); otherwise it's hidden because setting `target`
+          on a component without that prop wouldn't propagate. */}
+      {primaryLinkField && (
+        <LinkSection
+          href={attributes[primaryLinkField.name] ?? ""}
+          target={attributes.target}
+          rel={attributes.rel}
+          onAttrChange={(attr, value) => {
+            // The primary field name might not be 'href' literally — translate.
+            if (attr === "href") commit(primaryLinkField.name, value);
+            else commit(attr, value);
+          }}
+          label={primaryLinkField.name === "href" ? "Link" : `Link (${primaryLinkField.name})`}
+          hideNewTab={!usePairedLink}
+        />
+      )}
+      {/* Any additional link fields beyond the first render as plain inputs */}
+      {linkFields.length > 1 && (
+        <div className="border-b border-zinc-800 px-3 py-2.5">
+          <div className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
+            <LinkIcon size={11} className="text-blue-400" />
+            Other links
+          </div>
+          <div className="space-y-3">
+            {linkFields.slice(1).map((field) => (
+              <PropField
+                key={field.name}
+                field={field}
+                currentValue={attributes[field.name]}
+                onChange={(v) => commit(field.name, v)}
+                prominent
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
       {advancedFields.length > 0 && (
         <AdvancedSection
           fields={advancedFields}
           attributes={attributes}
           onChange={commit}
-          defaultOpen={contentFields.length === 0}
+          defaultOpen={contentFields.length === 0 && linkFields.length === 0}
         />
       )}
     </>
