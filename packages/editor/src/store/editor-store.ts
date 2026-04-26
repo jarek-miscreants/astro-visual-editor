@@ -16,6 +16,7 @@ import {
 import { connectWebSocket, onWsMessage } from "../lib/ws-client";
 import { useHistoryStore, computeInverse } from "./history-store";
 import { toast } from "./toast-store";
+import { useGitStore } from "./git-store";
 
 function describeMutation(mutation: Mutation): string {
   switch (mutation.type) {
@@ -121,6 +122,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       devServerUrl: null,
       iframeReady: false,
     });
+    useGitStore.getState().reset();
   },
 
   async initProject() {
@@ -137,6 +139,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           set({ devServerStatus: "error" });
         }
         if (msg.type === "file:changed") {
+          // Any source-file change can affect the working-tree status
+          useGitStore.getState().refreshDebounced();
           const state = get();
           if (state.currentFile === msg.path) {
             const newMap = buildNodeMap(msg.ast);
@@ -169,6 +173,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       // Load files
       await get().loadFiles();
+
+      // Initial git status — non-blocking, widget hides itself if no-git
+      if (info.path) {
+        useGitStore.getState().refresh();
+      }
 
       // Check dev server status
       const status = await api.getDevServerStatus();
@@ -313,6 +322,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
         set(nextState);
         toast.success(describeMutation(mutation), state.currentFile);
+        // Working tree is now dirty — refresh the git widget. Debounced so
+        // that rapid-fire mutations don't hammer the API.
+        useGitStore.getState().refreshDebounced();
       } else if (!result.success) {
         console.error("Mutation failed:", result.error);
         toast.error("Couldn't save", result.error || "The mutation was rejected.");

@@ -25,6 +25,7 @@ import { ProjectPickerDialog } from "../dialogs/ProjectPickerDialog";
 import { DesignSystemPanel } from "../design-system/DesignSystemPanel";
 import { Tooltip } from "../ui/Tooltip";
 import { openShortcutsDialog } from "../ui/ShortcutsDialog";
+import { GitToolbarWidget } from "../git/GitToolbarWidget";
 
 export function Toolbar() {
   const [showNewComponent, setShowNewComponent] = useState(false);
@@ -115,6 +116,11 @@ export function Toolbar() {
 
       {/* Page selector */}
       <PageSelector />
+
+      <Divider />
+
+      {/* Git widget — hidden when project isn't a repo */}
+      <GitToolbarWidget />
 
       <Divider />
 

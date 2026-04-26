@@ -17,6 +17,7 @@
     "gray-matter": "^4.0.3",
     "http-proxy-middleware": "^3.0.5",
     "magic-string": "^0.30.17",
+    "simple-git": "^3.36.0",
     "ws": "^8.18.1"
   },
   "devDependencies": {

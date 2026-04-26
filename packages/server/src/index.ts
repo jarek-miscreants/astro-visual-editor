@@ -12,6 +12,7 @@ import { componentsRouter } from "./routes/components.js";
 import { configRouter } from "./routes/config.js";
 import { contentRouter } from "./routes/content.js";
 import { projectRouter } from "./routes/project.js";
+import { gitRouter } from "./routes/git.js";
 import { setupFileWatcher } from "./services/file-watcher.js";
 import { stopDevServer } from "./services/astro-dev-server.js";
 import type { FSWatcher } from "chokidar";
@@ -79,6 +80,7 @@ app.use("/api/dev-server", devServerRouter);
 app.use("/api/components", componentsRouter);
 app.use("/api/config", configRouter);
 app.use("/api/content", contentRouter);
+app.use("/api/git", gitRouter);
 
 // WebSocket connections
 const wsClients = new Set<WebSocket>();

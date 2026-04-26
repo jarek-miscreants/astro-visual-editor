@@ -7,9 +7,28 @@ import type {
   ContentFile,
   ComponentPropSchema,
   RecentProject,
+  GitStatus,
+  GitBranchInfo,
+  GitDiffEntry,
+  GitCommitInfo,
+  TveBranchConfig,
 } from "@tve/shared";
 
 const API_BASE = "/api";
+
+/** Error thrown when an API call returns a non-2xx response. Carries the
+ *  optional error code so callers (e.g. promotion conflict prompt) can branch
+ *  on it without parsing the message string. */
+export class ApiError extends Error {
+  code?: string;
+  status: number;
+  constructor(message: string, status: number, code?: string) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.code = code;
+  }
+}
 
 async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${url}`, {
@@ -18,7 +37,7 @@ async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(err.error || res.statusText);
+    throw new ApiError(err.error || res.statusText, res.status, err.code);
   }
   return res.json();
 }
@@ -169,6 +188,97 @@ export const api = {
     return fetchJson("/components/extract", {
       method: "POST",
       body: JSON.stringify({ sourceFile, nodeId, componentName }),
+    });
+  },
+
+  /** Git: working-tree status (mode, branch, dirty files, ahead/behind) */
+  getGitStatus(): Promise<GitStatus> {
+    return fetchJson("/git/status");
+  },
+
+  /** Git: list local + remote branches */
+  getGitBranches(): Promise<{ branches: GitBranchInfo[] }> {
+    return fetchJson("/git/branches");
+  },
+
+  /** Git: working-tree diff per file */
+  getGitDiff(): Promise<{ diff: GitDiffEntry[] }> {
+    return fetchJson("/git/diff");
+  },
+
+  /** Git: recent commit log */
+  getGitCommits(limit = 20): Promise<{ commits: GitCommitInfo[] }> {
+    return fetchJson(`/git/commits?limit=${limit}`);
+  },
+
+  /** Git: stage + commit */
+  gitCommit(message: string, files?: string[]): Promise<{ success: boolean; hash: string }> {
+    return fetchJson("/git/commit", {
+      method: "POST",
+      body: JSON.stringify({ message, files }),
+    });
+  },
+
+  /** Git: push current branch (or named branch) to origin */
+  gitPush(opts: { branch?: string; setUpstream?: boolean } = {}): Promise<{ success: boolean }> {
+    return fetchJson("/git/push", {
+      method: "POST",
+      body: JSON.stringify(opts),
+    });
+  },
+
+  /** Git: pull from origin */
+  gitPull(opts: { mode?: "ff-only" | "merge" | "rebase"; branch?: string } = {}): Promise<{ success: boolean }> {
+    return fetchJson("/git/pull", {
+      method: "POST",
+      body: JSON.stringify(opts),
+    });
+  },
+
+  /** Git: read .tve/config.json */
+  getGitConfig(): Promise<TveBranchConfig> {
+    return fetchJson("/git/config");
+  },
+
+  /** Git: write .tve/config.json (partial merge) */
+  saveGitConfig(config: Partial<TveBranchConfig>): Promise<{ success: boolean; config: TveBranchConfig }> {
+    return fetchJson("/git/config", {
+      method: "PUT",
+      body: JSON.stringify(config),
+    });
+  },
+
+  /** Git: switch to an existing branch (refuses on dirty tree) */
+  gitCheckout(branch: string): Promise<{ success: boolean }> {
+    return fetchJson("/git/checkout", {
+      method: "POST",
+      body: JSON.stringify({ branch }),
+    });
+  },
+
+  /** Git: create a new local branch (and optionally check it out) */
+  gitCreateBranch(name: string, opts: { from?: string; checkout?: boolean } = {}): Promise<{ success: boolean }> {
+    return fetchJson("/git/branch", {
+      method: "POST",
+      body: JSON.stringify({ name, ...opts }),
+    });
+  },
+
+  /** Git: ensure the staging branch exists locally + on origin */
+  gitEnsureStaging(): Promise<{ success: boolean; created: boolean; name: string; pushed: boolean }> {
+    return fetchJson("/git/ensure-staging", { method: "POST" });
+  },
+
+  /** Git: merge `from` into `to`, push the target branch */
+  gitPromote(opts: { from: string; to: string; ffOnly?: boolean; push?: boolean }): Promise<{
+    success: boolean;
+    method: "fast-forward" | "merge";
+    pushed: boolean;
+    currentBranch: string;
+  }> {
+    return fetchJson("/git/promote", {
+      method: "POST",
+      body: JSON.stringify(opts),
     });
   },
 };

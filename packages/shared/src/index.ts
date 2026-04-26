@@ -12,6 +12,13 @@ export type {
   ComponentPropField,
   ComponentPropSchema,
   RecentProject,
+  GitMode,
+  GitStatus,
+  GitDirtyFile,
+  GitBranchInfo,
+  GitDiffEntry,
+  GitCommitInfo,
+  TveBranchConfig,
 } from "./types.js";
 
 export type {
