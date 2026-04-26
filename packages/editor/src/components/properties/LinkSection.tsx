@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link as LinkIcon, ExternalLink, FileText, Globe } from "lucide-react";
 import { useEditorStore } from "../../store/editor-store";
+import { useContentStore } from "../../store/content-store";
 
 interface Props {
   /** Current href value (empty string if not set) */
@@ -36,9 +37,47 @@ function pageFileToUrl(filePath: string): string | null {
   return "/" + route;
 }
 
+/**
+ * Match a single-param dynamic route file. Returns the collection name (the
+ * directory before the [param] segment) and the route prefix.
+ *   src/pages/blog/[slug].astro     → { collection: "blog", prefix: "/blog" }
+ *   src/pages/[slug].astro          → { collection: null, prefix: "" } (root-level dynamic)
+ *   src/pages/blog/[...slug].astro  → null  (catch-all, skipped)
+ */
+function parseDynamicRoute(
+  filePath: string
+): { collection: string | null; prefix: string } | null {
+  const m = filePath.match(/^src\/pages\/(.*)\/\[([^\]]+)\]\.astro$/);
+  if (m) {
+    if (m[2].startsWith("...")) return null; // catch-all
+    const prefix = "/" + m[1];
+    const collection = m[1].split("/").pop() || null;
+    return { collection, prefix };
+  }
+  // Root-level [slug].astro — no collection inference possible
+  const root = filePath.match(/^src\/pages\/\[([^\]]+)\]\.astro$/);
+  if (root && !root[1].startsWith("...")) {
+    return { collection: null, prefix: "" };
+  }
+  return null;
+}
+
+/** Extract slug from a content file path: src/content/blog/foo.md → "foo" */
+function contentPathToSlug(filePath: string, collection: string): string | null {
+  const escaped = collection.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const m = filePath.match(new RegExp(`^src\\/content\\/${escaped}\\/(.+)\\.(md|mdx)$`));
+  return m ? m[1] : null;
+}
+
+function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
 interface PageOption {
   url: string;
   label: string;
+  /** Group label for optgroup. "Pages" for static, collection name for content entries. */
+  group: string;
   isTemplate: boolean;
 }
 
@@ -57,28 +96,109 @@ export function LinkSection({
   hideNewTab = false,
 }: Props) {
   const files = useEditorStore((s) => s.files);
+  const contentFiles = useContentStore((s) => s.files);
 
   const pageOptions: PageOption[] = useMemo(() => {
     const list: PageOption[] = [];
+
+    // Static pages — non-dynamic .astro files
     for (const f of files) {
       if (f.type !== "page") continue;
       const url = pageFileToUrl(f.path);
       if (!url) continue;
-      const isTemplate = url.includes("[");
-      list.push({ url, label: url, isTemplate });
+      if (url.includes("[")) continue; // dynamic templates handled below
+      list.push({ url, label: url, group: "Pages", isTemplate: false });
     }
-    // Stable order: home first, then alpha by url
-    return list.sort((a, b) => {
-      if (a.url === "/" && b.url !== "/") return -1;
-      if (b.url === "/" && a.url !== "/") return 1;
-      return a.url.localeCompare(b.url);
-    });
-  }, [files]);
 
-  // Detect mode from the current href: page-shaped if it matches a known page URL.
+    // Dynamic routes paired with content collections — generate one URL per
+    // collection entry. Heuristic: pages/X/[slug].astro pairs with the X
+    // collection. Custom slugs in frontmatter aren't followed (filename slug
+    // is used). Catch-all routes are skipped.
+    for (const f of files) {
+      if (f.type !== "page") continue;
+      const route = parseDynamicRoute(f.path);
+      if (!route) {
+        // Surface the dynamic file as a disabled "template" entry so the user
+        // sees it exists but knows they need URL mode.
+        const url = pageFileToUrl(f.path);
+        if (url && url.includes("[")) {
+          list.push({ url, label: `${url} (dynamic — use URL mode)`, group: "Templates", isTemplate: true });
+        }
+        continue;
+      }
+      if (!route.collection) {
+        // Root-level [slug].astro — can't infer collection
+        list.push({
+          url: f.path,
+          label: `/${f.path} (custom routing — use URL mode)`,
+          group: "Templates",
+          isTemplate: true,
+        });
+        continue;
+      }
+      // Pair with content collection of the same name
+      const entries = contentFiles.filter((c) => c.collection === route.collection);
+      if (entries.length === 0) {
+        // Dynamic route exists but no entries yet — show as template
+        const url = pageFileToUrl(f.path);
+        if (url) {
+          list.push({
+            url,
+            label: `${url} (no entries yet)`,
+            group: "Templates",
+            isTemplate: true,
+          });
+        }
+        continue;
+      }
+      for (const entry of entries) {
+        const slug = contentPathToSlug(entry.path, route.collection);
+        if (!slug) continue;
+        const url = `${route.prefix}/${slug}`;
+        list.push({
+          url,
+          label: url,
+          group: capitalize(route.collection),
+          isTemplate: false,
+        });
+      }
+    }
+
+    return list;
+  }, [files, contentFiles]);
+
+  // Group options by section for the dropdown's optgroups. Pages always first.
+  const groupedOptions = useMemo(() => {
+    const groups = new Map<string, PageOption[]>();
+    for (const opt of pageOptions) {
+      const arr = groups.get(opt.group) || [];
+      arr.push(opt);
+      groups.set(opt.group, arr);
+    }
+    // Sort within each group: home first, then alpha
+    for (const arr of groups.values()) {
+      arr.sort((a, b) => {
+        if (a.url === "/" && b.url !== "/") return -1;
+        if (b.url === "/" && a.url !== "/") return 1;
+        return a.url.localeCompare(b.url);
+      });
+    }
+    // Fixed group order: Pages, then alpha-sorted collections, then Templates last
+    const fixed = ["Pages"];
+    const collectionGroups = [...groups.keys()]
+      .filter((g) => g !== "Pages" && g !== "Templates")
+      .sort();
+    const order = [...fixed, ...collectionGroups, "Templates"];
+    return order
+      .filter((g) => groups.has(g))
+      .map((g) => ({ group: g, options: groups.get(g)! }));
+  }, [pageOptions]);
+
+  // Detect mode from the current href: page-shaped if it matches a known
+  // (non-template) page URL.
   const initialMode = useMemo<"url" | "page">(() => {
     if (!href) return "url";
-    return pageOptions.some((p) => p.url === href) ? "page" : "url";
+    return pageOptions.some((p) => !p.isTemplate && p.url === href) ? "page" : "url";
   }, [href, pageOptions]);
 
   const [mode, setMode] = useState<"url" | "page">(initialMode);
@@ -164,7 +284,9 @@ export function LinkSection({
           </div>
         ) : (
           <select
-            value={pageOptions.some((p) => p.url === href) ? href : ""}
+            value={
+              pageOptions.some((p) => !p.isTemplate && p.url === href) ? href : ""
+            }
             onChange={(e) => {
               const v = e.target.value;
               onAttrChange("href", v === "" ? null : v);
@@ -172,11 +294,18 @@ export function LinkSection({
             className="w-full border border-zinc-800 bg-zinc-900 px-2 py-1.5 text-[11px] text-zinc-100 outline-none focus:border-blue-500"
           >
             <option value="">— Select a page —</option>
-            {pageOptions.map((p) => (
-              <option key={p.url} value={p.isTemplate ? "" : p.url} disabled={p.isTemplate}>
-                {p.label}
-                {p.isTemplate ? " (dynamic — pick in URL mode)" : ""}
-              </option>
+            {groupedOptions.map(({ group, options }) => (
+              <optgroup key={group} label={group}>
+                {options.map((p) => (
+                  <option
+                    key={p.url + p.label}
+                    value={p.isTemplate ? "" : p.url}
+                    disabled={p.isTemplate}
+                  >
+                    {p.label}
+                  </option>
+                ))}
+              </optgroup>
             ))}
           </select>
         )}
