@@ -179,6 +179,21 @@ export const api = {
     });
   },
 
+  /** Create a new .md/.mdx file in a content collection */
+  createContentFile(input: {
+    collection: string;
+    slug: string;
+    format: "md" | "mdx";
+    root?: "src/content" | "src/pages" | "content";
+    frontmatter?: Record<string, any>;
+    body?: string;
+  }): Promise<{ success: boolean; path: string }> {
+    return fetchJson("/content/create", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  },
+
   /** Extract an element into a new Astro component */
   extractComponent(
     sourceFile: string,

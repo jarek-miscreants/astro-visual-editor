@@ -3,6 +3,7 @@ import {
   scanContentFiles,
   readContentFile,
   writeContentFile,
+  createContentFile,
 } from "../services/content-files.js";
 import { resolveProjectPath, PathTraversalError } from "../lib/path-guard.js";
 
@@ -63,5 +64,58 @@ contentRouter.post("/write/*filePath", async (req, res) => {
       return;
     }
     res.status(500).json({ error: err.message });
+  }
+});
+
+/** POST /api/content/create — create a new .md/.mdx file in a collection */
+contentRouter.post("/create", async (req, res) => {
+  try {
+    const projectPath = req.app.locals.projectPath as string;
+    const { collection, slug, format, root, frontmatter, body } = req.body ?? {};
+
+    if (typeof collection !== "string" || typeof slug !== "string") {
+      res.status(400).json({ error: "collection and slug are required strings" });
+      return;
+    }
+    if (format !== "md" && format !== "mdx") {
+      res.status(400).json({ error: "format must be 'md' or 'mdx'" });
+      return;
+    }
+    if (root !== undefined && root !== "src/content" && root !== "src/pages" && root !== "content") {
+      res.status(400).json({ error: "invalid root" });
+      return;
+    }
+    if (frontmatter !== undefined && (typeof frontmatter !== "object" || frontmatter === null)) {
+      res.status(400).json({ error: "frontmatter must be an object" });
+      return;
+    }
+    if (body !== undefined && typeof body !== "string") {
+      res.status(400).json({ error: "body must be a string" });
+      return;
+    }
+
+    const result = await createContentFile(projectPath, {
+      collection,
+      slug,
+      format,
+      root,
+      frontmatter,
+      body,
+    });
+
+    // Validate the resolved path is inside the project
+    resolveProjectPath(projectPath, result.path);
+
+    res.json({ success: true, path: result.path });
+  } catch (err: any) {
+    if (err instanceof PathTraversalError) {
+      res.status(403).json({ error: err.message });
+      return;
+    }
+    if (err.code === "EEXIST") {
+      res.status(409).json({ error: err.message, code: "EEXIST" });
+      return;
+    }
+    res.status(400).json({ error: err.message });
   }
 });

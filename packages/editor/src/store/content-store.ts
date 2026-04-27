@@ -13,6 +13,14 @@ interface ContentState {
   loadFiles: () => Promise<void>;
   openFile: (path: string) => Promise<void>;
   closeFile: () => void;
+  createFile: (input: {
+    collection: string;
+    slug: string;
+    format: "md" | "mdx";
+    root?: "src/content" | "src/pages" | "content";
+    frontmatter?: Record<string, any>;
+    body?: string;
+  }) => Promise<string>;
   updateBody: (body: string) => void;
   updateFrontmatterField: (key: string, value: any) => void;
   renameFrontmatterField: (oldKey: string, newKey: string) => void;
@@ -49,6 +57,13 @@ export const useContentStore = create<ContentState>((set, get) => ({
 
   closeFile() {
     set({ currentPath: null, current: null, dirty: false, lastError: null });
+  },
+
+  async createFile(input) {
+    const { path } = await api.createContentFile(input);
+    await get().loadFiles();
+    await get().openFile(path);
+    return path;
   },
 
   updateBody(body) {

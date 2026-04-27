@@ -1,10 +1,13 @@
 import { useState, useRef, useEffect } from "react";
-import { FileText, ChevronDown, FileType } from "lucide-react";
+import { FileText, ChevronDown, FileType, Plus } from "lucide-react";
 import { useEditorStore } from "../../store/editor-store";
 import { useContentStore } from "../../store/content-store";
+import { ContentFileDialog } from "../dialogs/ContentFileDialog";
 
 export function PageSelector() {
   const [open, setOpen] = useState(false);
+  const [createDialogCollection, setCreateDialogCollection] = useState<string | null>(null);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const files = useEditorStore((s) => s.files);
   const currentFile = useEditorStore((s) => s.currentFile);
@@ -104,14 +107,37 @@ export function PageSelector() {
               currentFile={currentContentPath}
               onSelect={openContent}
               accent="emerald"
+              onAddNew={() => {
+                setCreateDialogCollection(collection);
+                setShowCreateDialog(true);
+                setOpen(false);
+              }}
             />
           ))}
+          <button
+            onClick={() => {
+              setCreateDialogCollection(null);
+              setShowCreateDialog(true);
+              setOpen(false);
+            }}
+            className="mt-1 flex w-full items-center gap-1.5 border-t border-zinc-700 px-3 py-2 text-xs text-emerald-400 hover:bg-zinc-700"
+          >
+            <Plus size={12} />
+            New content entry…
+          </button>
           {files.length === 0 && contentFiles.length === 0 && (
             <p className="px-3 py-2 text-xs text-zinc-500">
               No editable files found
             </p>
           )}
         </div>
+      )}
+
+      {showCreateDialog && (
+        <ContentFileDialog
+          defaultCollection={createDialogCollection ?? undefined}
+          onClose={() => setShowCreateDialog(false)}
+        />
       )}
     </div>
   );
@@ -123,12 +149,14 @@ function FileGroup({
   currentFile,
   onSelect,
   accent = "blue",
+  onAddNew,
 }: {
   label: string;
   files: { path: string; type: string }[];
   currentFile: string | null;
   onSelect: (path: string) => void;
   accent?: "blue" | "emerald";
+  onAddNew?: () => void;
 }) {
   const activeClass =
     accent === "emerald"
@@ -136,8 +164,19 @@ function FileGroup({
       : "bg-blue-600/20 text-blue-300";
   return (
     <div>
-      <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
-        {label}
+      <div className="flex items-center justify-between px-3 py-1">
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+          {label}
+        </span>
+        {onAddNew && (
+          <button
+            onClick={onAddNew}
+            className="text-zinc-500 hover:text-emerald-400"
+            title="New entry"
+          >
+            <Plus size={12} />
+          </button>
+        )}
       </div>
       {files.map((file) => (
         <button

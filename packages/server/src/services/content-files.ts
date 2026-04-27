@@ -103,3 +103,74 @@ export async function writeContentFile(
   const out = matter.stringify(body, frontmatter);
   await fs.writeFile(full, out, "utf-8");
 }
+
+export interface CreateContentFileInput {
+  collection: string;
+  slug: string;
+  format: "md" | "mdx";
+  /** Optional content root override; defaults to a heuristic based on existing files. */
+  root?: "src/content" | "src/pages" | "content";
+  frontmatter?: Record<string, any>;
+  body?: string;
+}
+
+const SLUG_RE = /^[a-z0-9]+(?:[-_][a-z0-9]+)*$/;
+const COLLECTION_RE = /^[a-zA-Z0-9][a-zA-Z0-9-_]*$/;
+
+/** Create a new .md/.mdx file. Refuses to overwrite. Returns the relative path. */
+export async function createContentFile(
+  projectPath: string,
+  input: CreateContentFileInput
+): Promise<{ path: string }> {
+  const { collection, slug, format, frontmatter = {}, body = "" } = input;
+
+  if (!COLLECTION_RE.test(collection)) {
+    throw new Error("Invalid collection name");
+  }
+  if (!SLUG_RE.test(slug)) {
+    throw new Error("Slug must be lowercase letters, digits, hyphens or underscores");
+  }
+  if (format !== "md" && format !== "mdx") {
+    throw new Error("Format must be md or mdx");
+  }
+
+  const root = input.root ?? (await pickContentRoot(projectPath, collection));
+  const relPath = `${root}/${collection}/${slug}.${format}`;
+  const full = path.join(projectPath, relPath);
+
+  // Ensure file does not already exist
+  try {
+    await fs.access(full);
+    const err: any = new Error(`File already exists: ${relPath}`);
+    err.code = "EEXIST";
+    throw err;
+  } catch (e: any) {
+    if (e.code !== "ENOENT") {
+      if (e.code === "EEXIST") throw e;
+      // any other access error — surface it
+      throw e;
+    }
+  }
+
+  await fs.mkdir(path.dirname(full), { recursive: true });
+  const out = matter.stringify(body, frontmatter);
+  await fs.writeFile(full, out, "utf-8");
+
+  return { path: relPath };
+}
+
+/** If files for this collection already exist, reuse their root; otherwise default to src/content. */
+async function pickContentRoot(
+  projectPath: string,
+  collection: string
+): Promise<"src/content" | "src/pages" | "content"> {
+  const existing = await scanContentFiles(projectPath);
+  for (const f of existing) {
+    if (f.collection !== collection) continue;
+    const parts = f.path.split("/");
+    if (parts[0] === "src" && parts[1] === "content") return "src/content";
+    if (parts[0] === "src" && parts[1] === "pages") return "src/pages";
+    if (parts[0] === "content") return "content";
+  }
+  return "src/content";
+}
