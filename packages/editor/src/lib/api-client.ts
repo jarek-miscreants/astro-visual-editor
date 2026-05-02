@@ -74,6 +74,19 @@ export const api = {
     return fetchJson(`/files/${path}`);
   },
 
+  /** Frontmatter imports for a single .astro file. Used by AddElementPanel
+   *  to surface package-imported components (Icon from astro-icon, etc.). */
+  getFileImports(path: string): Promise<{
+    imports: {
+      name: string;
+      source: string;
+      isDefault: boolean;
+      isExternal: boolean;
+    }[];
+  }> {
+    return fetchJson(`/files/imports/${path}`);
+  },
+
   /** Parse file into AST */
   getAst(path: string): Promise<{ path: string; ast: ASTNode[] }> {
     return fetchJson(`/ast/${path}`);
@@ -125,6 +138,17 @@ export const api = {
   getComponentProps(componentPath: string): Promise<ComponentPropSchema> {
     const qs = encodeURIComponent(componentPath);
     return fetchJson(`/components/props?path=${qs}`);
+  },
+
+  /** Fetch the `<slot>` declarations a component exposes. Drives the tree's
+   *  per-slot drop targets and the slot autocomplete on `slot=` attribute
+   *  fields. */
+  getComponentSlots(componentPath: string): Promise<{
+    componentPath: string;
+    slots: { name: string | null }[];
+  }> {
+    const qs = encodeURIComponent(componentPath);
+    return fetchJson(`/components/slots?path=${qs}`);
   },
 
   /** Get TVE project config (defaultMode, etc.) */

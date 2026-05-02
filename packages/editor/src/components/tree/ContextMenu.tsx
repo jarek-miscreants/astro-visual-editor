@@ -76,7 +76,7 @@ export function ContextMenu({ node, x, y, onClose }: ContextMenuProps) {
     onClose();
   }
 
-  function handleAddElement(html: string) {
+  function handleAddElement(html: string, options?: { componentPath?: string }) {
     if (!ast) return;
 
     if (showAddPanel === "child") {
@@ -85,6 +85,7 @@ export function ContextMenu({ node, x, y, onClose }: ContextMenuProps) {
         parentNodeId: node.nodeId,
         position: node.children.length,
         html,
+        componentPath: options?.componentPath,
       });
     } else if (showAddPanel === "before" || showAddPanel === "after") {
       const parentInfo = findParent(ast, node.nodeId);
@@ -95,6 +96,7 @@ export function ContextMenu({ node, x, y, onClose }: ContextMenuProps) {
         parentNodeId: parentInfo.parent.nodeId,
         position: pos,
         html,
+        componentPath: options?.componentPath,
       });
     }
     onClose();
@@ -222,4 +224,3 @@ function MenuItem({
 function MenuDivider() {
   return <div className="my-1 border-t border-zinc-700" />;
 }
-

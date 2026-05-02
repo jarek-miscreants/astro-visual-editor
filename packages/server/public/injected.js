@@ -731,6 +731,42 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
     if (window.__tve_initialized) return;
     window.__tve_initialized = true;
     console.log("[TVE] Injected script loaded");
+    const SCROLL_KEY = `__tve_scroll:${location.pathname}`;
+    if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+    const saved = sessionStorage.getItem(SCROLL_KEY);
+    if (saved) {
+      try {
+        const { x, y } = JSON.parse(saved);
+        const tryRestore = (attempt) => {
+          var _a;
+          const max = Math.max(
+            document.documentElement.scrollHeight,
+            ((_a = document.body) == null ? void 0 : _a.scrollHeight) ?? 0
+          ) - window.innerHeight;
+          const target = Math.min(y, Math.max(0, max));
+          window.scrollTo(x, target);
+          if (window.scrollY < y - 4 && attempt < 30) {
+            requestAnimationFrame(() => tryRestore(attempt + 1));
+          }
+        };
+        requestAnimationFrame(() => tryRestore(0));
+      } catch {
+      }
+    }
+    let scrollSaveTimer;
+    window.addEventListener(
+      "scroll",
+      () => {
+        if (scrollSaveTimer !== void 0) window.clearTimeout(scrollSaveTimer);
+        scrollSaveTimer = window.setTimeout(() => {
+          sessionStorage.setItem(
+            SCROLL_KEY,
+            JSON.stringify({ x: window.scrollX, y: window.scrollY })
+          );
+        }, 100);
+      },
+      { passive: true }
+    );
     const domMapper = new DomMapper();
     const overlay = createOverlay();
     const bridge = setupBridge(domMapper);

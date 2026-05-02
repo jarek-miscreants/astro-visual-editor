@@ -1,14 +1,20 @@
-import { useState } from "react";
-import { Search, Box, Type, Image, MousePointer, List, Component, Layers } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Search, Box, Type, Image, MousePointer, List, Component, Layers, Package } from "lucide-react";
 import { ELEMENT_TEMPLATES, templateToHtml, type TemplateGroup } from "../../lib/element-templates";
 import { useEditorStore } from "../../store/editor-store";
+import { api } from "../../lib/api-client";
 
 interface AddElementPanelProps {
-  onSelect: (html: string) => void;
+  onSelect: (html: string, options?: { componentPath?: string }) => void;
   onClose: () => void;
   /** If true, only show project components — hide raw HTML element templates.
    *  Used in marketer mode where the authoring surface is pre-built blocks. */
   componentsOnly?: boolean;
+}
+
+interface ExternalImport {
+  name: string;
+  source: string;
 }
 
 const GROUP_ICONS: Record<string, React.ReactNode> = {
@@ -23,13 +29,54 @@ const GROUP_ICONS: Record<string, React.ReactNode> = {
 export function AddElementPanel({ onSelect, onClose, componentsOnly = false }: AddElementPanelProps) {
   const [search, setSearch] = useState("");
   const files = useEditorStore((s) => s.files);
+  const currentFile = useEditorStore((s) => s.currentFile);
 
   // Project components
   const components = files.filter((f) => f.type === "component");
 
+  // External components: parsed from the open file's frontmatter, filtered to
+  // PascalCase names imported from non-relative sources. Fetched once per
+  // file open so the panel can offer Icon, Image, etc. that the project
+  // scanner wouldn't surface. Skips lowercase names (utility helpers like
+  // getCollection) since they aren't valid component tags.
+  const [externals, setExternals] = useState<ExternalImport[]>([]);
+  useEffect(() => {
+    if (!currentFile) {
+      setExternals([]);
+      return;
+    }
+    let cancelled = false;
+    api
+      .getFileImports(currentFile)
+      .then(({ imports }) => {
+        if (cancelled) return;
+        const seen = new Set<string>();
+        const out: ExternalImport[] = [];
+        for (const imp of imports) {
+          if (!imp.isExternal) continue;
+          if (!/^[A-Z]/.test(imp.name)) continue; // not a component-shaped tag
+          // astro:* virtual modules expose helpers, not components — skip.
+          if (imp.source.startsWith("astro:")) continue;
+          if (seen.has(imp.name)) continue;
+          seen.add(imp.name);
+          out.push({ name: imp.name, source: imp.source });
+        }
+        setExternals(out);
+      })
+      .catch(() => {
+        if (!cancelled) setExternals([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [currentFile]);
+
   const query = search.toLowerCase();
   const filteredComponents = components.filter(
     (c) => !query || c.path.toLowerCase().includes(query)
+  );
+  const filteredExternals = externals.filter(
+    (e) => !query || e.name.toLowerCase().includes(query) || e.source.toLowerCase().includes(query)
   );
 
   return (
@@ -61,7 +108,7 @@ export function AddElementPanel({ onSelect, onClose, componentsOnly = false }: A
               return (
                 <button
                   key={comp.path}
-                  onClick={() => onSelect(`<${name} />`)}
+                  onClick={() => onSelect(`<${name} />`, { componentPath: comp.path })}
                   className="flex w-full items-center gap-2  px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-700"
                 >
                   <Component size={11} className="text-cyan-400" />
@@ -80,6 +127,31 @@ export function AddElementPanel({ onSelect, onClose, componentsOnly = false }: A
         {componentsOnly && components.length > 0 && filteredComponents.length === 0 && (
           <div className="px-2 py-3 text-center text-[11px] text-zinc-500">
             No components match "{search}".
+          </div>
+        )}
+
+        {/* External components imported into this page (e.g. Icon from
+            astro-icon). Listed only when present so empty pages don't get a
+            stray section. The import already exists in this file, so the
+            mutation engine won't need to add one. */}
+        {filteredExternals.length > 0 && (
+          <div className="mb-1">
+            <div className="flex items-center gap-1 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-amber-400">
+              <Package size={10} />
+              External
+            </div>
+            {filteredExternals.map((ext) => (
+              <button
+                key={ext.name}
+                onClick={() => onSelect(`<${ext.name} />`)}
+                className="flex w-full items-center gap-2 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-700"
+                title={`Imported from ${ext.source}`}
+              >
+                <Package size={11} className="text-amber-400" />
+                <span className="font-mono">{ext.name}</span>
+                <span className="ml-auto truncate text-[9px] text-zinc-600">{ext.source}</span>
+              </button>
+            ))}
           </div>
         )}
 

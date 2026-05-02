@@ -88,13 +88,14 @@ export function LeftSidebar() {
     return () => window.removeEventListener("keydown", handleKey);
   }, []);
 
-  function handleAddElement(html: string) {
+  function handleAddElement(html: string, options?: { componentPath?: string }) {
     if (!selectedNodeId) return;
     applyMutation({
       type: "add-element",
       parentNodeId: selectedNodeId,
       position: useEditorStore.getState().nodeMap.get(selectedNodeId)?.children.length || 0,
       html,
+      componentPath: options?.componentPath,
     });
     setShowAddPanel(false);
   }
@@ -218,4 +219,3 @@ export function LeftSidebar() {
     </div>
   );
 }
-

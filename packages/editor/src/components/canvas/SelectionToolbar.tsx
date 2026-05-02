@@ -1,7 +1,9 @@
-import { useEffect, useState, type RefObject } from "react";
-import { Copy, Trash2, ArrowUp, ArrowDown } from "lucide-react";
+import { useEffect, useRef, useState, type RefObject } from "react";
+import { Copy, Trash2, ArrowUp, ArrowDown, PlusCircle } from "lucide-react";
+import { createPortal } from "react-dom";
 import { useEditorStore } from "../../store/editor-store";
 import { Tooltip } from "../ui/Tooltip";
+import { AddElementPanel } from "../tree/AddElementPanel";
 
 interface Props {
   /** Ref to the iframe so we can compute its page offset. */
@@ -21,6 +23,32 @@ export function SelectionToolbar({ iframeRef }: Props) {
   const applyMutation = useEditorStore((s) => s.applyMutation);
 
   const [coords, setCoords] = useState<{ top: number; left: number } | null>(null);
+  const [showAddChild, setShowAddChild] = useState(false);
+  const addBtnRef = useRef<HTMLButtonElement | null>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
+
+  // Reset the panel when selection changes — otherwise it lingers anchored
+  // to the previous element's coords.
+  useEffect(() => {
+    setShowAddChild(false);
+  }, [selectedNodeId]);
+
+  // Close on outside click
+  useEffect(() => {
+    if (!showAddChild) return;
+    function onMouseDown(e: MouseEvent) {
+      if (
+        panelRef.current &&
+        !panelRef.current.contains(e.target as Node) &&
+        addBtnRef.current &&
+        !addBtnRef.current.contains(e.target as Node)
+      ) {
+        setShowAddChild(false);
+      }
+    }
+    document.addEventListener("mousedown", onMouseDown);
+    return () => document.removeEventListener("mousedown", onMouseDown);
+  }, [showAddChild]);
 
   useEffect(() => {
     const iframe = iframeRef.current;
@@ -83,11 +111,39 @@ export function SelectionToolbar({ iframeRef }: Props) {
     });
   }
 
+  // Look up the selected node so the add-child mutation knows the current
+  // child count (insertion position). Empty self-closing components like
+  // <CardIcon /> still get this button — the file-writer expands them on
+  // child insertion.
+  const selectedNode = ast ? findNode(ast, selectedNodeId) : null;
+  const childCount = selectedNode?.children.length ?? 0;
+
+  function handleAddChild(html: string, options?: { componentPath?: string }) {
+    if (!selectedNodeId) return;
+    applyMutation({
+      type: "add-element",
+      parentNodeId: selectedNodeId,
+      position: childCount,
+      html,
+      componentPath: options?.componentPath,
+    });
+    setShowAddChild(false);
+  }
+
   return (
     <div
       className="fixed z-[60] flex items-center gap-0.5 rounded-md border border-zinc-700 bg-zinc-900/95 p-0.5 shadow-lg shadow-black/30 backdrop-blur"
       style={{ top: coords.top, left: coords.left }}
     >
+      <Tooltip content="Add child">
+        <button
+          ref={addBtnRef}
+          onClick={() => setShowAddChild((v) => !v)}
+          className="flex h-6 w-6 items-center justify-center rounded text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-white"
+        >
+          <PlusCircle size={12} />
+        </button>
+      </Tooltip>
       <Tooltip content="Move up">
         <ToolbarButton
           disabled={!canMoveUp}
@@ -123,8 +179,37 @@ export function SelectionToolbar({ iframeRef }: Props) {
           <Trash2 size={12} />
         </ToolbarButton>
       </Tooltip>
+
+      {showAddChild && addBtnRef.current && createPortal(
+        <div
+          ref={panelRef}
+          className="fixed z-[9999]"
+          style={{
+            left: addBtnRef.current.getBoundingClientRect().left,
+            top: addBtnRef.current.getBoundingClientRect().bottom + 4,
+          }}
+        >
+          <AddElementPanel
+            onSelect={handleAddChild}
+            onClose={() => setShowAddChild(false)}
+          />
+        </div>,
+        document.body
+      )}
     </div>
   );
+}
+
+function findNode(
+  nodes: import("@tve/shared").ASTNode[],
+  targetId: string
+): import("@tve/shared").ASTNode | null {
+  for (const n of nodes) {
+    if (n.nodeId === targetId) return n;
+    const found = findNode(n.children, targetId);
+    if (found) return found;
+  }
+  return null;
 }
 
 function ToolbarButton({
