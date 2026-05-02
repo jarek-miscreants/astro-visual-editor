@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Search, Box, Type, Image, MousePointer, List, Component, Layers, Package } from "lucide-react";
+import type { ASTNode } from "@tve/shared";
 import { ELEMENT_TEMPLATES, templateToHtml, type TemplateGroup } from "../../lib/element-templates";
 import { useEditorStore } from "../../store/editor-store";
 import { api } from "../../lib/api-client";
@@ -17,6 +18,43 @@ interface ExternalImport {
   source: string;
 }
 
+/** Build the HTML for an inserted external component. We can't introspect
+ *  Props for package components (they live in node_modules and we'd have
+ *  to walk types), so a bare `<Tag />` often crashes Astro at render —
+ *  e.g. `<Icon />` from astro-icon throws "Icon requires a name prop".
+ *  Mitigation: copy attributes from the first existing instance of the
+ *  same tag on the open page. Excludes context-specific attributes
+ *  (`slot`, `class`) so the inserted element doesn't accidentally land
+ *  in someone else's slot or carry styling that doesn't fit. */
+function buildExternalComponentHtml(tagName: string, ast: ASTNode[] | null): string {
+  const sample = ast ? findFirstNodeByTag(ast, tagName) : null;
+  if (!sample) return `<${tagName} />`;
+  const skip = new Set(["slot", "class", "className"]);
+  const attrs: string[] = [];
+  for (const [key, value] of Object.entries(sample.attributes)) {
+    if (skip.has(key)) continue;
+    // Astro expression bindings come back as `{expr}`; we can't safely
+    // re-emit those for a fresh element so just drop them.
+    if (typeof value === "string" && value.startsWith("{") && value.endsWith("}")) continue;
+    attrs.push(`${key}="${escapeAttrValue(value)}"`);
+  }
+  const attrStr = attrs.length > 0 ? " " + attrs.join(" ") : "";
+  return `<${tagName}${attrStr} />`;
+}
+
+function findFirstNodeByTag(nodes: ASTNode[], tagName: string): ASTNode | null {
+  for (const n of nodes) {
+    if (n.tagName === tagName) return n;
+    const found = findFirstNodeByTag(n.children, tagName);
+    if (found) return found;
+  }
+  return null;
+}
+
+function escapeAttrValue(v: string): string {
+  return v.replace(/"/g, "&quot;");
+}
+
 const GROUP_ICONS: Record<string, React.ReactNode> = {
   Structure: <Box size={11} />,
   Text: <Type size={11} />,
@@ -30,6 +68,7 @@ export function AddElementPanel({ onSelect, onClose, componentsOnly = false }: A
   const [search, setSearch] = useState("");
   const files = useEditorStore((s) => s.files);
   const currentFile = useEditorStore((s) => s.currentFile);
+  const ast = useEditorStore((s) => s.ast);
 
   // Project components
   const components = files.filter((f) => f.type === "component");
@@ -143,7 +182,7 @@ export function AddElementPanel({ onSelect, onClose, componentsOnly = false }: A
             {filteredExternals.map((ext) => (
               <button
                 key={ext.name}
-                onClick={() => onSelect(`<${ext.name} />`)}
+                onClick={() => onSelect(buildExternalComponentHtml(ext.name, ast))}
                 className="flex w-full items-center gap-2 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-700"
                 title={`Imported from ${ext.source}`}
               >
