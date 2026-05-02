@@ -1,0 +1,276 @@
+/* Element Tree styles
+ *
+ * Single source of truth for tree row colors. Each role (HTML tag, component,
+ * slot, drop target, badge…) maps to a CSS variable here so visual tweaks are
+ * a one-line edit instead of hunting through ternaries in ElementTree.tsx.
+ *
+ * To change how a regular <div> renders in the tree, edit `--tree-tag-color`.
+ * For component rows (PascalCase tags), edit `--tree-component-color`.
+ */
+
+:root {
+  /* Row text colors — applied to the tag label */
+  --tree-tag-color: #fafafa;            /* white-ish for plain HTML tags */
+  --tree-tag-color-hover: #ffffff;
+  --tree-component-color: #4ade80;       /* green for components */
+  --tree-component-color-hover: #86efac;
+  --tree-slot-color: #4ade80;
+  --tree-slot-color-muted: rgba(34, 197, 94, 0.5);
+
+  /* Secondary text inside a row */
+  --tree-class-preview-color: #71717a;   /* faint mono `.class` snippet */
+  --tree-text-preview-color: #d4d4d8;    /* italic "text content" snippet */
+  --tree-icon-color: #71717a;
+  --tree-grip-color: #52525b;
+
+  /* Selection + hover backgrounds */
+  --tree-row-hover-bg: rgba(39, 39, 42, 0.5);
+  --tree-row-selected-bg: rgba(37, 99, 235, 0.2);
+  --tree-row-selected-text: #93c5fd;
+  --tree-row-selected-component-bg: rgba(22, 163, 74, 0.2);
+  --tree-row-selected-component-text: #86efac;
+
+  /* Drop indicators */
+  --tree-drop-line: #3b82f6;
+  --tree-drop-inside-bg: rgba(59, 130, 246, 0.1);
+  --tree-drop-inside-border: rgba(59, 130, 246, 0.3);
+
+  /* Badges */
+  --tree-badge-comp-bg: rgba(22, 78, 99, 0.4);
+  --tree-badge-comp-fg: #22d3ee;
+  --tree-badge-expr-bg: rgba(88, 28, 135, 0.4);
+  --tree-badge-expr-fg: #c084fc;
+
+  /* Slot placeholder (the dashed dropzone) */
+  --tree-slot-placeholder-border: rgba(34, 197, 94, 0.3);
+  --tree-slot-placeholder-text: rgba(34, 197, 94, 0.6);
+  --tree-slot-placeholder-border-hover: rgba(34, 197, 94, 0.6);
+  --tree-slot-placeholder-text-hover: #4ade80;
+  --tree-slot-placeholder-text-over: #4ade80;
+  --tree-slot-placeholder-border-over: #4ade80;
+  --tree-slot-hint: #52525b;             /* "drop or click" affordance */
+
+  /* Unmatched slot warning */
+  --tree-unmatched-color: rgba(251, 191, 36, 0.7);
+}
+
+/* ──────────────────────────────────────────────
+   Row container
+   ────────────────────────────────────────────── */
+
+.tve-tree-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 4px;
+  font-size: 12px;
+  line-height: 24px;
+  cursor: pointer;
+  transition: background-color 100ms, color 100ms;
+}
+
+/* Default state — HTML tag */
+.tve-tree-row {
+  color: var(--tree-tag-color);
+}
+.tve-tree-row:hover {
+  background-color: var(--tree-row-hover-bg);
+  color: var(--tree-tag-color-hover);
+}
+
+/* Component / slot rows */
+.tve-tree-row[data-kind="component"],
+.tve-tree-row[data-kind="slot"] {
+  color: var(--tree-component-color);
+}
+.tve-tree-row[data-kind="component"]:hover,
+.tve-tree-row[data-kind="slot"]:hover {
+  color: var(--tree-component-color-hover);
+}
+
+/* Selected state */
+.tve-tree-row[data-selected="true"] {
+  background-color: var(--tree-row-selected-bg);
+  color: var(--tree-row-selected-text);
+}
+.tve-tree-row[data-selected="true"][data-kind="component"],
+.tve-tree-row[data-selected="true"][data-kind="slot"] {
+  background-color: var(--tree-row-selected-component-bg);
+  color: var(--tree-row-selected-component-text);
+}
+
+/* Hovered (mirrored from iframe) */
+.tve-tree-row[data-hovered="true"] {
+  background-color: var(--tree-row-hover-bg);
+}
+
+/* Drag — fade source while dragging */
+.tve-tree-row[data-dragging="true"] {
+  opacity: 0.3;
+}
+
+/* Drop "inside" indicator */
+.tve-tree-row[data-drop="inside"] {
+  background-color: var(--tree-drop-inside-bg);
+  border: 1px dashed var(--tree-drop-inside-border);
+}
+
+/* ──────────────────────────────────────────────
+   Row sub-elements
+   ────────────────────────────────────────────── */
+
+.tve-tree-row__grip {
+  flex-shrink: 0;
+  color: var(--tree-grip-color);
+  opacity: 0;
+  transition: opacity 100ms;
+}
+.tve-tree-row:hover .tve-tree-row__grip {
+  opacity: 1;
+}
+
+.tve-tree-row__chevron {
+  flex-shrink: 0;
+  padding: 2px;
+  color: var(--tree-icon-color);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+.tve-tree-row__chevron:hover {
+  color: #d4d4d8;
+}
+.tve-tree-row__chevron-spacer {
+  width: 14px;
+  flex-shrink: 0;
+}
+
+.tve-tree-row__icon {
+  flex-shrink: 0;
+  color: var(--tree-icon-color);
+}
+
+.tve-tree-row__label {
+  flex-shrink: 0;
+  font-family: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+}
+
+.tve-tree-row__text-preview {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--tree-text-preview-color);
+  font-style: italic;
+}
+
+.tve-tree-row__class-preview {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--tree-class-preview-color);
+  font-family: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+}
+
+/* ──────────────────────────────────────────────
+   Badges
+   ────────────────────────────────────────────── */
+
+.tve-tree-badge {
+  margin-left: auto;
+  flex-shrink: 0;
+  padding: 0 4px;
+  font-size: 9px;
+}
+.tve-tree-badge--comp {
+  background-color: var(--tree-badge-comp-bg);
+  color: var(--tree-badge-comp-fg);
+}
+.tve-tree-badge--expr {
+  background-color: var(--tree-badge-expr-bg);
+  color: var(--tree-badge-expr-fg);
+}
+
+/* ──────────────────────────────────────────────
+   Drop line indicator (before/after)
+   ────────────────────────────────────────────── */
+
+.tve-tree-drop-line {
+  height: 2px;
+  margin: 0 4px;
+  background-color: var(--tree-drop-line);
+}
+
+/* ──────────────────────────────────────────────
+   Slot placeholder (dashed drop zone for empty slots)
+   ────────────────────────────────────────────── */
+
+.tve-slot-placeholder {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 4px;
+  padding: 4px 8px;
+  font-size: 10px;
+  line-height: 20px;
+  cursor: pointer;
+  border: 1px dashed var(--tree-slot-placeholder-border);
+  color: var(--tree-slot-placeholder-text);
+  transition: color 100ms, border-color 100ms;
+}
+.tve-slot-placeholder:hover {
+  border-color: var(--tree-slot-placeholder-border-hover);
+  color: var(--tree-slot-placeholder-text-hover);
+}
+.tve-slot-placeholder[data-over="true"] {
+  border-color: var(--tree-slot-placeholder-border-over);
+  color: var(--tree-slot-placeholder-text-over);
+}
+.tve-slot-placeholder__name { font-style: italic; }
+.tve-slot-placeholder__hint {
+  margin-left: auto;
+  font-size: 8px;
+  color: var(--tree-slot-hint);
+}
+
+/* Compact label shown above non-empty named slots */
+.tve-slot-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-style: italic;
+  color: var(--tree-slot-color-muted);
+  transition: color 100ms;
+}
+.tve-slot-header[data-over="true"] {
+  color: var(--tree-slot-placeholder-text-over);
+}
+
+/* Drag overlay (the floating chip following the cursor while dragging) */
+.tve-tree-drag-overlay {
+  padding: 4px 8px;
+  font-size: 12px;
+  font-family: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+  color: var(--tree-row-selected-text);
+  background-color: var(--tree-row-selected-bg);
+  border: 1px solid rgba(59, 130, 246, 0.4);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+.tve-tree-drag-overlay__classes {
+  margin-left: 4px;
+  color: var(--tree-class-preview-color);
+}
+
+/* Unmatched-slot warning row */
+.tve-tree-unmatched {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  font-size: 10px;
+  font-style: italic;
+  color: var(--tree-unmatched-color);
+}

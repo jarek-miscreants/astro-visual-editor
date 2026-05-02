@@ -16,9 +16,9 @@ const OVERFLOW = ["overflow-auto", "overflow-hidden", "overflow-visible", "overf
 
 export function LayoutTab({ classes, onClassesChange }: LayoutTabProps) {
   return (
-    <div className="space-y-0">
+    <div>
       {/* Display, Position, Flex/Grid */}
-      <div className="border-b border-zinc-800 px-3 py-3">
+      <div className="tve-prop-section">
         <LayoutControls classes={classes} onClassesChange={onClassesChange} />
       </div>
 
@@ -39,7 +39,7 @@ export function LayoutTab({ classes, onClassesChange }: LayoutTabProps) {
         <select
           value={OVERFLOW.find((o) => hasClass(classes, o)) || ""}
           onChange={(e) => onClassesChange(replaceClassFromSet(classes, OVERFLOW, e.target.value))}
-          className="h-7 w-full  border border-zinc-800 bg-zinc-900 px-2.5 text-[11px] text-zinc-200 outline-none focus:border-blue-500 hover:border-zinc-700 transition-colors cursor-pointer"
+          className="tve-prop-select"
         >
           <option value="">default</option>
           {OVERFLOW.map((o) => (
@@ -53,8 +53,8 @@ export function LayoutTab({ classes, onClassesChange }: LayoutTabProps) {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="border-b border-zinc-800 px-3 py-3">
-      <div className="mb-2 text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">{title}</div>
+    <div className="tve-prop-section">
+      <div className="tve-prop-section__header">{title}</div>
       {children}
     </div>
   );
@@ -88,15 +88,15 @@ function SizeControl({
   const values = prefix === "max-w" ? MAX_W_VALUES : SIZE_VALUES;
 
   return (
-    <div>
-      <div className="mb-1 text-[10px] font-medium text-zinc-400">{label}</div>
+    <div className="tve-prop-field">
+      <div className="tve-prop-field__label">{label}</div>
       <select
         value={currentValue}
         onChange={(e) => {
           const newClass = e.target.value ? `${prefix}-${e.target.value}` : "";
           onClassesChange(replaceClassByPrefix(classes, `${prefix}-`, newClass));
         }}
-        className="h-7 w-full  border border-zinc-800 bg-zinc-900 px-2 text-[10px] text-zinc-200 outline-none focus:border-blue-500 hover:border-zinc-700 transition-colors cursor-pointer"
+        className="tve-prop-select tve-prop-select--mono"
       >
         <option value="">auto</option>
         {values.map((v) => (

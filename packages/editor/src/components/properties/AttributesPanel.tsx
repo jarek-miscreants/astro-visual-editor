@@ -39,30 +39,25 @@ export function AttributesPanel({ nodeId, attributes }: AttributesPanelProps) {
   }
 
   return (
-    <div className="border-b border-zinc-800 px-3 py-2.5">
-      <div className="mb-2 text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">
-        Attributes
-      </div>
+    <div className="tve-prop-section">
+      <div className="tve-prop-section__header">Attributes</div>
 
       {entries.length === 0 && (
-        <div className="mb-2 text-[11px] text-zinc-600 italic">No attributes</div>
+        <div className="tve-prop-section__empty">No attributes</div>
       )}
 
-      <div className="space-y-1">
+      <div className="tve-prop-stack--xs">
         {entries.map(([key, value]) => {
           const isExpression = value.startsWith("{") && value.endsWith("}");
           return (
-            <div key={key} className="flex items-center gap-1">
-              <span className="w-20 shrink-0 truncate font-mono text-[10px] text-zinc-400">
+            <div key={key} className="tve-prop-row">
+              <span className="tve-prop-field-row__label" style={{ paddingTop: 0 }}>
                 {key}
               </span>
               {isExpression ? (
-                <div
-                  className="flex flex-1 items-center gap-1 border border-zinc-800 bg-zinc-900/50 px-1.5 py-1 font-mono text-[10px] text-amber-400/80"
-                  title="Astro expression — edit in source"
-                >
+                <div className="tve-prop-expr" style={{ flex: 1 }} title="Astro expression — edit in source">
                   <Code2 size={10} />
-                  <span className="truncate">{value}</span>
+                  <span className="tve-prop-expr__text">{value}</span>
                 </div>
               ) : (
                 <input
@@ -73,12 +68,13 @@ export function AttributesPanel({ nodeId, attributes }: AttributesPanelProps) {
                   onKeyDown={(e) => {
                     if (e.key === "Enter") (e.target as HTMLInputElement).blur();
                   }}
-                  className="flex-1 border border-zinc-800 bg-zinc-900 px-1.5 py-1 font-mono text-[10px] text-zinc-200 outline-none focus:border-blue-500"
+                  className="tve-prop-input tve-prop-input--mono"
+                  style={{ flex: 1 }}
                 />
               )}
               <button
                 onClick={() => removeAttr(key)}
-                className="p-1 text-zinc-600 hover:text-red-400"
+                className="tve-prop-icon-action tve-prop-icon-action--danger"
                 title="Remove attribute"
               >
                 <X size={11} />
@@ -89,12 +85,13 @@ export function AttributesPanel({ nodeId, attributes }: AttributesPanelProps) {
       </div>
 
       {/* Add new */}
-      <div className="mt-2 flex items-center gap-1">
+      <div className="tve-prop-row" style={{ marginTop: 8 }}>
         <input
           value={draftKey}
           onChange={(e) => setDraftKey(e.target.value)}
           placeholder="name"
-          className="w-20 shrink-0 border border-zinc-800 bg-zinc-900 px-1.5 py-1 font-mono text-[10px] text-zinc-200 outline-none placeholder:text-zinc-600 focus:border-blue-500"
+          className="tve-prop-input tve-prop-input--mono"
+          style={{ width: 80, flexShrink: 0 }}
         />
         <input
           value={draftValue}
@@ -103,12 +100,13 @@ export function AttributesPanel({ nodeId, attributes }: AttributesPanelProps) {
             if (e.key === "Enter") addDraft();
           }}
           placeholder="value"
-          className="flex-1 border border-zinc-800 bg-zinc-900 px-1.5 py-1 font-mono text-[10px] text-zinc-200 outline-none placeholder:text-zinc-600 focus:border-blue-500"
+          className="tve-prop-input tve-prop-input--mono"
+          style={{ flex: 1 }}
         />
         <button
           onClick={addDraft}
           disabled={!draftKey.trim()}
-          className="p-1 text-zinc-500 hover:text-blue-400 disabled:opacity-30"
+          className="tve-prop-icon-action tve-prop-icon-action--add"
           title="Add attribute"
         >
           <Plus size={11} />

@@ -221,22 +221,19 @@ export function LinkSection({
   const isExternalUrl = href.startsWith("http://") || href.startsWith("https://");
 
   return (
-    <div className="border-b border-zinc-800 px-3 py-2.5">
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
-          <LinkIcon size={11} className="text-blue-400" />
+    <div className="tve-prop-section">
+      <div className="tve-prop-section__header" style={{ justifyContent: "space-between" }}>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <LinkIcon size={11} className="tve-prop-section__header-icon--link" />
           {label}
-        </div>
+        </span>
         {pageOptions.length > 0 && (
-          <div className="inline-flex items-center gap-0.5 rounded border border-zinc-800 bg-zinc-900 p-0.5">
+          <div className="tve-prop-mode">
             <button
               type="button"
               onClick={() => setMode("url")}
-              className={`inline-flex h-5 items-center gap-1 rounded px-1.5 text-[10px] font-medium transition-colors ${
-                mode === "url"
-                  ? "bg-zinc-800 text-white"
-                  : "text-zinc-500 hover:text-zinc-300"
-              }`}
+              className="tve-prop-mode__btn"
+              data-active={mode === "url" || undefined}
             >
               <Globe size={9} />
               URL
@@ -244,11 +241,8 @@ export function LinkSection({
             <button
               type="button"
               onClick={() => setMode("page")}
-              className={`inline-flex h-5 items-center gap-1 rounded px-1.5 text-[10px] font-medium transition-colors ${
-                mode === "page"
-                  ? "bg-zinc-800 text-white"
-                  : "text-zinc-500 hover:text-zinc-300"
-              }`}
+              className="tve-prop-mode__btn"
+              data-active={mode === "page" || undefined}
             >
               <FileText size={9} />
               Page
@@ -257,9 +251,9 @@ export function LinkSection({
         )}
       </div>
 
-      <div className="space-y-2">
+      <div className="tve-prop-stack--sm">
         {mode === "url" ? (
-          <div className="flex gap-1">
+          <div className="tve-prop-row">
             <input
               type="text"
               key={href}
@@ -269,14 +263,15 @@ export function LinkSection({
                 const v = e.target.value.trim();
                 if (v !== href) onAttrChange("href", v === "" ? null : v);
               }}
-              className="min-w-0 flex-1 border border-zinc-800 bg-zinc-900 px-2 py-1.5 text-[11px] text-zinc-100 outline-none focus:border-blue-500 placeholder:text-zinc-600"
+              className="tve-prop-input"
+              style={{ flex: 1, minWidth: 0 }}
             />
             {isExternalUrl && (
               <button
                 type="button"
                 onClick={() => window.open(href, "_blank", "noopener,noreferrer")}
                 title="Open link in new tab"
-                className="flex h-[28px] w-[28px] shrink-0 items-center justify-center border border-zinc-800 bg-zinc-900 text-zinc-400 hover:bg-zinc-800 hover:text-white"
+                className="tve-prop-link-launch"
               >
                 <ExternalLink size={12} />
               </button>
@@ -291,7 +286,7 @@ export function LinkSection({
               const v = e.target.value;
               onAttrChange("href", v === "" ? null : v);
             }}
-            className="w-full border border-zinc-800 bg-zinc-900 px-2 py-1.5 text-[11px] text-zinc-100 outline-none focus:border-blue-500"
+            className="tve-prop-select"
           >
             <option value="">— Select a page —</option>
             {groupedOptions.map(({ group, options }) => (
@@ -311,20 +306,20 @@ export function LinkSection({
         )}
 
         {!hideNewTab && (
-          <label className="inline-flex cursor-pointer items-center gap-2 text-[11px] text-zinc-300 select-none">
+          <label className="tve-prop-bool">
             <input
               type="checkbox"
               checked={isNewTab}
               onChange={(e) => handleNewTabToggle(e.target.checked)}
-              className="h-3.5 w-3.5 accent-blue-500"
+              className="tve-prop-bool__check"
             />
             Open in new tab
           </label>
         )}
         {!href && mode === "url" && (
-          <p className="text-[10px] text-zinc-600">
-            Tip: use <span className="font-mono text-zinc-500">/page</span> for
-            internal links, <span className="font-mono text-zinc-500">#section</span>{" "}
+          <p className="tve-prop-section__hint">
+            Tip: use <span style={{ fontFamily: "ui-monospace, monospace" }}>/page</span> for
+            internal links, <span style={{ fontFamily: "ui-monospace, monospace" }}>#section</span>{" "}
             for in-page anchors, or a full URL for external sites.
           </p>
         )}

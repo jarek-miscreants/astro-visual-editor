@@ -17,26 +17,26 @@ export function EditorLayout() {
 
   useShortcutsHotkey();
   return (
-    <div className="flex h-screen flex-col">
+    <div className="tve-shell">
       <Toolbar />
       {isContent ? (
-        <div className="flex-1 min-h-0">
+        <div className="tve-shell__body">
           <MarkdownEditor />
         </div>
       ) : isPreview ? (
-        <div className="flex-1">
+        <div className="tve-shell__body">
           <IframeCanvas />
         </div>
       ) : (
-        <PanelGroup direction="horizontal" className="flex-1">
+        <PanelGroup direction="horizontal" className="tve-shell__body">
           <Panel defaultSize={18} minSize={12} maxSize={30}>
             <LeftSidebar />
           </Panel>
-          <PanelResizeHandle className="w-1 bg-zinc-800 hover:bg-blue-500 transition-colors" />
+          <PanelResizeHandle className="tve-resize-handle" />
           <Panel defaultSize={57} minSize={30}>
             <IframeCanvas />
           </Panel>
-          <PanelResizeHandle className="w-1 bg-zinc-800 hover:bg-blue-500 transition-colors" />
+          <PanelResizeHandle className="tve-resize-handle" />
           <Panel defaultSize={25} minSize={15} maxSize={40}>
             <RightSidebar />
           </Panel>

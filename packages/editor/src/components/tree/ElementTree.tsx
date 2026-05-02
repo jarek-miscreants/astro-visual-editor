@@ -314,10 +314,10 @@ export function ElementTree({ nodes, depth }: ElementTreeProps) {
 
       <DragOverlay dropAnimation={null}>
         {draggedNode && (
-          <div className=" bg-blue-600/20 border border-blue-500/40 px-2 py-1 text-xs text-blue-300 font-mono shadow-lg">
+          <div className="tve-tree-drag-overlay">
             &lt;{draggedNode.tagName}&gt;
             {draggedNode.classes && (
-              <span className="ml-1 text-zinc-500">
+              <span className="tve-tree-drag-overlay__classes">
                 .{draggedNode.classes.split(" ")[0]}
               </span>
             )}
@@ -452,12 +452,14 @@ function TreeNode({
     setContextMenu({ x: e.clientX, y: e.clientY });
   }
 
+  const rowKind = node.isComponent ? "component" : node.tagName === "slot" ? "slot" : "tag";
+
   return (
     <div>
       {/* Drop indicator: before */}
       {dropPosition === "before" && (
         <div
-          className="h-0.5 bg-blue-500  mx-1"
+          className="tve-tree-drop-line"
           style={{ marginLeft: `${depth * 12 + 4}px` }}
         />
       )}
@@ -467,19 +469,12 @@ function TreeNode({
         data-tve-node-id={node.nodeId}
         {...listeners}
         {...attributes}
-        className={`group flex cursor-pointer items-center gap-1 px-1 text-xs leading-6 transition-colors ${
-          isDragging
-            ? "opacity-30"
-            : isSelected
-              ? (node.isComponent || node.tagName === "slot") ? "bg-green-600/20 text-green-300" : "bg-blue-600/20 text-blue-300"
-              : dropPosition === "inside"
-                ? "bg-blue-500/10 border border-blue-500/30 border-dashed"
-                : isHovered
-                  ? "bg-zinc-800 text-zinc-200"
-                  : (node.isComponent || node.tagName === "slot")
-                    ? "text-green-400/70 hover:bg-zinc-800/50 hover:text-green-300"
-                    : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-300"
-        }`}
+        className="tve-tree-row group"
+        data-kind={rowKind}
+        data-selected={isSelected || undefined}
+        data-hovered={!isSelected && isHovered || undefined}
+        data-dragging={isDragging || undefined}
+        data-drop={dropPosition === "inside" ? "inside" : undefined}
         style={{ paddingLeft: `${depth * 12 + 4}px` }}
         onClick={() => {
           selectNode(node.nodeId, makeElementInfo());
@@ -499,65 +494,49 @@ function TreeNode({
         onMouseEnter={() => highlightNodeInIframe(node.nodeId)}
         onMouseLeave={() => highlightNodeInIframe(null)}
       >
-        {/* Visual drag-affordance — no longer a drag source; the whole row is draggable */}
-        <span className="shrink-0 text-zinc-600 opacity-0 group-hover:opacity-100">
+        <span className="tve-tree-row__grip">
           <GripVertical size={10} />
         </span>
 
-        {/* Expand toggle */}
         {hasChildren || hasSlot ? (
           <button
             onClick={(e) => {
               e.stopPropagation();
               setExpanded(!expanded);
             }}
-            className="shrink-0 p-0.5 text-zinc-500 hover:text-zinc-300"
+            className="tve-tree-row__chevron"
           >
             {expanded ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
           </button>
         ) : (
-          <span className="w-3.5 shrink-0" />
+          <span className="tve-tree-row__chevron-spacer" />
         )}
 
-        {/* Icon */}
-        <span className="shrink-0 text-zinc-500">{icon}</span>
+        <span className="tve-tree-row__icon">{icon}</span>
 
-        {/* Tag name */}
-        <span className="shrink-0 font-mono">{label}</span>
+        <span className="tve-tree-row__label">{label}</span>
 
-        {/* Text content preview — most useful identifier for marketers */}
         {textPreview && (
-          <span className="min-w-0 truncate text-zinc-300 italic">
-            "{textPreview}"
-          </span>
+          <span className="tve-tree-row__text-preview">"{textPreview}"</span>
         )}
 
-        {/* Class preview (suppressed when there's already a text preview, to reduce noise) */}
         {!textPreview && classPreview && (
-          <span className="min-w-0 truncate text-zinc-600 font-mono">
-            .{classPreview}
-          </span>
+          <span className="tve-tree-row__class-preview">.{classPreview}</span>
         )}
 
-        {/* Dynamic badge */}
         {node.isDynamic && (
-          <span className="ml-auto shrink-0  bg-purple-900/40 px-1 text-[9px] text-purple-400">
-            expr
-          </span>
+          <span className="tve-tree-badge tve-tree-badge--expr">expr</span>
         )}
 
-        {/* Component badge */}
         {node.isComponent && (
-          <span className="ml-auto shrink-0  bg-cyan-900/40 px-1 text-[9px] text-cyan-400">
-            comp
-          </span>
+          <span className="tve-tree-badge tve-tree-badge--comp">comp</span>
         )}
       </div>
 
       {/* Drop indicator: after */}
       {dropPosition === "after" && (
         <div
-          className="h-0.5 bg-blue-500  mx-1"
+          className="tve-tree-drop-line"
           style={{ marginLeft: `${depth * 12 + 4}px` }}
         />
       )}
@@ -713,7 +692,7 @@ function ComponentChildren({
       {unmatched.length > 0 && (
         <div>
           <div
-            className="flex items-center gap-1.5 px-2 py-1 text-[10px] italic text-amber-400/70"
+            className="tve-tree-unmatched"
             style={{ marginLeft: `${(depth + 1) * 12 + 4}px` }}
             title="These children target slot names that the component doesn't declare — likely a typo. They will not render."
           >
@@ -838,9 +817,8 @@ function SlotPlaceholder({
     return (
       <div ref={setNodeRef}>
         <div
-          className={`flex items-center gap-1.5 px-2 py-0.5 text-[10px] italic transition-colors ${
-            isOver ? "text-green-300" : "text-green-500/50"
-          }`}
+          className="tve-slot-header"
+          data-over={isOver || undefined}
           style={{ marginLeft: `${depth * 12 + 4}px` }}
         >
           <SlotIcon size={11} />
@@ -853,17 +831,14 @@ function SlotPlaceholder({
   return (
     <div ref={setNodeRef}>
       <div
-        className={`flex cursor-pointer items-center gap-1.5 border border-dashed mx-1 my-0.5 px-2 py-1 text-[10px] leading-5 transition-colors ${
-          isOver
-            ? "border-green-400 text-green-400"
-            : "border-green-500/30 text-green-500/60 hover:border-green-500/60 hover:text-green-400"
-        }`}
+        className="tve-slot-placeholder"
+        data-over={isOver || undefined}
         style={{ marginLeft: `${depth * 12 + 4}px` }}
         onClick={() => setShowAdd(!showAdd)}
       >
         <SlotIcon size={11} />
-        <span className="italic">{slotName ? slotName : "default slot"}</span>
-        <span className="ml-auto text-[8px] text-zinc-600">drop or click</span>
+        <span className="tve-slot-placeholder__name">{slotName ? slotName : "default slot"}</span>
+        <span className="tve-slot-placeholder__hint">drop or click</span>
       </div>
       {showAdd && (
         <div className="ml-4">

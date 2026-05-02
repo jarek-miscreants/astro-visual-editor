@@ -143,18 +143,10 @@ export function ComponentPropsPanel({ nodeId, tagName, attributes }: Props) {
   }, [componentFile?.path]);
 
   if (loading) {
-    return (
-      <div className="border-b border-zinc-800 px-3 py-2.5 text-[10px] text-zinc-500">
-        Loading props…
-      </div>
-    );
+    return <div className="tve-prop-status">Loading props…</div>;
   }
   if (error) {
-    return (
-      <div className="border-b border-zinc-800 px-3 py-2.5 text-[10px] text-red-400">
-        {error}
-      </div>
-    );
+    return <div className="tve-prop-status tve-prop-status--error">{error}</div>;
   }
 
   // Schema priority:
@@ -201,12 +193,12 @@ export function ComponentPropsPanel({ nodeId, tagName, attributes }: Props) {
   return (
     <>
       {contentFields.length > 0 && (
-        <div className="border-b border-zinc-800 px-3 py-2.5">
-          <div className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
-            <Sparkles size={11} className="text-emerald-400" />
+        <div className="tve-prop-section">
+          <div className="tve-prop-section__header">
+            <Sparkles size={11} className="tve-prop-section__header-icon--sparkle" />
             Content
           </div>
-          <div className="space-y-3">
+          <div className="tve-prop-stack">
             {contentFields.map((field) => (
               <PropField
                 key={field.name}
@@ -239,14 +231,13 @@ export function ComponentPropsPanel({ nodeId, tagName, attributes }: Props) {
           hideNewTab={!usePairedLink}
         />
       )}
-      {/* Any additional link fields beyond the first render as plain inputs */}
       {linkFields.length > 1 && (
-        <div className="border-b border-zinc-800 px-3 py-2.5">
-          <div className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
-            <LinkIcon size={11} className="text-blue-400" />
+        <div className="tve-prop-section">
+          <div className="tve-prop-section__header">
+            <LinkIcon size={11} className="tve-prop-section__header-icon--link" />
             Other links
           </div>
-          <div className="space-y-3">
+          <div className="tve-prop-stack">
             {linkFields.slice(1).map((field) => (
               <PropField
                 key={field.name}
@@ -289,19 +280,18 @@ function AdvancedSection({
 }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="border-b border-zinc-800 px-3 py-2.5">
+    <div className="tve-prop-section">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-1 text-left text-[10px] font-semibold uppercase tracking-wider text-zinc-400 hover:text-zinc-200"
+        className="tve-prop-section__header tve-prop-section__header--toggle"
+        style={{ marginBottom: open ? 8 : 0 }}
       >
         {open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
         Advanced
-        <span className="ml-1 text-zinc-600 font-normal normal-case tracking-normal">
-          ({fields.length})
-        </span>
+        <span className="tve-prop-section__count">({fields.length})</span>
       </button>
       {open && (
-        <div className="mt-2 space-y-2">
+        <div className="tve-prop-stack--sm">
           {fields.map((field) => (
             <PropField
               key={field.name}
@@ -337,18 +327,15 @@ function PropField({
 
   if (prominent) {
     return (
-      <div className="flex flex-col gap-1">
-        <label className="text-[10px] font-medium text-zinc-300 capitalize">
+      <div className="tve-prop-field">
+        <label className="tve-prop-field__label--prominent">
           {field.name}
-          {field.required && <span className="ml-0.5 text-red-400">*</span>}
+          {field.required && <span className="tve-prop-field__required">*</span>}
         </label>
         {isExpression ? (
-          <div
-            className="flex items-center gap-1 border border-zinc-800 bg-zinc-900/50 px-2 py-1.5 font-mono text-[10px] text-amber-400/80"
-            title="Astro expression — edit in source"
-          >
+          <div className="tve-prop-expr" title="Astro expression — edit in source">
             <Code2 size={10} />
-            <span className="truncate">{currentValue}</span>
+            <span className="tve-prop-expr__text">{currentValue}</span>
           </div>
         ) : (
           <PropControl nodeId={nodeId} field={field} value={currentValue} onChange={onChange} prominent />
@@ -358,19 +345,16 @@ function PropField({
   }
 
   return (
-    <div className="flex items-start gap-2">
-      <label className="w-20 shrink-0 pt-1 font-mono text-[10px] text-zinc-400">
+    <div className="tve-prop-field-row">
+      <label className="tve-prop-field-row__label">
         {field.name}
-        {field.required && <span className="ml-0.5 text-red-400">*</span>}
+        {field.required && <span className="tve-prop-field__required">*</span>}
       </label>
-      <div className="min-w-0 flex-1">
+      <div className="tve-prop-field-row__control">
         {isExpression ? (
-          <div
-            className="flex items-center gap-1 border border-zinc-800 bg-zinc-900/50 px-1.5 py-1 font-mono text-[10px] text-amber-400/80"
-            title="Astro expression — edit in source"
-          >
+          <div className="tve-prop-expr" title="Astro expression — edit in source">
             <Code2 size={10} />
-            <span className="truncate">{currentValue}</span>
+            <span className="tve-prop-expr__text">{currentValue}</span>
           </div>
         ) : (
           <PropControl nodeId={nodeId} field={field} value={currentValue} onChange={onChange} />
@@ -406,7 +390,7 @@ function PropControl({
       <select
         value={current}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full border border-zinc-800 bg-zinc-900 px-1.5 py-1 font-mono text-[10px] text-zinc-200 outline-none focus:border-blue-500"
+        className="tve-prop-select tve-prop-select--mono"
       >
         {!field.required && !field.default && (
           <option value="">— unset —</option>
@@ -424,17 +408,17 @@ function PropControl({
   if (field.kind === "boolean") {
     const checked = value === "" || value === "true" || value === field.name;
     return (
-      <label className="inline-flex items-center gap-2 text-[11px] text-zinc-300">
+      <label className="tve-prop-bool">
         <input
           type="checkbox"
           checked={checked}
           onChange={(e) => onChange(e.target.checked ? "" : null)}
-          className="h-3.5 w-3.5 accent-blue-500"
+          className="tve-prop-bool__check"
         />
-        <span className="text-zinc-500 font-mono">
+        <span className="tve-prop-bool__state">
           {checked ? "true" : "false"}
           {field.default !== undefined && (
-            <span className="ml-1 text-[9px] text-zinc-600">
+            <span className="tve-prop-bool__default">
               (default: {String(field.default)})
             </span>
           )}
@@ -454,7 +438,7 @@ function PropControl({
           const v = e.target.value.trim();
           if (v !== (value ?? "")) onChange(v === "" ? null : v);
         }}
-        className="w-full border border-zinc-800 bg-zinc-900 px-1.5 py-1 font-mono text-[10px] text-zinc-200 outline-none focus:border-blue-500"
+        className="tve-prop-input tve-prop-input--mono"
       />
     );
   }
@@ -471,7 +455,7 @@ function PropControl({
             const v = e.target.value;
             if (v !== (value ?? "")) onChange(v === "" ? null : v);
           }}
-          className="w-full resize-y border border-zinc-800 bg-zinc-900 px-2 py-1.5 text-[12px] text-zinc-100 outline-none focus:border-blue-500 placeholder:text-zinc-600"
+          className="tve-prop-textarea tve-prop-textarea--prominent"
         />
       );
     }
@@ -485,12 +469,11 @@ function PropControl({
           const v = e.target.value;
           if (v !== (value ?? "")) onChange(v === "" ? null : v);
         }}
-        className="w-full border border-zinc-800 bg-zinc-900 px-1.5 py-1 font-mono text-[10px] text-zinc-200 outline-none focus:border-blue-500"
+        className="tve-prop-input tve-prop-input--mono"
       />
     );
   }
 
-  // Unknown type — fall back to free-form text
   if (prominent) {
     return (
       <textarea
@@ -502,7 +485,7 @@ function PropControl({
           const v = e.target.value;
           if (v !== (value ?? "")) onChange(v === "" ? null : v);
         }}
-        className="w-full resize-y border border-zinc-800 bg-zinc-900 px-2 py-1.5 text-[12px] text-zinc-100 outline-none focus:border-blue-500 placeholder:text-zinc-600"
+        className="tve-prop-textarea tve-prop-textarea--prominent"
         title={`Type: ${field.typeText}`}
       />
     );
@@ -517,7 +500,7 @@ function PropControl({
         const v = e.target.value;
         if (v !== (value ?? "")) onChange(v === "" ? null : v);
       }}
-      className="w-full border border-zinc-800 bg-zinc-900 px-1.5 py-1 font-mono text-[10px] text-zinc-200 outline-none focus:border-blue-500"
+      className="tve-prop-input tve-prop-input--mono"
       title={`Type: ${field.typeText}`}
     />
   );

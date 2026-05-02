@@ -45,7 +45,7 @@ function removeColorClasses(classes: string, prefix: ColorProperty): string {
 
 export function ColorControls({ classes, onClassesChange }: ColorControlsProps) {
   return (
-    <div className="space-y-3">
+    <div className="tve-prop-stack">
       <ColorPicker label="Text" prefix="text" classes={classes} onClassesChange={onClassesChange} />
       <ColorPicker label="Background" prefix="bg" classes={classes} onClassesChange={onClassesChange} />
       <ColorPicker label="Border" prefix="border" classes={classes} onClassesChange={onClassesChange} />
@@ -83,56 +83,43 @@ function ColorPicker({
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-1">
-        <span className="text-[10px] text-zinc-500">{label}</span>
-        <div className="flex items-center gap-1">
+      <div className="tve-prop-color-row">
+        <span className="tve-prop-color-row__label">{label}</span>
+        <div className="tve-prop-color-row__value">
           {currentHex && (
-            <span
-              className="h-4 w-4  border border-zinc-600"
-              style={{ backgroundColor: currentHex }}
-            />
+            <span className="tve-prop-swatch" style={{ backgroundColor: currentHex }} />
           )}
-          <span className="font-mono text-[10px] text-zinc-400">
-            {currentColor || "none"}
-          </span>
+          <span>{currentColor || "none"}</span>
         </div>
       </div>
 
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="w-full  bg-zinc-800 border border-zinc-700 px-2 py-1 text-[10px] text-zinc-400 hover:bg-zinc-700 text-left"
-      >
+      <button onClick={() => setExpanded(!expanded)} className="tve-prop-color-toggle">
         {expanded ? "Close palette" : "Choose color..."}
       </button>
 
       {expanded && (
-        <div className="mt-1.5  border border-zinc-700 bg-zinc-800 p-2">
-          {/* Special values */}
-          <div className="flex gap-1 mb-2">
-            <button
-              onClick={clearColor}
-              className=" px-1.5 py-0.5 text-[9px] bg-zinc-700 text-zinc-400 hover:bg-zinc-600"
-            >
+        <div className="tve-prop-color-grid">
+          <div className="tve-prop-color-grid__specials">
+            <button onClick={clearColor} className="tve-prop-color-grid__special tve-prop-color-grid__special--none">
               none
             </button>
             <button
               onClick={() => setColor(`${prefix}-white`)}
-              className=" px-1.5 py-0.5 text-[9px] bg-white text-zinc-900 border border-zinc-600"
+              className="tve-prop-color-grid__special tve-prop-color-grid__special--white"
             >
               white
             </button>
             <button
               onClick={() => setColor(`${prefix}-black`)}
-              className=" px-1.5 py-0.5 text-[9px] bg-black text-white border border-zinc-600"
+              className="tve-prop-color-grid__special tve-prop-color-grid__special--black"
             >
               black
             </button>
           </div>
 
-          {/* Color grid */}
-          <div className="space-y-0.5">
+          <div className="tve-prop-color-rows">
             {COLOR_NAMES.map((colorName) => (
-              <div key={colorName} className="flex gap-0.5" title={colorName}>
+              <div key={colorName} className="tve-prop-color-rows__row" title={colorName}>
                 {SHADES.map((shade) => {
                   const hex = (COLORS[colorName] as Record<string, string>)[shade];
                   const cls = `${prefix}-${colorName}-${shade}`;
@@ -141,9 +128,8 @@ function ColorPicker({
                     <button
                       key={shade}
                       onClick={() => setColor(cls)}
-                      className={`h-4 w-4  transition-transform ${
-                        isActive ? "ring-2 ring-white scale-125 z-10" : "hover:scale-110"
-                      }`}
+                      className="tve-prop-color-cell"
+                      data-active={isActive || undefined}
                       style={{ backgroundColor: hex }}
                       title={`${colorName}-${shade}`}
                     />

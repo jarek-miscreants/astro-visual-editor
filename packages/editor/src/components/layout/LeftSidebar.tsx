@@ -106,21 +106,17 @@ export function LeftSidebar() {
   const toggleMarketerZoom = useTreeUIStore((s) => s.toggleMarketerZoom);
 
   return (
-    <div className="flex h-full flex-col bg-zinc-950 border-r border-zinc-800">
-      <div className="flex h-10 items-center justify-between border-b border-zinc-800 px-3">
-        <span className="text-[11px] font-semibold text-zinc-200 tracking-tight">
+    <div className="tve-panel tve-panel--left">
+      <div className="tve-panel__header">
+        <span className="tve-panel__title">
           {userMode === "marketer" ? "Blocks" : "Elements"}
         </span>
-        <div className="flex items-center gap-0.5">
+        <div className="tve-panel__actions">
           {userMode === "marketer" && (
             <Tooltip content={marketerZoom ? "Show full tree" : "Collapse to blocks only"}>
               <button
                 onClick={toggleMarketerZoom}
-                className={`flex h-6 w-6 items-center justify-center rounded transition-colors ${
-                  marketerZoom
-                    ? "bg-emerald-500/15 text-emerald-300"
-                    : "text-zinc-400 hover:bg-zinc-900 hover:text-white"
-                }`}
+                className={`tve-icon-btn tve-icon-btn--sm ${marketerZoom ? "tve-icon-btn--active" : ""}`}
               >
                 <Focus size={12} />
               </button>
@@ -134,11 +130,7 @@ export function LeftSidebar() {
               ref={addBtnRef}
               onClick={() => setShowAddPanel(!showAddPanel)}
               disabled={!selectedNodeId}
-              className={`flex h-6 w-6 items-center justify-center rounded transition-colors ${
-                selectedNodeId
-                  ? "text-zinc-400 hover:bg-zinc-900 hover:text-white"
-                  : "text-zinc-700 cursor-not-allowed"
-              }`}
+              className="tve-icon-btn tve-icon-btn--sm"
             >
               <Plus size={13} />
             </button>
@@ -168,11 +160,7 @@ export function LeftSidebar() {
                 }
               }}
               disabled={!selectedNodeId}
-              className={`flex h-6 w-6 items-center justify-center rounded transition-colors ${
-                selectedNodeId
-                  ? "text-zinc-400 hover:bg-zinc-900 hover:text-red-400"
-                  : "text-zinc-700 cursor-not-allowed"
-              }`}
+              className="tve-icon-btn tve-icon-btn--sm tve-icon-btn--danger"
             >
               <Trash2 size={13} />
             </button>
@@ -180,21 +168,20 @@ export function LeftSidebar() {
         </div>
       </div>
 
-      {/* Search input */}
-      <div className="border-b border-zinc-800 px-2 py-1.5">
-        <div className="relative flex items-center">
-          <Search size={11} className="absolute left-2 text-zinc-600" />
+      <div className="tve-panel__section">
+        <div className="tve-search">
+          <Search size={11} className="tve-search__icon" />
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search tree…"
-            className="w-full rounded border border-zinc-800 bg-zinc-900 pl-7 pr-6 py-1 text-[11px] text-zinc-200 outline-none placeholder:text-zinc-600 focus:border-blue-500"
+            className="tve-search__input"
           />
           {query && (
             <button
               onClick={() => setQuery("")}
-              className="absolute right-1.5 text-zinc-600 hover:text-zinc-300"
+              className="tve-search__clear"
               aria-label="Clear search"
             >
               <X size={11} />
@@ -203,15 +190,11 @@ export function LeftSidebar() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto p-1.5">
+      <div className="tve-panel__body tve-panel__body--padded">
         {!currentFile ? (
-          <p className="px-2 py-6 text-xs text-zinc-500 text-center">
-            Select a page to edit
-          </p>
+          <p className="tve-panel__empty">Select a page to edit</p>
         ) : !ast ? (
-          <p className="px-2 py-6 text-xs text-zinc-500 text-center">
-            Loading...
-          </p>
+          <p className="tve-panel__empty">Loading...</p>
         ) : (
           <ElementTree nodes={ast} depth={0} />
         )}

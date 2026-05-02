@@ -55,25 +55,17 @@ export function PropertiesPanel({ nodeId, elementInfo }: PropertiesPanelProps) {
       <Breadcrumb nodeId={nodeId} />
 
       {/* Element header */}
-      <div className="border-b border-zinc-800 px-3 py-2.5">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span
-            className={`inline-flex items-center rounded-md border px-1.5 py-0.5 font-mono text-[11px] font-medium ${
-              isComponent
-                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
-                : "border-blue-500/30 bg-blue-500/10 text-blue-300"
-            }`}
-          >
-            {elementInfo.tagName}
-          </span>
-          {Object.entries(elementInfo.attributes)
-            .slice(0, 2)
-            .map(([key, value]) => (
-              <span key={key} className="text-[10px] text-zinc-500 font-mono truncate">
-                {key}=<span className="text-zinc-400">&quot;{value}&quot;</span>
-              </span>
-            ))}
-        </div>
+      <div className="tve-prop-header">
+        <span className={`tve-prop-badge ${isComponent ? "tve-prop-badge--component" : "tve-prop-badge--tag"}`}>
+          {elementInfo.tagName}
+        </span>
+        {Object.entries(elementInfo.attributes)
+          .slice(0, 2)
+          .map(([key, value]) => (
+            <span key={key} className="tve-prop-attr-pill">
+              {key}=<span className="tve-prop-attr-pill__value">&quot;{value}&quot;</span>
+            </span>
+          ))}
       </div>
 
       {userMode === "marketer" ? (
@@ -183,14 +175,10 @@ export function PropertiesPanel({ nodeId, elementInfo }: PropertiesPanelProps) {
           {/* Classes — remembered-open collapsible */}
           <CollapsibleSection storageKey="tve:props:classes" title="Classes">
             {classExpression ? (
-              <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-2 text-[10px] text-amber-300/80">
-                <div className="mb-1 font-semibold text-amber-300">
-                  JSX expression binding
-                </div>
-                <div className="mb-1 font-mono text-amber-200/70">
-                  class={classExpression}
-                </div>
-                <div className="text-amber-300/60">
+              <div className="tve-prop-warning-card">
+                <div className="tve-prop-warning-card__title">JSX expression binding</div>
+                <div className="tve-prop-warning-card__code">class={classExpression}</div>
+                <div className="tve-prop-warning-card__desc">
                   Class is bound to a variable. Editing here is disabled to avoid
                   breaking the component. Edit the source, or set the class via
                   this component's parent prop.
@@ -209,22 +197,17 @@ export function PropertiesPanel({ nodeId, elementInfo }: PropertiesPanelProps) {
           <AttributesPanel nodeId={nodeId} attributes={attributes} />
 
           {/* Tabs */}
-          <div className="flex border-b border-zinc-800 bg-zinc-950">
+          <div className="tve-prop-tabs">
             {TABS.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`relative flex flex-1 items-center justify-center gap-1.5 py-2.5 text-[11px] font-medium transition-colors ${
-                  activeTab === tab.id
-                    ? "text-white"
-                    : "text-zinc-500 hover:text-zinc-300"
-                }`}
+                className="tve-prop-tab"
+                data-active={activeTab === tab.id || undefined}
               >
                 {tab.icon}
                 {tab.label}
-                {activeTab === tab.id && (
-                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500 " />
-                )}
+                {activeTab === tab.id && <span className="tve-prop-tab__indicator" />}
               </button>
             ))}
           </div>
@@ -279,15 +262,11 @@ function ComponentContentField({
   const hasNonTextChildren = hasChildren && existingText == null;
 
   if (hasNonTextChildren) {
-    // If SlotContentEditor already exposed something editable, don't show a
-    // redundant "contains nested elements" hint.
     if (hasTextEditableSlots) return null;
     return (
-      <div className="border-b border-zinc-800 px-3 py-2.5">
-        <div className="mb-2 text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">
-          Content
-        </div>
-        <p className="text-[11px] text-zinc-500 italic">
+      <div className="tve-prop-section">
+        <div className="tve-prop-section__header">Content</div>
+        <p className="tve-prop-section__hint">
           This component contains nested elements. Edit them in the tree view (Dev mode).
         </p>
       </div>
@@ -295,10 +274,8 @@ function ComponentContentField({
   }
 
   return (
-    <div className="border-b border-zinc-800 px-3 py-2.5">
-      <div className="mb-2 text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">
-        Content
-      </div>
+    <div className="tve-prop-section">
+      <div className="tve-prop-section__header">Content</div>
       <textarea
         key={existingText ?? "__empty__"}
         defaultValue={existingText ?? ""}
@@ -314,10 +291,10 @@ function ComponentContentField({
           }
         }}
         rows={3}
-        className="w-full resize-y border border-zinc-800 bg-zinc-900 px-2 py-1.5 text-[11px] text-zinc-200 outline-none focus:border-blue-500 placeholder:text-zinc-600"
+        className="tve-prop-textarea"
       />
       {existingText == null && (
-        <p className="mt-1 text-[10px] text-zinc-600">
+        <p className="tve-prop-section__hint" style={{ marginTop: 4 }}>
           Type text and click outside to insert it into this component's slot.
         </p>
       )}
@@ -376,14 +353,12 @@ function SlotContentEditor({
   if (editable.length === 0) return null;
 
   return (
-    <div className="border-b border-zinc-800 px-3 py-2.5">
-      <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
-        Slot content
-      </div>
-      <div className="space-y-3">
+    <div className="tve-prop-section">
+      <div className="tve-prop-section__header">Slot content</div>
+      <div className="tve-prop-stack">
         {editable.map((child) => (
-          <div key={child.nodeId} className="flex flex-col gap-1">
-            <label className="text-[10px] font-medium text-zinc-300 capitalize">
+          <div key={child.nodeId} className="tve-prop-field">
+            <label className="tve-prop-field__label--prominent">
               {formatSlotLabel(child)}
             </label>
             <textarea
@@ -397,7 +372,7 @@ function SlotContentEditor({
                 const next = e.target.value;
                 if (next !== (child.textContent ?? "")) onUpdate(child.nodeId, next);
               }}
-              className="w-full resize-y border border-zinc-800 bg-zinc-900 px-2 py-1.5 text-[12px] text-zinc-100 outline-none focus:border-blue-500 placeholder:text-zinc-600"
+              className="tve-prop-textarea tve-prop-textarea--prominent"
             />
           </div>
         ))}
@@ -419,10 +394,8 @@ function InlineTextContentField({
   onUpdate: (text: string) => void;
 }) {
   return (
-    <div className="border-b border-zinc-800 px-3 py-2.5">
-      <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
-        Content
-      </div>
+    <div className="tve-prop-section">
+      <div className="tve-prop-section__header">Content</div>
       <textarea
         key={text}
         defaultValue={text}
@@ -431,7 +404,7 @@ function InlineTextContentField({
           if (e.target.value !== text) onUpdate(e.target.value);
         }}
         rows={Math.min(6, Math.max(2, Math.ceil(text.length / 48)))}
-        className="w-full resize-y border border-zinc-800 bg-zinc-900 px-2 py-1.5 text-[12px] text-zinc-100 outline-none focus:border-blue-500 placeholder:text-zinc-600"
+        className="tve-prop-textarea tve-prop-textarea--prominent"
       />
     </div>
   );
@@ -446,18 +419,18 @@ function MarketerPlaceholder({
 }) {
   return (
     <div className="flex-1 overflow-auto px-4 py-6">
-      <div className="border border-zinc-800 bg-zinc-900/40 p-4">
-        <div className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold text-zinc-200">
-          <Sparkles size={12} className="text-emerald-400" />
+      <div className="tve-prop-marketer-card">
+        <div className="tve-prop-marketer-card__title">
+          <Sparkles size={12} style={{ color: "var(--prop-emerald)" }} />
           {isComponent ? `${tagName} — no marketer controls yet` : "No marketer controls"}
         </div>
-        <p className="text-[11px] leading-relaxed text-zinc-400">
+        <p className="tve-prop-marketer-card__body">
           {isComponent
             ? "This component doesn't have a .tve.ts schema defining marketer-editable props yet."
             : "Raw HTML elements aren't directly editable in marketer mode — use pre-built components instead."}
         </p>
-        <p className="mt-2 text-[11px] leading-relaxed text-zinc-500">
-          Switch to <span className="font-semibold text-zinc-300">Dev</span> mode in the top bar to edit classes and attributes directly.
+        <p className="tve-prop-marketer-card__hint">
+          Switch to <span style={{ fontWeight: 600, color: "var(--prop-section-title-color-hover)" }}>Dev</span> mode in the top bar to edit classes and attributes directly.
         </p>
       </div>
     </div>

@@ -20,7 +20,7 @@ export function LayoutControls({ classes, onClassesChange }: LayoutControlsProps
   const isGrid = currentDisplay === "grid" || currentDisplay === "inline-grid";
 
   return (
-    <div className="space-y-3">
+    <div className="tve-prop-stack">
       {/* Display */}
       <ControlGroup label="Display">
         <ButtonGroup
@@ -112,8 +112,8 @@ export function LayoutControls({ classes, onClassesChange }: LayoutControlsProps
 
 function ControlGroup({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div>
-      <div className="mb-1.5 text-[10px] font-medium text-zinc-400">{label}</div>
+    <div className="tve-prop-field">
+      <div className="tve-prop-field__label">{label}</div>
       {children}
     </div>
   );
@@ -131,7 +131,7 @@ function ButtonGroup({
   onChange: (value: string) => void;
 }) {
   return (
-    <div className="flex flex-wrap gap-0.5">
+    <div className="tve-prop-toggle-group">
       {options.map((opt, i) => {
         const label = labels?.[i] || opt.replace(/^(flex-|justify-|items-|grid-|inline-)/, "");
         const isActive = opt === value;
@@ -139,11 +139,8 @@ function ButtonGroup({
           <button
             key={opt}
             onClick={() => onChange(isActive ? "" : opt)}
-            className={` border px-2 py-0.5 text-[10px] font-mono transition-colors ${
-              isActive
-                ? "border-blue-500/40 bg-blue-500/15 text-blue-300"
-                : "border-zinc-800 bg-zinc-900 text-zinc-400 hover:border-zinc-700 hover:bg-zinc-800 hover:text-zinc-200"
-            }`}
+            className="tve-prop-toggle tve-prop-toggle--mono tve-prop-toggle--auto-width"
+            data-active={isActive || undefined}
             title={opt}
           >
             {label}
@@ -167,13 +164,11 @@ function SelectControl({
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="h-7 w-full  border border-zinc-800 bg-zinc-900 px-2.5 text-[11px] text-zinc-200 outline-none focus:border-blue-500 hover:border-zinc-700 transition-colors cursor-pointer"
+      className="tve-prop-select"
     >
       <option value="">none</option>
       {options.map((opt) => (
-        <option key={opt} value={opt}>
-          {opt}
-        </option>
+        <option key={opt} value={opt}>{opt}</option>
       ))}
     </select>
   );

@@ -53,14 +53,14 @@ export function Toolbar() {
   }
 
   return (
-    <div className="flex h-12 items-center gap-2 border-b border-zinc-800 bg-zinc-950 px-3">
+    <div className="tve-toolbar">
       {/* Project name — click to switch project */}
       <Tooltip content="Open another project">
         <button
           onClick={() => setShowProjectPicker(true)}
-          className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-[11px] font-semibold text-zinc-200 tracking-tight hover:bg-zinc-900 hover:text-white"
+          className="tve-toolbar__brand"
         >
-          <FolderOpen size={11} className="text-zinc-500" />
+          <FolderOpen size={11} className="tve-toolbar__brand-icon" />
           {projectName || "Open project…"}
         </button>
       </Tooltip>
@@ -75,7 +75,7 @@ export function Toolbar() {
       <Divider />
 
       {/* User mode: Dev / Marketer */}
-      <div className="inline-flex items-center gap-0.5 rounded-md border border-zinc-800 bg-zinc-900 p-0.5 shadow-sm">
+      <div className="tve-segment">
         <SegmentButton active={userMode === "dev"} onClick={() => setUserMode("dev")}>
           <Code2 size={11} />
           Dev
@@ -90,23 +90,20 @@ export function Toolbar() {
 
       {/* Dev server control */}
       {devServerStatus === "stopped" || devServerStatus === "error" ? (
-        <button
-          onClick={startDevServer}
-          className="inline-flex h-7 items-center gap-1.5 rounded-md bg-emerald-500 px-2.5 text-xs font-medium text-white shadow-sm hover:bg-emerald-400 transition-colors"
-        >
+        <button onClick={startDevServer} className="tve-button-primary">
           <Play size={11} />
           Start
         </button>
       ) : devServerStatus === "starting" ? (
-        <span className="inline-flex items-center gap-1.5 text-xs text-amber-400">
+        <span className="tve-status tve-status--starting">
           <Loader2 size={12} className="animate-spin" />
           Starting...
         </span>
       ) : (
-        <span className="inline-flex items-center gap-1.5 text-xs text-emerald-400">
-          <span className="relative flex h-2 w-2">
-            <span className="absolute inline-flex h-full w-full animate-ping  bg-emerald-400 opacity-75" />
-            <span className="relative inline-flex h-2 w-2  bg-emerald-400" />
+        <span className="tve-status tve-status--running">
+          <span className="tve-status__dot">
+            <span className="tve-status__dot-ping" />
+            <span className="tve-status__dot-core" />
           </span>
           Running
         </span>
@@ -156,10 +153,7 @@ export function Toolbar() {
       {userMode === "dev" && (
         <>
           <Tooltip content="Create new component">
-            <button
-              onClick={() => setShowNewComponent(true)}
-              className="inline-flex h-7 items-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-900 px-2.5 text-xs font-medium text-zinc-300 shadow-sm hover:bg-zinc-800 hover:text-white hover:border-zinc-700 transition-colors"
-            >
+            <button onClick={() => setShowNewComponent(true)} className="tve-button-secondary">
               <Plus size={11} />
               Component
             </button>
@@ -170,10 +164,7 @@ export function Toolbar() {
           )}
 
           <Tooltip content="Design system tokens">
-            <button
-              onClick={() => setShowDesignSystem(true)}
-              className="inline-flex h-7 items-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-900 px-2.5 text-xs font-medium text-zinc-300 shadow-sm hover:bg-zinc-800 hover:text-white hover:border-zinc-700 transition-colors"
-            >
+            <button onClick={() => setShowDesignSystem(true)} className="tve-button-secondary">
               <Palette size={11} />
               Design
             </button>
@@ -185,7 +176,7 @@ export function Toolbar() {
         </>
       )}
 
-      <div className="flex-1" />
+      <div className="tve-toolbar__spacer" />
 
       {/* Keyboard shortcuts */}
       <Tooltip content="Keyboard shortcuts" shortcut="?">
@@ -195,7 +186,7 @@ export function Toolbar() {
       </Tooltip>
 
       {/* Mode toggle */}
-      <div className="inline-flex items-center gap-0.5 rounded-md border border-zinc-800 bg-zinc-900 p-0.5 shadow-sm">
+      <div className="tve-segment">
         <SegmentButton active={mode === "edit"} onClick={() => setMode("edit")}>
           <Pencil size={11} />
           Edit
@@ -207,7 +198,7 @@ export function Toolbar() {
       </div>
 
       {/* Device presets */}
-      <div className="inline-flex items-center gap-0.5 rounded-md border border-zinc-800 bg-zinc-900 p-0.5 shadow-sm">
+      <div className="tve-segment">
         {([
           { key: "desktop" as const, icon: <Monitor size={12} />, label: "Desktop" },
           { key: "tablet" as const, icon: <Tablet size={12} />, label: "Tablet (768px)" },
@@ -216,11 +207,8 @@ export function Toolbar() {
           <Tooltip key={key} content={label}>
             <button
               onClick={() => setDevicePreset(key)}
-              className={`flex h-6 w-6 items-center justify-center rounded transition-colors ${
-                devicePreset === key
-                  ? "bg-zinc-800 text-white shadow-sm"
-                  : "text-zinc-500 hover:text-zinc-300"
-              }`}
+              className="tve-segment__btn tve-segment__btn--icon"
+              data-active={devicePreset === key || undefined}
             >
               {icon}
             </button>
@@ -232,7 +220,7 @@ export function Toolbar() {
 }
 
 function Divider() {
-  return <div className="mx-1 h-5 w-px bg-zinc-800" />;
+  return <div className="tve-toolbar__divider" />;
 }
 
 function IconButton({
@@ -245,15 +233,7 @@ function IconButton({
   disabled?: boolean;
 }) {
   return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={`flex h-7 w-7 items-center justify-center rounded transition-colors ${
-        disabled
-          ? "text-zinc-700 cursor-not-allowed"
-          : "text-zinc-400 hover:bg-zinc-900 hover:text-white"
-      }`}
-    >
+    <button onClick={onClick} disabled={disabled} className="tve-icon-btn">
       {children}
     </button>
   );
@@ -271,11 +251,8 @@ function SegmentButton({
   return (
     <button
       onClick={onClick}
-      className={`inline-flex h-6 items-center gap-1 rounded px-2 text-[11px] font-medium transition-colors ${
-        active
-          ? "bg-zinc-800 text-white shadow-sm"
-          : "text-zinc-500 hover:text-zinc-300"
-      }`}
+      className="tve-segment__btn"
+      data-active={active || undefined}
     >
       {children}
     </button>

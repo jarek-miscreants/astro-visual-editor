@@ -41,25 +41,20 @@ export function Breadcrumb({ nodeId }: Props) {
   }
 
   return (
-    <div className="flex items-center gap-0.5 overflow-x-auto border-b border-zinc-800 px-3 py-1.5 text-[10px] text-zinc-500">
+    <div className="tve-prop-breadcrumb">
       {path.map((n, i) => {
         const last = i === path.length - 1;
         const isComp = n.isComponent || /^[A-Z]/.test(n.tagName);
         return (
-          <div key={n.nodeId} className="flex items-center gap-0.5">
-            {i > 0 && <ChevronRight size={9} className="text-zinc-700" />}
+          <div key={n.nodeId} className="tve-prop-crumb-row">
+            {i > 0 && <ChevronRight size={9} className="tve-prop-crumb-sep" />}
             <button
               onClick={() => {
                 selectNode(n.nodeId, makeElementInfo(n));
                 highlightNodeInIframe(n.nodeId);
               }}
-              className={`rounded px-1 py-0.5 font-mono transition-colors ${
-                last
-                  ? isComp
-                    ? "bg-emerald-500/15 text-emerald-300"
-                    : "bg-blue-500/15 text-blue-300"
-                  : "text-zinc-500 hover:bg-zinc-900 hover:text-zinc-300"
-              }`}
+              className="tve-prop-crumb"
+              data-current={last ? (isComp ? "component" : "tag") : undefined}
             >
               {n.tagName}
             </button>

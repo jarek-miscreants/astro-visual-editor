@@ -1,0 +1,509 @@
+/* Editor shell styles
+ *
+ * Single source of truth for the visual chrome of the editor: backgrounds,
+ * borders, panels, toolbar, buttons, and segmented controls.
+ *
+ * To re-skin the entire app, edit the CSS variables at the top.
+ */
+
+:root {
+  /* ── Background hierarchy (darkest → lightest) ──────────────── */
+  --shell-bg: #212121;              /* outermost canvas / panels */
+  --shell-bg-elevated: #404040;     /* inputs, secondary buttons, segmented tracks */
+  --shell-bg-subtle: #27272a;       /* hover state, active segment, dividers */
+  --shell-bg-hover: #27272a;
+  --shell-bg-active: #3f3f46;       /* pressed / dragged-over */
+  --shell-bg-iframe: #ffffff;       /* the rendered preview's frame bg */
+
+  /* ── Borders ────────────────────────────────────────────────── */
+  --shell-border: #212121;
+  --shell-border-strong: #363636;
+  --shell-border-focus: #3b82f6;
+
+  /* ── Text ───────────────────────────────────────────────────── */
+  --shell-text: #fafafa;            /* primary headings/labels */
+  --shell-text-secondary: #d4d4d8;  /* body */
+  --shell-text-muted: #a1a1aa;      /* secondary copy */
+  --shell-text-subtle: #71717a;     /* placeholders, hints */
+  --shell-text-faint: #52525b;      /* disabled, separators */
+
+  /* ── Accent (primary action) ────────────────────────────────── */
+  --shell-accent: #3b82f6;
+  --shell-accent-hover: #60a5fa;
+  --shell-accent-bg: #2563eb;
+  --shell-accent-bg-hover: #1d4ed8;
+  --shell-accent-fg: #ffffff;
+
+  /* ── Status ─────────────────────────────────────────────────── */
+  --shell-success: #34d399;
+  --shell-success-bg: #10b981;
+  --shell-success-bg-hover: #34d399;
+  --shell-warning: #fbbf24;
+  --shell-danger: #f87171;
+  --shell-danger-hover: #ef4444;
+}
+
+/* ──────────────────────────────────────────────
+   Shell container
+   ────────────────────────────────────────────── */
+
+.tve-shell {
+  display: flex;
+  height: 100vh;
+  flex-direction: column;
+}
+
+.tve-shell__body {
+  flex: 1;
+  min-height: 0;
+}
+
+/* ──────────────────────────────────────────────
+   Top toolbar
+   ────────────────────────────────────────────── */
+
+.tve-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 48px;
+  padding: 0 12px;
+  background-color: var(--shell-bg);
+  border-bottom: 1px solid var(--shell-border);
+}
+
+.tve-toolbar__divider {
+  width: 1px;
+  height: 20px;
+  margin: 0 4px;
+  background-color: var(--shell-border);
+}
+
+.tve-toolbar__spacer { flex: 1; }
+
+.tve-toolbar__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--shell-text);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  transition: background-color 100ms, color 100ms;
+}
+.tve-toolbar__brand:hover {
+  background-color: var(--shell-bg-elevated);
+  color: var(--shell-text);
+}
+.tve-toolbar__brand-icon { color: var(--shell-text-subtle); }
+
+/* ──────────────────────────────────────────────
+   Panels (left tree, right properties)
+   ────────────────────────────────────────────── */
+
+.tve-panel {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  background-color: var(--shell-bg);
+}
+.tve-panel--left  { border-right: 1px solid var(--shell-border); }
+.tve-panel--right { border-left: 1px solid var(--shell-border); }
+
+.tve-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 40px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--shell-border);
+}
+.tve-panel__title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--shell-text);
+}
+.tve-panel__actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.tve-panel__body {
+  flex: 1;
+  overflow: auto;
+}
+.tve-panel__body--padded { padding: 6px; }
+
+/* Empty-state copy inside a panel */
+.tve-panel__empty {
+  padding: 24px 8px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--shell-text-subtle);
+}
+
+/* Section under the panel header (e.g. tree search) */
+.tve-panel__section {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--shell-border);
+}
+
+/* ──────────────────────────────────────────────
+   Resize handle (between panels)
+   ────────────────────────────────────────────── */
+
+.tve-resize-handle {
+  width: 4px;
+  background-color: var(--shell-border);
+  transition: background-color 100ms;
+}
+.tve-resize-handle:hover { background-color: var(--shell-accent); }
+
+/* ──────────────────────────────────────────────
+   Canvas area (where the iframe sits)
+   ────────────────────────────────────────────── */
+
+.tve-canvas {
+  position: relative;
+  display: flex;
+  height: 100%;
+  justify-content: center;
+  padding: 8px;
+  background-color: var(--shell-bg);
+  overflow: auto;
+}
+.tve-canvas--centered {
+  align-items: center;
+  padding: 0;
+}
+
+.tve-canvas__frame {
+  height: 100%;
+  overflow: hidden;
+  background-color: var(--shell-bg-iframe);
+  border: 1px solid var(--shell-border);
+  transition: width 300ms;
+}
+.tve-canvas__iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+/* ──────────────────────────────────────────────
+   Buttons
+   ────────────────────────────────────────────── */
+
+/* Square icon button (toolbar / panel actions) */
+.tve-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  background: transparent;
+  border: 0;
+  color: var(--shell-text-muted);
+  cursor: pointer;
+  transition: background-color 100ms, color 100ms;
+}
+.tve-icon-btn:hover:not(:disabled) {
+  background-color: var(--shell-bg-elevated);
+  color: var(--shell-text);
+}
+.tve-icon-btn:disabled {
+  color: var(--shell-text-faint);
+  cursor: not-allowed;
+}
+.tve-icon-btn--sm { width: 24px; height: 24px; }
+.tve-icon-btn--danger:hover:not(:disabled) { color: var(--shell-danger); }
+.tve-icon-btn--active {
+  background-color: rgba(16, 185, 129, 0.15);
+  color: #6ee7b7;
+}
+
+/* Primary action (Start dev server) */
+.tve-button-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 6px;
+  border: 0;
+  font-size: 12px;
+  font-weight: 500;
+  background-color: var(--shell-success-bg);
+  color: var(--shell-accent-fg);
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  transition: background-color 100ms;
+}
+.tve-button-primary:hover { background-color: var(--shell-success-bg-hover); }
+
+.tve-button-accent {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 16px;
+  border: 0;
+  font-size: 13px;
+  font-weight: 500;
+  background-color: var(--shell-accent-bg);
+  color: var(--shell-accent-fg);
+  cursor: pointer;
+  transition: background-color 100ms;
+}
+.tve-button-accent:hover { background-color: var(--shell-accent-bg-hover); }
+
+/* Secondary button (+ Component, Design) */
+.tve-button-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 6px;
+  border: 1px solid var(--shell-border);
+  background-color: var(--shell-bg-elevated);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--shell-text-secondary);
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  transition: background-color 100ms, color 100ms, border-color 100ms;
+}
+.tve-button-secondary:hover {
+  background-color: var(--shell-bg-subtle);
+  color: var(--shell-text);
+  border-color: var(--shell-border-strong);
+}
+
+/* ──────────────────────────────────────────────
+   Segmented control (Dev/Marketer, Edit/Preview, Devices)
+   ────────────────────────────────────────────── */
+
+.tve-segment {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 6px;
+  border: 1px solid var(--shell-border);
+  background-color: var(--shell-bg-elevated);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+.tve-segment__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 4px;
+  border: 0;
+  background: transparent;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--shell-text-subtle);
+  cursor: pointer;
+  transition: background-color 100ms, color 100ms;
+}
+.tve-segment__btn:hover { color: var(--shell-text-secondary); }
+.tve-segment__btn[data-active="true"] {
+  background-color: var(--shell-bg-subtle);
+  color: var(--shell-text);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+/* Square device-preset variant: icon-only, fixed width */
+.tve-segment__btn--icon {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  justify-content: center;
+}
+
+/* ──────────────────────────────────────────────
+   Status pill (dev server: starting / running / error)
+   ────────────────────────────────────────────── */
+
+.tve-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+.tve-status--starting { color: var(--shell-warning); }
+.tve-status--running  { color: var(--shell-success); }
+.tve-status--error    { color: var(--shell-danger); }
+
+.tve-status__dot {
+  position: relative;
+  display: flex;
+  width: 8px;
+  height: 8px;
+}
+.tve-status__dot-ping,
+.tve-status__dot-core {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background-color: var(--shell-success);
+}
+.tve-status__dot-ping {
+  animation: tve-ping 1s cubic-bezier(0, 0, 0.2, 1) infinite;
+  opacity: 0.75;
+}
+.tve-status__dot-core { position: relative; }
+
+@keyframes tve-ping {
+  75%, 100% {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+
+/* ──────────────────────────────────────────────
+   Search input (used in tree search)
+   ────────────────────────────────────────────── */
+
+.tve-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.tve-search__icon {
+  position: absolute;
+  left: 8px;
+  color: var(--shell-text-faint);
+  pointer-events: none;
+}
+.tve-search__input {
+  width: 100%;
+  padding: 4px 24px 4px 28px;
+  border-radius: 4px;
+  border: 1px solid var(--shell-border);
+  background-color: var(--shell-bg-elevated);
+  font-size: 11px;
+  color: var(--shell-text);
+  outline: none;
+}
+.tve-search__input::placeholder { color: var(--shell-text-faint); }
+.tve-search__input:focus { border-color: var(--shell-border-focus); }
+.tve-search__clear {
+  position: absolute;
+  right: 6px;
+  background: transparent;
+  border: 0;
+  color: var(--shell-text-faint);
+  cursor: pointer;
+}
+.tve-search__clear:hover { color: var(--shell-text-secondary); }
+
+/* ──────────────────────────────────────────────
+   Properties empty state
+   ────────────────────────────────────────────── */
+
+.tve-empty {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 0 24px;
+  text-align: center;
+}
+.tve-empty__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 9999px;
+  border: 1px solid var(--shell-border);
+  background-color: var(--shell-bg-elevated);
+  color: var(--shell-text-subtle);
+}
+.tve-empty__title {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--shell-text-secondary);
+}
+.tve-empty__desc {
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--shell-text-subtle);
+}
+.tve-empty__hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  font-size: 10px;
+  color: var(--shell-text-faint);
+}
+.tve-empty__note {
+  margin-top: 8px;
+  max-width: 220px;
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--shell-text-faint);
+}
+
+/* ──────────────────────────────────────────────
+   Inline error block (dev server failed)
+   ────────────────────────────────────────────── */
+
+.tve-error {
+  margin: 0 auto;
+  max-width: 28rem;
+  text-align: left;
+}
+.tve-error__title {
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--shell-danger);
+}
+.tve-error__msg {
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: var(--shell-text-secondary);
+}
+.tve-error__file {
+  margin-bottom: 8px;
+  font-family: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+  font-size: 11px;
+  color: var(--shell-text-subtle);
+  word-break: break-all;
+}
+.tve-error__fields {
+  margin-bottom: 12px;
+  font-size: 11px;
+  color: var(--shell-text-muted);
+}
+.tve-error__fields-list {
+  font-family: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+  color: var(--shell-text-secondary);
+}
+.tve-error__actions { display: flex; gap: 8px; }
+.tve-error__raw {
+  margin-top: 12px;
+  max-height: 16rem;
+  overflow: auto;
+  padding: 12px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  background-color: var(--shell-bg-elevated);
+  font-size: 10px;
+  color: var(--shell-text-muted);
+}

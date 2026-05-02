@@ -1,4 +1,7 @@
 @import "tailwindcss";
+@import "./styles/shell.css";
+@import "./styles/element-tree.css";
+@import "./styles/properties.css";
 
 @theme {
   /* Editor color tokens — shadcn-inspired dark theme */
@@ -11,8 +14,8 @@
   --color-border-strong: #3f3f46;
   --color-border-focus: #3b82f6;
 
-  --color-text: #fafafa;
-  --color-text-muted: #a1a1aa;
+  --color-text: #ffffff;
+  --color-text-muted: #ffffff;
   --color-text-subtle: #71717a;
   --color-text-faint: #52525b;
 

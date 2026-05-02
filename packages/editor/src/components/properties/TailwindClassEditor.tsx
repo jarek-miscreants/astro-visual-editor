@@ -76,9 +76,9 @@ export function TailwindClassEditor({
   }
 
   return (
-    <div className="space-y-2">
+    <div className="tve-prop-stack--sm">
       {/* Smart class chips */}
-      <div className="flex flex-wrap gap-1">
+      <div className="tve-prop-chips">
         {classList.map((cls) => (
           <SmartClassChip
             key={cls}
@@ -90,9 +90,9 @@ export function TailwindClassEditor({
       </div>
 
       {/* Search input */}
-      <div className="relative">
-        <div className="flex items-center gap-1  border border-zinc-700 bg-zinc-800 px-2">
-          <Search size={11} className="text-zinc-500" />
+      <div style={{ position: "relative" }}>
+        <div className="tve-prop-search">
+          <Search size={11} className="tve-prop-search__icon" />
           <input
             ref={inputRef}
             value={inputValue}
@@ -101,12 +101,12 @@ export function TailwindClassEditor({
             onFocus={() => inputValue && setShowSuggestions(true)}
             onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
             placeholder="Add class..."
-            className="w-full bg-transparent py-1 text-xs text-zinc-200 outline-none placeholder:text-zinc-600"
+            className="tve-prop-search__input"
           />
         </div>
 
         {showSuggestions && suggestions.length > 0 && (
-          <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-48 overflow-auto  border border-zinc-700 bg-zinc-800 py-1 shadow-lg">
+          <div className="tve-prop-popover tve-prop-popover--wide">
             {suggestions.map((item, idx) => (
               <button
                 key={item.name}
@@ -114,22 +114,17 @@ export function TailwindClassEditor({
                   e.preventDefault();
                   addClass(item.name);
                 }}
-                className={`flex w-full items-center gap-2 px-2 py-1 text-left text-xs ${
-                  idx === selectedIdx
-                    ? "bg-blue-600/20 text-blue-300"
-                    : "text-zinc-300 hover:bg-zinc-700"
-                }`}
+                className="tve-prop-popover__item"
+                data-active={idx === selectedIdx || undefined}
               >
                 {item.color && (
                   <span
-                    className="h-3 w-3 shrink-0  border border-zinc-600"
+                    className="tve-prop-popover__swatch"
                     style={{ backgroundColor: item.color }}
                   />
                 )}
-                <span className="font-mono">{item.name}</span>
-                <span className="ml-auto text-[10px] text-zinc-500">
-                  {item.category}
-                </span>
+                <span className="tve-prop-popover__name">{item.name}</span>
+                <span className="tve-prop-popover__meta">{item.category}</span>
               </button>
             ))}
           </div>
@@ -167,35 +162,30 @@ function SmartClassChip({
   }, [open]);
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={ref} className="tve-prop-chip-wrapper">
       <span
-        className={`group flex items-center gap-0.5  px-1.5 py-0.5 font-mono text-[11px] transition-colors ${
-          open
-            ? "bg-blue-600/20 text-blue-300 border border-blue-500/40"
-            : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700 border border-transparent"
-        } ${hasAlts ? "cursor-pointer" : ""}`}
+        className="tve-prop-chip"
+        data-open={open || undefined}
+        data-clickable={hasAlts || undefined}
         onClick={() => hasAlts && setOpen(!open)}
       >
         {className}
         {hasAlts && (
-          <ChevronDown
-            size={8}
-            className={`ml-0.5 text-zinc-500 transition-transform ${open ? "rotate-180" : ""}`}
-          />
+          <ChevronDown size={8} className="tve-prop-chip__chevron" />
         )}
         <button
           onClick={(e) => {
             e.stopPropagation();
             onRemove();
           }}
-          className="ml-0.5  p-0.5 text-zinc-500 opacity-0 hover:text-red-400 group-hover:opacity-100"
+          className="tve-prop-chip__remove"
         >
           <X size={8} />
         </button>
       </span>
 
       {open && (
-        <div className="absolute left-0 top-full z-50 mt-1 max-h-52 w-40 overflow-auto  border border-zinc-700 bg-zinc-800 py-1 shadow-lg">
+        <div className="tve-prop-popover tve-prop-popover--alts">
           {alternatives.map((alt) => (
             <button
               key={alt.value}
@@ -206,21 +196,18 @@ function SmartClassChip({
                 }
                 setOpen(false);
               }}
-              className={`flex w-full items-center gap-2 px-2 py-1 text-left text-[11px] ${
-                alt.value === className
-                  ? "bg-blue-600/20 text-blue-300"
-                  : "text-zinc-300 hover:bg-zinc-700"
-              }`}
+              className="tve-prop-popover__item"
+              data-active={alt.value === className || undefined}
             >
               {alt.color && (
                 <span
-                  className="h-3 w-3 shrink-0  border border-zinc-600"
+                  className="tve-prop-popover__swatch"
                   style={{ backgroundColor: alt.color }}
                 />
               )}
-              <span className="font-mono">{alt.value}</span>
+              <span className="tve-prop-popover__name">{alt.value}</span>
               {alt.label && (
-                <span className="ml-auto text-[9px] text-zinc-500">{alt.label}</span>
+                <span className="tve-prop-popover__meta">{alt.label}</span>
               )}
             </button>
           ))}

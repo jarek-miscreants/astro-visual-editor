@@ -75,47 +75,41 @@ export function TokenSuggestions({ tagName, classes, onClassesChange }: TokenSug
   if (typographyMatches.length === 0 && colorTokenEntries.length === 0) return null;
 
   return (
-    <div className="border-b border-zinc-800 px-3 py-2">
-      <div className="flex items-center gap-1 mb-1.5 text-[10px] font-semibold text-amber-400/80 uppercase tracking-wider">
-        <Sparkles size={10} />
+    <div className="tve-prop-section tve-prop-section--compact">
+      <div className="tve-prop-section__header">
+        <Sparkles size={10} className="tve-prop-section__header-icon--amber" />
         Tokens
       </div>
 
-      {/* Current match indicator */}
       {matchedTypoToken && (
-        <div className="mb-1.5  bg-amber-500/10 border border-amber-500/20 px-2 py-1 text-[10px] text-amber-300">
-          Matches <span className="font-mono font-bold">{matchedTypoToken[0]}</span> token
+        <div className="tve-prop-token-banner">
+          Matches <span className="tve-prop-token-banner__name">{matchedTypoToken[0]}</span> token
         </div>
       )}
 
-      {/* Typography token suggestions */}
       {typographyMatches.length > 0 && (
-        <div className="space-y-1 mb-2">
-          <div className="text-[9px] text-zinc-500">Typography</div>
+        <div className="tve-prop-token-group">
+          <div className="tve-prop-token-group__title">Typography</div>
           {typographyMatches.map((t) => {
             const isActive = matchedTypoToken?.[0] === t.name;
             return (
               <button
                 key={t.name}
                 onClick={() => applyTypographyToken(t)}
-                className={`flex w-full items-center gap-2  px-2 py-1 text-left text-[10px] transition-colors ${
-                  isActive
-                    ? "bg-amber-500/15 text-amber-300 border border-amber-500/30"
-                    : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-300 border border-transparent"
-                }`}
+                className="tve-prop-token"
+                data-active={isActive || undefined}
               >
-                <span className="font-medium w-8">{t.name}</span>
-                <span className="font-mono text-zinc-500">{t.size} {t.weight} {t.lineHeight}</span>
+                <span className="tve-prop-token__name">{t.name}</span>
+                <span className="tve-prop-token__detail">{t.size} {t.weight} {t.lineHeight}</span>
               </button>
             );
           })}
         </div>
       )}
 
-      {/* Color token quick-apply */}
-      <div className="space-y-1">
-        <div className="text-[9px] text-zinc-500">Colors</div>
-        <div className="flex flex-wrap gap-1">
+      <div className="tve-prop-token-group">
+        <div className="tve-prop-token-group__title">Colors</div>
+        <div className="tve-prop-token-colors">
           {colorTokenEntries.slice(0, 8).map(([name, value]) => {
             const resolveHex = useThemeStore.getState().resolveColorHex;
             const hex = resolveHex(value);
@@ -127,10 +121,13 @@ export function TokenSuggestions({ tagName, classes, onClassesChange }: TokenSug
                   e.preventDefault();
                   applyColorToken("text", value);
                 }}
-                className="flex items-center gap-1  bg-zinc-800 px-1.5 py-0.5 text-[9px] text-zinc-400 hover:bg-zinc-700"
+                className="tve-prop-token-color"
                 title={`Left click: bg-${value} | Right click: text-${value}`}
               >
-                <span className="h-2.5 w-2.5  border border-zinc-600" style={{ backgroundColor: hex || "#888" }} />
+                <span
+                  className="tve-prop-swatch tve-prop-swatch--xs"
+                  style={{ backgroundColor: hex || "#888" }}
+                />
                 {name}
               </button>
             );

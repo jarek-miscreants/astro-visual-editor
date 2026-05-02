@@ -78,71 +78,58 @@ export function TypographyControls({ classes, onClassesChange }: TypographyContr
   const currentFont = allFontClasses.find((f) => hasClass(classes, f)) || "";
 
   return (
-    <div className="space-y-3">
-      {/* Font Family */}
-      <div>
-        <div className="mb-1.5 text-[10px] font-medium text-zinc-400">Font Family</div>
+    <div className="tve-prop-stack">
+      <div className="tve-prop-field">
+        <div className="tve-prop-field__label">Font Family</div>
         <select
           value={currentFont}
           onChange={(e) => onClassesChange(replaceClassFromSet(classes, allFontClasses, e.target.value))}
-          className="h-7 w-full  border border-zinc-800 bg-zinc-900 px-2.5 text-[11px] text-zinc-200 outline-none focus:border-blue-500 hover:border-zinc-700 transition-colors cursor-pointer"
+          className="tve-prop-select"
         >
           <option value="">default</option>
           {allFontFamilies.map((f) => (
-            <option key={f.cls} value={f.cls}>
-              {f.label}
-            </option>
+            <option key={f.cls} value={f.cls}>{f.label}</option>
           ))}
         </select>
       </div>
 
-      {/* Font Size */}
-      <div>
-        <div className="mb-1.5 text-[10px] font-medium text-zinc-400">Size</div>
+      <div className="tve-prop-field">
+        <div className="tve-prop-field__label">Size</div>
         <select
           value={currentSize}
           onChange={(e) => onClassesChange(replaceClassFromSet(classes, allSizes, e.target.value))}
-          className="h-7 w-full  border border-zinc-800 bg-zinc-900 px-2.5 text-[11px] text-zinc-200 outline-none focus:border-blue-500 hover:border-zinc-700 transition-colors cursor-pointer"
+          className="tve-prop-select"
         >
           <option value="">default</option>
           {FONT_SIZES.map((s) => (
-            <option key={s.cls} value={s.cls}>
-              {s.label} ({s.px})
-            </option>
+            <option key={s.cls} value={s.cls}>{s.label} ({s.px})</option>
           ))}
         </select>
       </div>
 
-      {/* Font Weight */}
-      <div>
-        <div className="mb-1.5 text-[10px] font-medium text-zinc-400">Weight</div>
+      <div className="tve-prop-field">
+        <div className="tve-prop-field__label">Weight</div>
         <select
           value={currentWeight}
           onChange={(e) => onClassesChange(replaceClassFromSet(classes, allWeights, e.target.value))}
-          className="h-7 w-full  border border-zinc-800 bg-zinc-900 px-2.5 text-[11px] text-zinc-200 outline-none focus:border-blue-500 hover:border-zinc-700 transition-colors cursor-pointer"
+          className="tve-prop-select"
         >
           <option value="">default</option>
           {FONT_WEIGHTS.map((w) => (
-            <option key={w.cls} value={w.cls}>
-              {w.label} ({w.val})
-            </option>
+            <option key={w.cls} value={w.cls}>{w.label} ({w.val})</option>
           ))}
         </select>
       </div>
 
-      {/* Text Align */}
-      <div>
-        <div className="mb-1.5 text-[10px] font-medium text-zinc-400">Align</div>
-        <div className="flex gap-0.5">
+      <div className="tve-prop-field">
+        <div className="tve-prop-field__label">Align</div>
+        <div className="tve-prop-toggle-group">
           {TEXT_ALIGN.map((a, i) => (
             <button
               key={a}
               onClick={() => onClassesChange(replaceClassFromSet(classes, TEXT_ALIGN, a === currentAlign ? "" : a))}
-              className={`flex-1  py-0.5 text-[10px] transition-colors ${
-                a === currentAlign
-                  ? "bg-blue-600/30 text-blue-300 border border-blue-500/40"
-                  : "bg-zinc-800 text-zinc-400 border border-transparent hover:bg-zinc-700"
-              }`}
+              className="tve-prop-toggle"
+              data-active={a === currentAlign || undefined}
             >
               {ALIGN_LABELS[i]}
             </button>
@@ -150,13 +137,12 @@ export function TypographyControls({ classes, onClassesChange }: TypographyContr
         </div>
       </div>
 
-      {/* Line Height */}
-      <div>
-        <div className="mb-1.5 text-[10px] font-medium text-zinc-400">Line Height</div>
+      <div className="tve-prop-field">
+        <div className="tve-prop-field__label">Line Height</div>
         <select
           value={LINE_HEIGHT.find((l) => hasClass(classes, l)) || ""}
           onChange={(e) => onClassesChange(replaceClassFromSet(classes, LINE_HEIGHT, e.target.value))}
-          className="h-7 w-full  border border-zinc-800 bg-zinc-900 px-2.5 text-[11px] text-zinc-200 outline-none focus:border-blue-500 hover:border-zinc-700 transition-colors cursor-pointer"
+          className="tve-prop-select"
         >
           <option value="">default</option>
           {LINE_HEIGHT.map((l) => (
@@ -165,13 +151,12 @@ export function TypographyControls({ classes, onClassesChange }: TypographyContr
         </select>
       </div>
 
-      {/* Letter Spacing */}
-      <div>
-        <div className="mb-1.5 text-[10px] font-medium text-zinc-400">Letter Spacing</div>
+      <div className="tve-prop-field">
+        <div className="tve-prop-field__label">Letter Spacing</div>
         <select
           value={LETTER_SPACING.find((l) => hasClass(classes, l)) || ""}
           onChange={(e) => onClassesChange(replaceClassFromSet(classes, LETTER_SPACING, e.target.value))}
-          className="h-7 w-full  border border-zinc-800 bg-zinc-900 px-2.5 text-[11px] text-zinc-200 outline-none focus:border-blue-500 hover:border-zinc-700 transition-colors cursor-pointer"
+          className="tve-prop-select"
         >
           <option value="">default</option>
           {LETTER_SPACING.map((l) => (
@@ -180,10 +165,9 @@ export function TypographyControls({ classes, onClassesChange }: TypographyContr
         </select>
       </div>
 
-      {/* Transform & Decoration */}
-      <div>
-        <div className="mb-1.5 text-[10px] font-medium text-zinc-400">Style</div>
-        <div className="flex flex-wrap gap-0.5">
+      <div className="tve-prop-field">
+        <div className="tve-prop-field__label">Style</div>
+        <div className="tve-prop-toggle-group">
           {[...TEXT_TRANSFORM, ...TEXT_DECORATION].map((cls) => (
             <button
               key={cls}
@@ -192,11 +176,8 @@ export function TypographyControls({ classes, onClassesChange }: TypographyContr
                 const isActive = hasClass(classes, cls);
                 onClassesChange(replaceClassFromSet(classes, set, isActive ? "" : cls));
               }}
-              className={` px-1.5 py-0.5 text-[10px] transition-colors ${
-                hasClass(classes, cls)
-                  ? "bg-blue-600/30 text-blue-300 border border-blue-500/40"
-                  : "bg-zinc-800 text-zinc-400 border border-transparent hover:bg-zinc-700"
-              }`}
+              className="tve-prop-toggle tve-prop-toggle--auto-width"
+              data-active={hasClass(classes, cls) || undefined}
             >
               {cls}
             </button>

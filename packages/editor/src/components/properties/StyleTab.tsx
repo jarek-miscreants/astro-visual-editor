@@ -57,7 +57,7 @@ export function StyleTab({ classes, onClassesChange }: StyleTabProps) {
             <select
               value={BORDER_RADIUS.find((r) => hasClass(classes, r)) || ""}
               onChange={(e) => onClassesChange(replaceClassFromSet(classes, BORDER_RADIUS, e.target.value))}
-              className="h-7 w-full  border border-zinc-800 bg-zinc-900 px-2.5 text-[11px] text-zinc-200 outline-none focus:border-blue-500 hover:border-zinc-700 transition-colors cursor-pointer"
+              className="tve-prop-select"
             >
               <option value="">none</option>
               {BORDER_RADIUS.map((r) => (
@@ -75,7 +75,7 @@ export function StyleTab({ classes, onClassesChange }: StyleTabProps) {
             <select
               value={SHADOW.find((s) => hasClass(classes, s)) || ""}
               onChange={(e) => onClassesChange(replaceClassFromSet(classes, SHADOW, e.target.value))}
-              className="h-7 w-full  border border-zinc-800 bg-zinc-900 px-2.5 text-[11px] text-zinc-200 outline-none focus:border-blue-500 hover:border-zinc-700 transition-colors cursor-pointer"
+              className="tve-prop-select"
             >
               <option value="">none</option>
               {SHADOW.map((s) => (
@@ -87,7 +87,7 @@ export function StyleTab({ classes, onClassesChange }: StyleTabProps) {
             <select
               value={OPACITY.find((o) => hasClass(classes, o)) || ""}
               onChange={(e) => onClassesChange(replaceClassFromSet(classes, OPACITY, e.target.value))}
-              className="h-7 w-full  border border-zinc-800 bg-zinc-900 px-2.5 text-[11px] text-zinc-200 outline-none focus:border-blue-500 hover:border-zinc-700 transition-colors cursor-pointer"
+              className="tve-prop-select"
             >
               <option value="">100%</option>
               {OPACITY.map((o) => (
@@ -104,23 +104,26 @@ export function StyleTab({ classes, onClassesChange }: StyleTabProps) {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   const [expanded, setExpanded] = useState(true);
   return (
-    <div className="border-b border-zinc-800">
+    <div style={{ borderBottom: "1px solid var(--prop-section-border)" }}>
       <button
         onClick={() => setExpanded(!expanded)}
-        className="flex w-full items-center justify-between px-3 py-2.5 text-[10px] font-semibold text-zinc-400 uppercase tracking-wider hover:text-zinc-200 transition-colors"
+        className="tve-prop-section__header tve-prop-section__header--toggle"
+        style={{ justifyContent: "space-between", padding: "10px 12px", margin: 0 }}
       >
         {title}
-        <span className="text-zinc-600 text-xs leading-none">{expanded ? "−" : "+"}</span>
+        <span style={{ color: "var(--prop-icon-color)", fontSize: 12, lineHeight: 1 }}>
+          {expanded ? "−" : "+"}
+        </span>
       </button>
-      {expanded && <div className="px-3 pb-3">{children}</div>}
+      {expanded && <div style={{ padding: "0 12px 12px" }}>{children}</div>}
     </div>
   );
 }
 
 function ControlRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div>
-      <div className="mb-1.5 text-[10px] font-medium text-zinc-400">{label}</div>
+    <div className="tve-prop-field">
+      <div className="tve-prop-field__label">{label}</div>
       {children}
     </div>
   );
@@ -141,16 +144,13 @@ function ButtonRow({
 }) {
   const current = options.find((o) => hasClass(classes, o)) || "";
   return (
-    <div className="flex gap-0.5">
+    <div className="tve-prop-toggle-group">
       {options.map((opt, i) => (
         <button
           key={opt}
           onClick={() => onClassesChange(replaceClassFromSet(classes, set, opt === current ? "" : opt))}
-          className={`flex-1  py-0.5 text-[10px] transition-colors ${
-            opt === current
-              ? "bg-blue-600/30 text-blue-300 border border-blue-500/40"
-              : "bg-zinc-800 text-zinc-400 border border-transparent hover:bg-zinc-700"
-          }`}
+          className="tve-prop-toggle"
+          data-active={opt === current || undefined}
         >
           {labels[i]}
         </button>
