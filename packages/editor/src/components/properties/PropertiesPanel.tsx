@@ -82,7 +82,7 @@ export function PropertiesPanel({ nodeId, elementInfo }: PropertiesPanelProps) {
             <>
               <ComponentPropsPanel
                 nodeId={nodeId}
-                tagName={elementInfo.tagName}
+                tagName={astNode?.tagName ?? elementInfo.tagName}
                 attributes={attributes}
               />
               {astNode && (
@@ -139,11 +139,16 @@ export function PropertiesPanel({ nodeId, elementInfo }: PropertiesPanelProps) {
         </div>
       ) : (
         <>
-          {/* Component-level typed props (variants, etc.) — dev mode */}
+          {/* Component-level typed props (variants, etc.) — dev mode.
+              Use the AST node's tagName: when DomMapper flattens a component
+              to its rendered root (e.g. CardIcon → its outer <div>),
+              elementInfo.tagName is the rendered tag, which would route the
+              schema lookup at the wrong file and bleed unrelated div
+              attributes through the usage-derived fallback. */}
           {isComponent && (
             <ComponentPropsPanel
               nodeId={nodeId}
-              tagName={elementInfo.tagName}
+              tagName={astNode?.tagName ?? elementInfo.tagName}
               attributes={attributes}
             />
           )}
