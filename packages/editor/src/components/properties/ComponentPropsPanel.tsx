@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Sparkles, Code2, ChevronDown, ChevronRight, Link as LinkIcon } from "lucide-react";
-import type { ComponentPropSchema, ComponentPropField } from "@tve/shared";
+import type { ComponentPropSchema, ComponentPropField, ASTNode } from "@tve/shared";
 import { useEditorStore } from "../../store/editor-store";
 import { api } from "../../lib/api-client";
 import { LinkSection } from "./LinkSection";
@@ -58,6 +58,40 @@ function deriveSchemaFromAttributes(attributes: Record<string, string>): Compone
   return fields;
 }
 
+/** Collect every attribute key seen on any instance of `tagName` in the
+ *  page's AST. Used to suggest props for external components (like Icon
+ *  from astro-icon) whose Props interface lives in node_modules and isn't
+ *  introspectable. The current element's attributes are merged so any keys
+ *  it has but other instances don't are still represented. */
+function deriveSchemaFromPageUsages(
+  ast: ASTNode[] | null,
+  tagName: string,
+  currentAttributes: Record<string, string>
+): ComponentPropField[] {
+  const seen = new Set<string>();
+  if (ast) {
+    function walk(nodes: ASTNode[]) {
+      for (const n of nodes) {
+        if (n.tagName === tagName) {
+          for (const k of Object.keys(n.attributes)) {
+            if (k !== "class" && k !== "className") seen.add(k);
+          }
+        }
+        walk(n.children);
+      }
+    }
+    walk(ast);
+  }
+  for (const k of Object.keys(currentAttributes)) {
+    if (k !== "class" && k !== "className") seen.add(k);
+  }
+  return [...seen].sort().map((name) => ({
+    kind: "string" as const,
+    name,
+    required: false,
+  }));
+}
+
 /**
  * Typed editor for a component's Props. Shows a dropdown/toggle/input per
  * declared prop, falling back to the generic AttributesPanel for anything the
@@ -65,6 +99,7 @@ function deriveSchemaFromAttributes(attributes: Record<string, string>): Compone
  */
 export function ComponentPropsPanel({ nodeId, tagName, attributes }: Props) {
   const files = useEditorStore((s) => s.files);
+  const ast = useEditorStore((s) => s.ast);
   const applyMutation = useEditorStore((s) => s.applyMutation);
   const [schema, setSchema] = useState<ComponentPropSchema | null>(null);
   const [loading, setLoading] = useState(false);
@@ -73,6 +108,14 @@ export function ComponentPropsPanel({ nodeId, tagName, attributes }: Props) {
   // Locate the component's source file by matching the tagName to a .astro filename
   const componentFile = files.find(
     (f) => f.type === "component" && f.path.endsWith(`/${tagName}.astro`)
+  );
+
+  // For external components (no .astro file in the project), derive a schema
+  // from observed attribute usages elsewhere on the same page. Memoised on
+  // the AST identity so we don't re-walk it on every render.
+  const usageDerived = useMemo(
+    () => deriveSchemaFromPageUsages(ast, tagName, attributes),
+    [ast, tagName, attributes]
   );
 
   useEffect(() => {
@@ -114,13 +157,19 @@ export function ComponentPropsPanel({ nodeId, tagName, attributes }: Props) {
     );
   }
 
-  // Schema from the component's Props interface takes priority. If none exists
-  // (or the component file isn't resolvable from tagName), fall back to
-  // auto-exposing the element's current string attributes.
+  // Schema priority:
+  //   1. The component's introspected Props interface (project components).
+  //   2. Attribute keys observed on other instances of this tag in the page
+  //      (external components like Icon — at least gives the user a list of
+  //      props that other instances are using).
+  //   3. The element's own current attributes (last resort).
+  // Only use a derived fallback when no project schema was found.
   const fields =
     schema && schema.fields.length > 0
       ? schema.fields
-      : deriveSchemaFromAttributes(attributes);
+      : usageDerived.length > 0
+        ? usageDerived
+        : deriveSchemaFromAttributes(attributes);
   if (fields.length === 0) return null;
 
   const contentFields: ComponentPropField[] = [];
@@ -161,6 +210,7 @@ export function ComponentPropsPanel({ nodeId, tagName, attributes }: Props) {
             {contentFields.map((field) => (
               <PropField
                 key={field.name}
+                nodeId={nodeId}
                 field={field}
                 currentValue={attributes[field.name]}
                 onChange={(v) => commit(field.name, v)}
@@ -200,6 +250,7 @@ export function ComponentPropsPanel({ nodeId, tagName, attributes }: Props) {
             {linkFields.slice(1).map((field) => (
               <PropField
                 key={field.name}
+                nodeId={nodeId}
                 field={field}
                 currentValue={attributes[field.name]}
                 onChange={(v) => commit(field.name, v)}
@@ -212,6 +263,7 @@ export function ComponentPropsPanel({ nodeId, tagName, attributes }: Props) {
 
       {advancedFields.length > 0 && (
         <AdvancedSection
+          nodeId={nodeId}
           fields={advancedFields}
           attributes={attributes}
           onChange={commit}
@@ -223,11 +275,13 @@ export function ComponentPropsPanel({ nodeId, tagName, attributes }: Props) {
 }
 
 function AdvancedSection({
+  nodeId,
   fields,
   attributes,
   onChange,
   defaultOpen,
 }: {
+  nodeId: string;
   fields: ComponentPropField[];
   attributes: Record<string, string>;
   onChange: (attr: string, value: string | null) => void;
@@ -251,6 +305,7 @@ function AdvancedSection({
           {fields.map((field) => (
             <PropField
               key={field.name}
+              nodeId={nodeId}
               field={field}
               currentValue={attributes[field.name]}
               onChange={(v) => onChange(field.name, v)}
@@ -263,11 +318,13 @@ function AdvancedSection({
 }
 
 function PropField({
+  nodeId,
   field,
   currentValue,
   onChange,
   prominent = false,
 }: {
+  nodeId: string;
   field: ComponentPropField;
   currentValue: string | undefined;
   onChange: (value: string | null) => void;
@@ -294,7 +351,7 @@ function PropField({
             <span className="truncate">{currentValue}</span>
           </div>
         ) : (
-          <PropControl field={field} value={currentValue} onChange={onChange} prominent />
+          <PropControl nodeId={nodeId} field={field} value={currentValue} onChange={onChange} prominent />
         )}
       </div>
     );
@@ -316,7 +373,7 @@ function PropField({
             <span className="truncate">{currentValue}</span>
           </div>
         ) : (
-          <PropControl field={field} value={currentValue} onChange={onChange} />
+          <PropControl nodeId={nodeId} field={field} value={currentValue} onChange={onChange} />
         )}
       </div>
     </div>
@@ -324,16 +381,25 @@ function PropField({
 }
 
 function PropControl({
+  nodeId,
   field,
   value,
   onChange,
   prominent = false,
 }: {
+  nodeId: string;
   field: ComponentPropField;
   value: string | undefined;
   onChange: (value: string | null) => void;
   prominent?: boolean;
 }) {
+  // Uncontrolled inputs (defaultValue) ignore later prop changes, so when the
+  // user picks a different element React reuses the same DOM input and the
+  // text stays stale. Keying by `${nodeId}-${field.name}` forces a remount on
+  // selection change so each instance shows its own value. Enum/boolean are
+  // controlled and don't need the key.
+  const inputKey = `${nodeId}-${field.name}`;
+
   if (field.kind === "enum") {
     const current = value ?? field.default ?? "";
     return (
@@ -380,6 +446,7 @@ function PropControl({
   if (field.kind === "number") {
     return (
       <input
+        key={inputKey}
         type="number"
         defaultValue={value ?? (field.default !== undefined ? String(field.default) : "")}
         placeholder={field.default !== undefined ? String(field.default) : "number"}
@@ -396,7 +463,7 @@ function PropControl({
     if (prominent) {
       return (
         <textarea
-          key={value ?? "__empty__"}
+          key={inputKey}
           defaultValue={value ?? ""}
           placeholder={field.default ?? ""}
           rows={Math.min(6, Math.max(2, Math.ceil((value?.length ?? 0) / 48)))}
@@ -410,6 +477,7 @@ function PropControl({
     }
     return (
       <input
+        key={inputKey}
         type="text"
         defaultValue={value ?? ""}
         placeholder={field.default ?? "string"}
@@ -426,7 +494,7 @@ function PropControl({
   if (prominent) {
     return (
       <textarea
-        key={value ?? "__empty__"}
+        key={inputKey}
         defaultValue={value ?? ""}
         placeholder={field.typeText || ""}
         rows={Math.min(6, Math.max(2, Math.ceil((value?.length ?? 0) / 48)))}
@@ -441,6 +509,7 @@ function PropControl({
   }
   return (
     <input
+      key={inputKey}
       type="text"
       defaultValue={value ?? ""}
       placeholder={field.typeText || "value"}

@@ -175,14 +175,20 @@ describe("useHistoryStore", () => {
     useHistoryStore.getState().push(makeEntry("b"));
 
     const undone = useHistoryStore.getState().undo();
-    expect(undone?.mutation.nodeId).toBe("b");
+    expect(undone?.mutation.type).toBe("update-classes");
+    if (undone?.mutation.type === "update-classes") {
+      expect(undone.mutation.nodeId).toBe("b");
+    }
 
     const stateAfterUndo = useHistoryStore.getState();
     expect(stateAfterUndo.canUndo).toBe(true);
     expect(stateAfterUndo.canRedo).toBe(true);
 
     const redone = useHistoryStore.getState().redo();
-    expect(redone?.mutation.nodeId).toBe("b");
+    expect(redone?.mutation.type).toBe("update-classes");
+    if (redone?.mutation.type === "update-classes") {
+      expect(redone.mutation.nodeId).toBe("b");
+    }
 
     const after = useHistoryStore.getState();
     expect(after.canRedo).toBe(false);

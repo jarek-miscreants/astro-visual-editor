@@ -310,6 +310,93 @@ describe("applyMutation: add-element", () => {
     // Existing children are untouched
     expect(out).toContain('<h2 class="text-3xl">Title</h2>');
   });
+
+  it("validates the target child range when inserting before an existing child", async () => {
+    const file = await stage("simple.astro");
+    const { ast } = await parseAstroFileAsync(file);
+    const p = ast[1];
+
+    const result = await applyMutation(file, {
+      type: "add-element",
+      parentNodeId: p.nodeId,
+      position: 0,
+      html: "<em>Lead</em>",
+    });
+
+    expect(result.success).toBe(true);
+    const out = await readFile(file);
+    expect(out).toContain("<em>Lead</em>");
+    expect(out).toContain("<span>nested text</span>");
+    expect(out).not.toMatch(/<span[^>]*<em/);
+  });
+
+  it("imports the exact nested component path selected by the editor", async () => {
+    const project = path.join(tmpDir, "project");
+    const pageDir = path.join(project, "src", "pages");
+    const componentDir = path.join(project, "src", "components", "marketing");
+    await fs.mkdir(pageDir, { recursive: true });
+    await fs.mkdir(componentDir, { recursive: true });
+
+    const file = path.join(pageDir, "index.astro");
+    const component = path.join(componentDir, "PromoCard.astro");
+    await fs.writeFile(file, "<section></section>\n", "utf-8");
+    await fs.writeFile(component, "<article>Promo</article>\n", "utf-8");
+
+    const { ast } = await parseAstroFileAsync(file);
+    const result = await applyMutation(file, {
+      type: "add-element",
+      parentNodeId: ast[0].nodeId,
+      position: 0,
+      html: "<PromoCard />",
+      componentPath: "src/components/marketing/PromoCard.astro",
+    });
+
+    expect(result.success).toBe(true);
+    const out = await readFile(file);
+    expect(out).toContain('import PromoCard from "../components/marketing/PromoCard.astro";');
+    expect(out).toContain("<PromoCard />");
+    expect(out.startsWith("---\n")).toBe(true);
+  });
+});
+
+describe("applyMutation: move-element", () => {
+  it("treats same-parent newPosition as the final index after removal", async () => {
+    const file = await stage("with-component.astro");
+    const { ast } = await parseAstroFileAsync(file);
+    const section = ast[0];
+    const h2 = section.children.find((c) => c.tagName === "h2")!;
+
+    const result = await applyMutation(file, {
+      type: "move-element",
+      nodeId: h2.nodeId,
+      newParentId: section.nodeId,
+      newPosition: 1,
+    });
+
+    expect(result.success).toBe(true);
+    const out = await readFile(file);
+    expect(out.indexOf("<Button")).toBeLessThan(out.indexOf('<h2 class="text-3xl">Title</h2>'));
+  });
+
+  it("expands a self-closing component when moving a child into it", async () => {
+    const file = await stage("self-closing-component.astro");
+    const { ast } = await parseAstroFileAsync(file);
+    const main = ast[0];
+    const sectionMain = main.children.find((c) => c.tagName === "SectionMain")!;
+    const card = main.children.find((c) => c.tagName === "Card")!;
+
+    const result = await applyMutation(file, {
+      type: "move-element",
+      nodeId: card.nodeId,
+      newParentId: sectionMain.nodeId,
+      newPosition: 0,
+    });
+
+    expect(result.success).toBe(true);
+    const out = await readFile(file);
+    expect(out).toMatch(/<SectionMain>\s*\n\s*<Card title="Hello" \/>\s*\n\s*<\/SectionMain>/);
+    expect(out).not.toMatch(/<SectionMain[^>]*\/\s*>/);
+  });
 });
 
 describe("applyMutation: wrap-element", () => {

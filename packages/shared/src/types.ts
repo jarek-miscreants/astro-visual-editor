@@ -72,6 +72,7 @@ export type Mutation =
       parentNodeId: string;
       position: number;
       html: string;
+      componentPath?: string;
     }
   | { type: "remove-element"; nodeId: string }
   | {

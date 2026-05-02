@@ -3,6 +3,7 @@ import path from "path";
 import MagicString from "magic-string";
 import type { Mutation, ASTNode } from "@tve/shared";
 import { parseAstroFileAsync, buildNodeMap } from "./astro-parser.js";
+import * as sourceRange from "./source-range.js";
 
 /** Apply a mutation to an .astro source file */
 export async function applyMutation(
@@ -24,7 +25,7 @@ export async function applyMutation(
         // which would land `tagStart + tagName.length + 1` AFTER the opening
         // tag's `>` and leak the inserted ` class="..."` into the page as
         // visible text. validateElementRange always lands on `<`.
-        const validated = validateElementRange(source, node);
+        const validated = sourceRange.validateElementRange(source, node);
         if (!validated) {
           return { success: false, error: `Could not validate range for <${node.tagName}>` };
         }
@@ -33,7 +34,7 @@ export async function applyMutation(
         // CRITICAL: Limit search to the opening tag only — find the first `>`
         // that's not inside a quoted attribute value. Otherwise the regex would
         // match a child element's class attribute and corrupt the file.
-        const openTagEnd = findOpenTagEnd(source, tagStart);
+        const openTagEnd = sourceRange.findOpenTagEnd(source, tagStart);
         if (openTagEnd === -1) {
           return { success: false, error: `Could not find opening tag end for ${node.tagName}` };
         }
@@ -72,8 +73,8 @@ export async function applyMutation(
         if (!node) return { success: false, error: `Node ${mutation.nodeId} not found` };
 
         // Find the text content between the opening and closing tags
-        const openTagEnd = findOpenTagEnd(source, node.position.start.offset);
-        const closeTagStart = findCloseTagStart(
+        const openTagEnd = sourceRange.findOpenTagEnd(source, node.position.start.offset);
+        const closeTagStart = sourceRange.findCloseTagStart(
           source,
           node.position.end.offset,
           node.tagName
@@ -90,12 +91,12 @@ export async function applyMutation(
         if (!node) return { success: false, error: `Node ${mutation.nodeId} not found` };
 
         // Resolve the real `<TagName` start (handles parser off-by-N).
-        const validated = validateElementRange(source, node);
+        const validated = sourceRange.validateElementRange(source, node);
         if (!validated) {
           return { success: false, error: `Could not validate range for <${node.tagName}>` };
         }
         const tagStart = validated.start;
-        const openTagEnd = findOpenTagEnd(source, tagStart);
+        const openTagEnd = sourceRange.findOpenTagEnd(source, tagStart);
         const tagSource = source.slice(tagStart, openTagEnd);
 
         const attrRegex = new RegExp(
@@ -143,7 +144,7 @@ export async function applyMutation(
         // before the trailing `/>`. validateElementRange locates the opening
         // tag from `<TagName` and walks forward, so it always finds the real
         // bounds.
-        const validated = validateElementRange(source, parentNode);
+        const validated = sourceRange.validateElementRange(source, parentNode);
         if (!validated) {
           return {
             success: false,
@@ -158,7 +159,7 @@ export async function applyMutation(
         // Locate the opening-tag terminator (`>`) and check for self-close.
         // For non-self-closing elements `validated.end` already includes the
         // close tag; for self-closing it's the offset right after `/>`.
-        const openTagEnd = findOpenTagEnd(source, validated.start);
+        const openTagEnd = sourceRange.findOpenTagEnd(source, validated.start);
         if (openTagEnd === -1) {
           return {
             success: false,
@@ -190,7 +191,7 @@ export async function applyMutation(
           // Insert at end of parent (before closing tag). Use validated.end
           // — the offset right after `</TagName>` — so findCloseTagStart's
           // backwards scan reliably lands on the close tag.
-          const closeTagStart = findCloseTagStart(
+          const closeTagStart = sourceRange.findCloseTagStart(
             source,
             validated.end,
             parentNode.tagName
@@ -200,13 +201,31 @@ export async function applyMutation(
         } else {
           // Insert before the child at the given position
           const targetChild = parentNode.children[mutation.position];
+          const targetRange = sourceRange.validateElementRange(source, targetChild);
+          if (!targetRange) {
+            return {
+              success: false,
+              error: `Could not validate target position for <${targetChild.tagName}>`,
+            };
+          }
           const insertHtml = `${mutation.html}\n${childIndent}`;
-          s.appendLeft(targetChild.position.start.offset, insertHtml);
+          s.appendLeft(targetRange.start, insertHtml);
         }
 
         // If the inserted HTML references project components (PascalCase tags),
         // add the missing imports to the frontmatter so the page still renders.
-        await ensureComponentImports(s, source, filePath, mutation.html);
+        const componentPathByTag = mutation.componentPath
+          ? {
+              [path.basename(mutation.componentPath, ".astro")]: mutation.componentPath,
+            }
+          : undefined;
+        await ensureComponentImports(
+          s,
+          source,
+          filePath,
+          mutation.html,
+          componentPathByTag
+        );
         break;
       }
 
@@ -215,7 +234,7 @@ export async function applyMutation(
         if (!node) return { success: false, error: `Node ${mutation.nodeId} not found` };
 
         // Validate that the node's source actually looks like an HTML element
-        const validatedRange = validateElementRange(source, node);
+        const validatedRange = sourceRange.validateElementRange(source, node);
         if (!validatedRange) {
           return { success: false, error: `Could not validate range for ${node.tagName}` };
         }
@@ -245,7 +264,7 @@ export async function applyMutation(
         if (!newParent) return { success: false, error: `Target parent ${mutation.newParentId} not found` };
 
         // Validate the node's source range before extracting/removing
-        const validatedRange = validateElementRange(source, node);
+        const validatedRange = sourceRange.validateElementRange(source, node);
         if (!validatedRange) {
           return { success: false, error: `Could not validate range for ${node.tagName}` };
         }
@@ -265,23 +284,21 @@ export async function applyMutation(
         s.remove(removeStart, removeEnd);
 
         // Insert at new position
-        const parentLine = source.lastIndexOf("\n", newParent.position.start.offset);
-        const parentIndent = source.slice(
-          parentLine + 1,
-          newParent.position.start.offset
-        );
+        const newParentRange = sourceRange.validateElementRange(source, newParent);
+        if (!newParentRange) {
+          return { success: false, error: `Could not validate range for ${newParent.tagName}` };
+        }
+        const parentLine = source.lastIndexOf("\n", newParentRange.start);
+        const parentIndent = source.slice(parentLine + 1, newParentRange.start);
         const childIndent = parentIndent + "  ";
 
-        // Find current parent and current index so we can detect
-        // same-parent forward moves (where naive appendLeft on the target's
-        // pre-move offset lands adjacent to the removed source and produces
-        // a no-op).
+        // newPosition is the final index after the moved node is removed.
+        // Convert same-parent forward moves back to an original-AST insertion
+        // offset so we can use source positions from the pre-mutation tree.
         const parentInfo = findParentIndex(ast, mutation.nodeId);
         const isSameParent =
           parentInfo != null && parentInfo.parent.nodeId === newParent.nodeId;
         const currentIndex = parentInfo?.index ?? -1;
-        // For same-parent forward moves, bump newPosition by 1 so we insert
-        // AFTER the swap target rather than before it.
         let effectivePosition = mutation.newPosition;
         if (isSameParent && currentIndex >= 0 && effectivePosition > currentIndex) {
           effectivePosition = effectivePosition + 1;
@@ -291,12 +308,37 @@ export async function applyMutation(
           effectivePosition >= newParent.children.length ||
           newParent.children.length === 0
         ) {
-          const closeTagStart = findCloseTagStart(
-            source,
-            newParent.position.end.offset,
-            newParent.tagName
-          );
-          s.appendLeft(closeTagStart, `\n${childIndent}${elementText}`);
+          const openTagEnd = sourceRange.findOpenTagEnd(source, newParentRange.start);
+          if (openTagEnd === -1) {
+            return {
+              success: false,
+              error: `Could not locate opening tag terminator for <${newParent.tagName}>`,
+            };
+          }
+          const isSelfClosing =
+            source[openTagEnd - 2] === "/" && newParent.children.length === 0;
+
+          if (isSelfClosing) {
+            let trimStart = openTagEnd - 2;
+            while (
+              trimStart > 0 &&
+              (source[trimStart - 1] === " " || source[trimStart - 1] === "\t")
+            ) {
+              trimStart--;
+            }
+            s.overwrite(
+              trimStart,
+              openTagEnd,
+              `>\n${childIndent}${elementText}\n${parentIndent}</${newParent.tagName}>`
+            );
+          } else {
+            const closeTagStart = sourceRange.findCloseTagStart(
+              source,
+              newParentRange.end,
+              newParent.tagName
+            );
+            s.appendLeft(closeTagStart, `\n${childIndent}${elementText}`);
+          }
         } else {
           const targetChild = newParent.children[effectivePosition];
           // If the target child is the moved node itself (no-op path after
@@ -309,7 +351,7 @@ export async function applyMutation(
           // some elements (most notably <span>), landing INSIDE the tag name.
           // If we appendLeft at that raw offset we wedge the moved element
           // into the middle of the target's opening tag. Validate first.
-          const targetRange = validateElementRange(source, targetChild);
+          const targetRange = sourceRange.validateElementRange(source, targetChild);
           if (!targetRange) {
             return {
               success: false,
@@ -328,7 +370,7 @@ export async function applyMutation(
         const node = nodeMap.get(mutation.nodeId);
         if (!node) return { success: false, error: `Node ${mutation.nodeId} not found` };
 
-        const validatedRange = validateElementRange(source, node);
+        const validatedRange = sourceRange.validateElementRange(source, node);
         if (!validatedRange) {
           return { success: false, error: `Could not validate range for ${node.tagName}` };
         }
@@ -350,7 +392,7 @@ export async function applyMutation(
         const node = nodeMap.get(mutation.nodeId);
         if (!node) return { success: false, error: `Node ${mutation.nodeId} not found` };
 
-        const validatedRange = validateElementRange(source, node);
+        const validatedRange = sourceRange.validateElementRange(source, node);
         if (!validatedRange) {
           return { success: false, error: `Could not validate range for ${node.tagName}` };
         }
@@ -552,7 +594,8 @@ async function ensureComponentImports(
   s: MagicString,
   source: string,
   filePath: string,
-  html: string
+  html: string,
+  componentPathByTag: Record<string, string> = {}
 ): Promise<void> {
   // Collect PascalCase tag names from the inserted HTML
   const tagRegex = /<([A-Z][A-Za-z0-9]*)\b/g;
@@ -563,14 +606,6 @@ async function ensureComponentImports(
   }
   if (tags.size === 0) return;
 
-  // Locate frontmatter `---` ... `---`
-  const fmStart = source.indexOf("---");
-  if (fmStart !== 0 && source.slice(0, fmStart).trim() !== "") return;
-  if (fmStart === -1) return;
-  const fmEnd = source.indexOf("---", fmStart + 3);
-  if (fmEnd === -1) return;
-  const frontmatter = source.slice(fmStart + 3, fmEnd);
-
   // Find the project root by walking up from filePath until we find src/
   const normalized = filePath.replace(/\\/g, "/");
   const srcIdx = normalized.lastIndexOf("/src/");
@@ -578,6 +613,15 @@ async function ensureComponentImports(
   const projectRoot = filePath.slice(0, srcIdx);
   const componentsDir = path.join(projectRoot, "src", "components");
   const sourceDir = path.dirname(filePath);
+
+  // Locate frontmatter if it exists. If it doesn't, create one when imports
+  // are needed so component insertion also works in bare .astro files.
+  const fmStart = source.indexOf("---");
+  const hasFrontmatter =
+    fmStart !== -1 && (fmStart === 0 || source.slice(0, fmStart).trim() === "");
+  const fmEnd = hasFrontmatter ? source.indexOf("---", fmStart + 3) : -1;
+  const frontmatter =
+    hasFrontmatter && fmEnd !== -1 ? source.slice(fmStart + 3, fmEnd) : "";
 
   const importLines: string[] = [];
   for (const tag of tags) {
@@ -588,7 +632,10 @@ async function ensureComponentImports(
     if (importRe.test(frontmatter)) continue;
 
     // Resolve component file
-    const compPath = path.join(componentsDir, `${tag}.astro`);
+    const compPath =
+      resolveComponentPath(projectRoot, componentPathByTag[tag]) ??
+      (await findComponentFile(componentsDir, `${tag}.astro`));
+    if (!compPath) continue;
     try {
       await fs.access(compPath);
     } catch {
@@ -602,11 +649,49 @@ async function ensureComponentImports(
 
   if (importLines.length === 0) return;
 
-  // Insert imports just before the closing `---`, preserving newlines
-  const needsLeadingNewline = !frontmatter.endsWith("\n");
-  const insertText =
-    (needsLeadingNewline ? "\n" : "") + importLines.join("\n") + "\n";
-  s.appendLeft(fmEnd, insertText);
+  if (hasFrontmatter && fmEnd !== -1) {
+    // Insert imports just before the closing `---`, preserving newlines
+    const needsLeadingNewline = !frontmatter.endsWith("\n");
+    const insertText =
+      (needsLeadingNewline ? "\n" : "") + importLines.join("\n") + "\n";
+    s.appendLeft(fmEnd, insertText);
+  } else {
+    s.prepend(`---\n${importLines.join("\n")}\n---\n\n`);
+  }
+}
+
+function resolveComponentPath(
+  projectRoot: string,
+  componentPath?: string
+): string | null {
+  if (!componentPath) return null;
+  const resolved = path.resolve(projectRoot, componentPath);
+  const root = path.resolve(projectRoot);
+  if (resolved !== root && !resolved.startsWith(root + path.sep)) return null;
+  return resolved.endsWith(".astro") ? resolved : null;
+}
+
+async function findComponentFile(
+  dir: string,
+  fileName: string
+): Promise<string | null> {
+  let entries: import("fs").Dirent[];
+  try {
+    entries = await fs.readdir(dir, { withFileTypes: true });
+  } catch {
+    return null;
+  }
+
+  for (const entry of entries) {
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isFile() && entry.name === fileName) return fullPath;
+  }
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const found = await findComponentFile(path.join(dir, entry.name), fileName);
+    if (found) return found;
+  }
+  return null;
 }
 
 /** Find the end of the opening tag (position of '>') */
