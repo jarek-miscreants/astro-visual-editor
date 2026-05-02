@@ -45,7 +45,11 @@ export function setupInteraction(
         elementInfo: {
           nodeId,
           tagName: mappedEl.tagName.toLowerCase(),
-          classes: mappedEl.className,
+          // SVG elements expose `className` as an SVGAnimatedString rather
+          // than a plain string; postMessage's structured-clone algorithm
+          // can't transfer it and throws DataCloneError. Read via the
+          // attribute instead so HTML and SVG behave the same.
+          classes: mappedEl.getAttribute("class") ?? "",
           textContent: getDirectTextContent(mappedEl),
           attributes: getAttributes(mappedEl),
           rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },

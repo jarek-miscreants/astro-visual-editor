@@ -79,7 +79,10 @@ export function setupBridge(domMapper: DomMapper): Bridge {
     if (data.type === "tve:update-classes") {
       const element = domMapper.getElementByNodeId(data.nodeId);
       if (element) {
-        element.className = data.classes;
+        // `el.className = "..."` only works for HTML elements; on SVG
+        // `className` is an SVGAnimatedString with no setter, so the
+        // assignment throws. setAttribute works for both.
+        element.setAttribute("class", data.classes);
       }
       return;
     }
