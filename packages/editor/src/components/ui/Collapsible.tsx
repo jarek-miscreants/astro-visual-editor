@@ -35,16 +35,17 @@ export function CollapsibleSection({
   }, [open, storageKey]);
 
   return (
-    <div className="border-b border-zinc-800">
+    <div style={{ borderBottom: "1px solid var(--prop-section-border)" }}>
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-1.5 px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-zinc-400 hover:text-zinc-200"
+        className="tve-prop-section__header tve-prop-section__header--toggle"
+        style={{ padding: "8px 12px", margin: 0 }}
       >
         {open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
-        <span className="flex-1">{title}</span>
+        <span style={{ flex: 1 }}>{title}</span>
         {trailing}
       </button>
-      {open && <div className="px-3 pb-3">{children}</div>}
+      {open && <div style={{ padding: "0 12px 12px" }}>{children}</div>}
     </div>
   );
 }

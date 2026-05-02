@@ -4,13 +4,12 @@ import type { ElementInfo, ASTNode } from "@tve/shared";
 import { useEditorStore } from "../../store/editor-store";
 import { useModeStore } from "../../store/mode-store";
 import { TailwindClassEditor } from "./TailwindClassEditor";
-import { AttributesPanel } from "./AttributesPanel";
+import { AttributesPanel, splitAttributes } from "./AttributesPanel";
 import { ComponentPropsPanel } from "./ComponentPropsPanel";
 import { TokenSuggestions } from "./TokenSuggestions";
 import { StyleTab } from "./StyleTab";
 import { LayoutTab } from "./LayoutTab";
 import { TextTab } from "./TextTab";
-import { Breadcrumb } from "./Breadcrumb";
 import { CollapsibleSection } from "../ui/Collapsible";
 import { LinkSection } from "./LinkSection";
 
@@ -49,25 +48,12 @@ export function PropertiesPanel({ nodeId, elementInfo }: PropertiesPanelProps) {
     applyMutation({ type: "update-classes", nodeId, classes: newClasses });
   }
 
+  // Dev mode shows raw attrs split into user-facing vs Astro-injected debug
+  // attrs. Marketer mode never shows raw attributes at all.
+  const { user: userAttrs, debug: debugAttrs } = splitAttributes(attributes);
+
   return (
     <div className="flex h-full flex-col">
-      {/* Breadcrumb — ancestor path */}
-      <Breadcrumb nodeId={nodeId} />
-
-      {/* Element header */}
-      <div className="tve-prop-header">
-        <span className={`tve-prop-badge ${isComponent ? "tve-prop-badge--component" : "tve-prop-badge--tag"}`}>
-          {elementInfo.tagName}
-        </span>
-        {Object.entries(elementInfo.attributes)
-          .slice(0, 2)
-          .map(([key, value]) => (
-            <span key={key} className="tve-prop-attr-pill">
-              {key}=<span className="tve-prop-attr-pill__value">&quot;{value}&quot;</span>
-            </span>
-          ))}
-      </div>
-
       {userMode === "marketer" ? (
         <div className="flex-1 overflow-auto">
           {isComponent ? (
@@ -131,48 +117,8 @@ export function PropertiesPanel({ nodeId, elementInfo }: PropertiesPanelProps) {
         </div>
       ) : (
         <>
-          {/* Component-level typed props (variants, etc.) — dev mode.
-              Use the AST node's tagName: when DomMapper flattens a component
-              to its rendered root (e.g. CardIcon → its outer <div>),
-              elementInfo.tagName is the rendered tag, which would route the
-              schema lookup at the wrong file and bleed unrelated div
-              attributes through the usage-derived fallback. */}
-          {isComponent && (
-            <ComponentPropsPanel
-              nodeId={nodeId}
-              tagName={astNode?.tagName ?? elementInfo.tagName}
-              attributes={attributes}
-            />
-          )}
-
-          {/* For empty components only: affordance to add initial slot content.
-              Non-empty components get their Content editor from TextTab below. */}
-          {isComponent &&
-            astNode?.textContent == null &&
-            (astNode?.children.length ?? 0) === 0 && (
-              <ComponentContentField
-                existingText={null}
-                hasChildren={false}
-                onUpdate={(text) => applyMutation({ type: "update-text", nodeId, text })}
-                onAdd={(text) =>
-                  applyMutation({
-                    type: "add-element",
-                    parentNodeId: nodeId,
-                    position: 0,
-                    html: text,
-                  })
-                }
-              />
-            )}
-
-          {/* Token suggestions */}
-          <TokenSuggestions
-            tagName={elementInfo.tagName}
-            classes={classes}
-            onClassesChange={handleClassesChange}
-          />
-
-          {/* Classes — remembered-open collapsible */}
+          {/* 1. Classes — most-edited control sits at the top. Stays open by
+              default; defaultOpen flag is honored by the persisted store. */}
           <CollapsibleSection storageKey="tve:props:classes" title="Classes">
             {classExpression ? (
               <div className="tve-prop-warning-card">
@@ -193,10 +139,42 @@ export function PropertiesPanel({ nodeId, elementInfo }: PropertiesPanelProps) {
             )}
           </CollapsibleSection>
 
-          {/* Attributes — read/write all non-class attrs */}
-          <AttributesPanel nodeId={nodeId} attributes={attributes} />
+          {/* 2. Content — typed component Content + Link fields, plus the
+              empty-component slot affordance. Use astNode.tagName to keep
+              the schema lookup pointed at the component file even when
+              DomMapper flattened it to its rendered root tag. */}
+          {isComponent && (
+            <ComponentPropsPanel
+              nodeId={nodeId}
+              tagName={astNode?.tagName ?? elementInfo.tagName}
+              attributes={attributes}
+              mode="content"
+            />
+          )}
 
-          {/* Tabs */}
+          {isComponent &&
+            astNode?.textContent == null &&
+            (astNode?.children.length ?? 0) === 0 && (
+              <ComponentContentField
+                existingText={null}
+                hasChildren={false}
+                onUpdate={(text) => applyMutation({ type: "update-text", nodeId, text })}
+                onAdd={(text) =>
+                  applyMutation({
+                    type: "add-element",
+                    parentNodeId: nodeId,
+                    position: 0,
+                    html: text,
+                  })
+                }
+              />
+            )}
+
+          {/* 3. Attributes — only the user-facing ones. Astro debug attrs
+              (data-astro-source-*) are pushed into Advanced below. */}
+          <AttributesPanel nodeId={nodeId} attributes={userAttrs} />
+
+          {/* 4. Tabs */}
           <div className="tve-prop-tabs">
             {TABS.map((tab) => (
               <button
@@ -212,7 +190,6 @@ export function PropertiesPanel({ nodeId, elementInfo }: PropertiesPanelProps) {
             ))}
           </div>
 
-          {/* Tab content */}
           <div className="flex-1 overflow-auto">
             {activeTab === "style" && (
               <StyleTab classes={classes} onClassesChange={handleClassesChange} />
@@ -232,6 +209,38 @@ export function PropertiesPanel({ nodeId, elementInfo }: PropertiesPanelProps) {
               />
             )}
           </div>
+
+          {/* 5. Advanced — collapsed by default. Houses tokens, the
+              component's advanced typed props, and Astro debug attrs.
+              Lives at the bottom of the panel because none of these are
+              part of the day-to-day editing loop. */}
+          <CollapsibleSection
+            storageKey="tve:props:advanced"
+            title="Advanced"
+            defaultOpen={false}
+          >
+            <TokenSuggestions
+              tagName={elementInfo.tagName}
+              classes={classes}
+              onClassesChange={handleClassesChange}
+            />
+            {isComponent && (
+              <ComponentPropsPanel
+                nodeId={nodeId}
+                tagName={astNode?.tagName ?? elementInfo.tagName}
+                attributes={attributes}
+                mode="advanced"
+              />
+            )}
+            {Object.keys(debugAttrs).length > 0 && (
+              <AttributesPanel
+                nodeId={nodeId}
+                attributes={debugAttrs}
+                title="Debug attributes"
+                embedded
+              />
+            )}
+          </CollapsibleSection>
         </>
       )}
     </div>

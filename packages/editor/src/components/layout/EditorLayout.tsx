@@ -8,17 +8,23 @@ import { useEditorStore } from "../../store/editor-store";
 import { useContentStore } from "../../store/content-store";
 import { Toaster } from "../ui/Toaster";
 import { ShortcutsDialog, useShortcutsHotkey } from "../ui/ShortcutsDialog";
+import { Breadcrumb } from "../properties/Breadcrumb";
 
 export function EditorLayout() {
   const mode = useEditorStore((s) => s.mode);
   const isPreview = mode === "preview";
   const contentPath = useContentStore((s) => s.currentPath);
   const isContent = !!contentPath;
+  const selectedNodeId = useEditorStore((s) => s.selectedNodeId);
 
   useShortcutsHotkey();
   return (
     <div className="tve-shell">
       <Toolbar />
+      {/* Selection breadcrumb — shown under the toolbar whenever something
+          is selected, so it stays visible regardless of which panel/tab the
+          user is in. Hidden in markdown-content mode. */}
+      {!isContent && selectedNodeId && <Breadcrumb nodeId={selectedNodeId} />}
       {isContent ? (
         <div className="tve-shell__body">
           <MarkdownEditor />

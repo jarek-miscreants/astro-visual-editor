@@ -6,6 +6,10 @@ interface TreeUIStore {
   /** Marketer zoom: hide pure-structural wrappers so only components + text remain. */
   marketerZoom: boolean;
   toggleMarketerZoom: () => void;
+  /** Currently open slot AddElementPanel, identified by `${parentId}:${slotName ?? ""}`.
+   *  Singleton — opening another slot's panel closes the previous one. */
+  openSlotId: string | null;
+  openSlot: (id: string | null) => void;
 }
 
 const ZOOM_KEY = "tve:tree-ui:marketer-zoom";
@@ -25,6 +29,8 @@ export const useTreeUIStore = create<TreeUIStore>((set) => ({
       }
       return { marketerZoom: next };
     }),
+  openSlotId: null,
+  openSlot: (id) => set({ openSlotId: id }),
 }));
 
 if (import.meta.hot) {

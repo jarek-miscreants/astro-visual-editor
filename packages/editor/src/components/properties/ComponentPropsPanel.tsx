@@ -9,6 +9,11 @@ interface Props {
   nodeId: string;
   tagName: string;
   attributes: Record<string, string>;
+  /** Render only a slice of the panel:
+   *    "content"  → Content + primary Link sections (high-traffic edits)
+   *    "advanced" → Advanced collapsible section only
+   *    undefined  → everything (legacy behavior, used in marketer mode) */
+  mode?: "content" | "advanced";
 }
 
 /** Prop names that almost always hold user-facing copy. */
@@ -97,7 +102,7 @@ function deriveSchemaFromPageUsages(
  * declared prop, falling back to the generic AttributesPanel for anything the
  * parser can't classify (returned as kind: "unknown").
  */
-export function ComponentPropsPanel({ nodeId, tagName, attributes }: Props) {
+export function ComponentPropsPanel({ nodeId, tagName, attributes, mode }: Props) {
   const files = useEditorStore((s) => s.files);
   const ast = useEditorStore((s) => s.ast);
   const applyMutation = useEditorStore((s) => s.applyMutation);
@@ -190,9 +195,12 @@ export function ComponentPropsPanel({ nodeId, tagName, attributes }: Props) {
     applyMutation({ type: "update-attribute", nodeId, attr, value });
   }
 
+  const showContent = mode !== "advanced";
+  const showAdvanced = mode !== "content";
+
   return (
     <>
-      {contentFields.length > 0 && (
+      {showContent && contentFields.length > 0 && (
         <div className="tve-prop-section">
           <div className="tve-prop-section__header">
             <Sparkles size={11} className="tve-prop-section__header-icon--sparkle" />
@@ -217,7 +225,7 @@ export function ComponentPropsPanel({ nodeId, tagName, attributes }: Props) {
           new-tab checkbox is shown only when the component declares a target
           prop (paired link); otherwise it's hidden because setting `target`
           on a component without that prop wouldn't propagate. */}
-      {primaryLinkField && (
+      {showContent && primaryLinkField && (
         <LinkSection
           href={attributes[primaryLinkField.name] ?? ""}
           target={attributes.target}
@@ -231,7 +239,7 @@ export function ComponentPropsPanel({ nodeId, tagName, attributes }: Props) {
           hideNewTab={!usePairedLink}
         />
       )}
-      {linkFields.length > 1 && (
+      {showContent && linkFields.length > 1 && (
         <div className="tve-prop-section">
           <div className="tve-prop-section__header">
             <LinkIcon size={11} className="tve-prop-section__header-icon--link" />
@@ -252,7 +260,7 @@ export function ComponentPropsPanel({ nodeId, tagName, attributes }: Props) {
         </div>
       )}
 
-      {advancedFields.length > 0 && (
+      {showAdvanced && advancedFields.length > 0 && (
         <AdvancedSection
           nodeId={nodeId}
           fields={advancedFields}

@@ -12,11 +12,11 @@
   --prop-section-border: var(--shell-border);
   --prop-section-pad-x: 12px;
   --prop-section-pad-y: 10px;
-  --prop-section-title-color: #a1a1aa;
+  --prop-section-title-color: rgba(255, 255, 255, 0.7);
   --prop-section-title-color-hover: #e4e4e7;
 
   /* ── Form controls (input, select, textarea) ───────────────── */
-  --prop-input-bg: #18181b;
+  --prop-input-bg: rgba(0, 0, 0, 0.40);
   --prop-input-bg-hover: #27272a;
   --prop-input-border: #27272a;
   --prop-input-border-hover: #3f3f46;
@@ -35,7 +35,7 @@
   --prop-toggle-active-text: #93c5fd;
 
   /* ── Class chips ───────────────────────────────────────────── */
-  --prop-chip-bg: #27272a;
+  --prop-chip-bg: #006acc;
   --prop-chip-bg-hover: #3f3f46;
   --prop-chip-text: #d4d4d8;
   --prop-chip-active-bg: rgba(37, 99, 235, 0.2);
@@ -63,7 +63,7 @@
   --prop-amber-border: rgba(251, 191, 36, 0.3);
 
   /* ── Misc ──────────────────────────────────────────────────── */
-  --prop-icon-color: #71717a;
+  --prop-icon-color: #ffffff;
   --prop-icon-color-hover: #e4e4e7;
   --prop-link-icon: #60a5fa;
   --prop-emerald: #34d399;
@@ -480,13 +480,14 @@
   gap: 2px;
   padding: 2px 6px;
   border: 1px solid transparent;
+  
   background-color: var(--prop-chip-bg);
   color: var(--prop-chip-text);
   font-family: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
   font-size: 11px;
   transition: background-color 100ms, color 100ms, border-color 100ms;
 }
-.tve-prop-chip:hover { background-color: var(--prop-chip-bg-hover); }
+.tve-prop-chip:hover { background-color: var(--prop-chip-bg-hover);  }
 .tve-prop-chip[data-open="true"] {
   background-color: var(--prop-chip-active-bg);
   border-color: var(--prop-chip-active-border);
@@ -505,7 +506,7 @@
   background: transparent;
   border: 0;
   color: var(--prop-icon-color);
-  opacity: 0;
+
   cursor: pointer;
   transition: opacity 100ms, color 100ms;
 }

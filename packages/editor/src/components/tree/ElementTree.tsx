@@ -62,6 +62,13 @@ interface ElementTreeProps {
   depth: number;
 }
 
+/** Slot rows lack the grip+chevron gutter that regular tree rows have, so
+ *  without an extra offset they sit flush with the parent's chevron column
+ *  instead of looking like a child of it. Match the regular row's
+ *  grip(10) + chevron-spacer(14) gutter so the slot icon aligns with where
+ *  child icons render. */
+const SLOT_GUTTER_PX = 24;
+
 /** Drop position relative to a target node */
 type DropPosition = "before" | "after" | "inside";
 
@@ -693,7 +700,7 @@ function ComponentChildren({
         <div>
           <div
             className="tve-tree-unmatched"
-            style={{ marginLeft: `${(depth + 1) * 12 + 4}px` }}
+            style={{ marginLeft: `${(depth + 1) * 12 + 4 + SLOT_GUTTER_PX}px` }}
             title="These children target slot names that the component doesn't declare — likely a typo. They will not render."
           >
             <SlotIcon size={11} />
@@ -803,12 +810,40 @@ function SlotPlaceholder({
    *  smaller header label rather than the dashed dropzone. */
   empty?: boolean;
 }) {
-  const [showAdd, setShowAdd] = useState(false);
   const applyMutation = useEditorStore((s) => s.applyMutation);
+  const openSlotId = useTreeUIStore((s) => s.openSlotId);
+  const openSlot = useTreeUIStore((s) => s.openSlot);
   const dropId = slotName
     ? `${nodeId}__slot:${slotName}`
     : `${nodeId}__slot`;
   const { setNodeRef, isOver } = useDroppable({ id: dropId });
+
+  // Singleton open state: only one slot's AddElementPanel is open at a time.
+  // Identifier mirrors the dropId so it's stable across renders.
+  const slotKey = dropId;
+  const showAdd = openSlotId === slotKey;
+  const placeholderRef = useRef<HTMLDivElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+
+  // Close on Escape or click outside (only while this slot is the open one).
+  useEffect(() => {
+    if (!showAdd) return;
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") openSlot(null);
+    }
+    function handleClick(e: MouseEvent) {
+      const t = e.target as Node;
+      if (popoverRef.current?.contains(t)) return;
+      if (placeholderRef.current?.contains(t)) return;
+      openSlot(null);
+    }
+    document.addEventListener("keydown", handleKey);
+    document.addEventListener("mousedown", handleClick);
+    return () => {
+      document.removeEventListener("keydown", handleKey);
+      document.removeEventListener("mousedown", handleClick);
+    };
+  }, [showAdd, openSlot]);
 
   // Non-empty named slot: small header strip, still a drop target so users
   // can append more children to it. Empty: full dashed dropzone with the
@@ -819,7 +854,7 @@ function SlotPlaceholder({
         <div
           className="tve-slot-header"
           data-over={isOver || undefined}
-          style={{ marginLeft: `${depth * 12 + 4}px` }}
+          style={{ marginLeft: `${depth * 12 + 4 + SLOT_GUTTER_PX}px` }}
         >
           <SlotIcon size={11} />
           <span>{slotName ?? "default slot"}</span>
@@ -831,17 +866,17 @@ function SlotPlaceholder({
   return (
     <div ref={setNodeRef}>
       <div
+        ref={placeholderRef}
         className="tve-slot-placeholder"
         data-over={isOver || undefined}
-        style={{ marginLeft: `${depth * 12 + 4}px` }}
-        onClick={() => setShowAdd(!showAdd)}
+        style={{ marginLeft: `${depth * 12 + 4 + SLOT_GUTTER_PX}px` }}
+        onClick={() => openSlot(showAdd ? null : slotKey)}
       >
         <SlotIcon size={11} />
         <span className="tve-slot-placeholder__name">{slotName ? slotName : "default slot"}</span>
-        <span className="tve-slot-placeholder__hint">drop or click</span>
       </div>
       {showAdd && (
-        <div className="ml-4">
+        <div ref={popoverRef} className="ml-4">
           <AddElementPanel
             onSelect={(html, options) => {
               const finalHtml = injectSlotAttr(html, slotName ?? null);
@@ -852,9 +887,9 @@ function SlotPlaceholder({
                 html: finalHtml,
                 componentPath: options?.componentPath,
               });
-              setShowAdd(false);
+              openSlot(null);
             }}
-            onClose={() => setShowAdd(false)}
+            onClose={() => openSlot(null)}
           />
         </div>
       )}

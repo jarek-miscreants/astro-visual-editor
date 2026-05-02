@@ -5,6 +5,12 @@ import { useEditorStore } from "../../store/editor-store";
 interface AttributesPanelProps {
   nodeId: string;
   attributes: Record<string, string>;
+  /** Override the section title (default: "Attributes"). Used when this panel
+   *  is rendered inside Advanced to show the leftover debug attrs. */
+  title?: string;
+  /** Hide the section's own border + header chrome — useful when nested
+   *  inside another collapsible (Advanced) so we don't double-up dividers. */
+  embedded?: boolean;
 }
 
 /**
@@ -15,7 +21,7 @@ interface AttributesPanelProps {
  * as `{expr}`) are shown read-only — overwriting them with `update-attribute`
  * would convert the expression to a string literal and corrupt the source.
  */
-export function AttributesPanel({ nodeId, attributes }: AttributesPanelProps) {
+export function AttributesPanel({ nodeId, attributes, title = "Attributes", embedded = false }: AttributesPanelProps) {
   const applyMutation = useEditorStore((s) => s.applyMutation);
   const [draftKey, setDraftKey] = useState("");
   const [draftValue, setDraftValue] = useState("");
@@ -38,9 +44,13 @@ export function AttributesPanel({ nodeId, attributes }: AttributesPanelProps) {
     setDraftValue("");
   }
 
+  const Wrapper = embedded ? "div" : "div";
+  const wrapperClass = embedded ? "" : "tve-prop-section";
+
   return (
-    <div className="tve-prop-section">
-      <div className="tve-prop-section__header">Attributes</div>
+    <Wrapper className={wrapperClass}>
+      {!embedded && <div className="tve-prop-section__header">{title}</div>}
+      {embedded && <div className="tve-prop-section__header" style={{ marginTop: 8 }}>{title}</div>}
 
       {entries.length === 0 && (
         <div className="tve-prop-section__empty">No attributes</div>
@@ -112,6 +122,25 @@ export function AttributesPanel({ nodeId, attributes }: AttributesPanelProps) {
           <Plus size={11} />
         </button>
       </div>
-    </div>
+    </Wrapper>
   );
+}
+
+/** Astro injects these attributes for HMR / dev tooling. They're noise in
+ *  the user-facing Attributes section, but we still expose them under
+ *  Advanced so power users can confirm what's there. */
+export function isDebugAttribute(key: string): boolean {
+  return key.startsWith("data-astro-");
+}
+
+export function splitAttributes(
+  attributes: Record<string, string>
+): { user: Record<string, string>; debug: Record<string, string> } {
+  const user: Record<string, string> = {};
+  const debug: Record<string, string> = {};
+  for (const [k, v] of Object.entries(attributes)) {
+    if (isDebugAttribute(k)) debug[k] = v;
+    else user[k] = v;
+  }
+  return { user, debug };
 }
