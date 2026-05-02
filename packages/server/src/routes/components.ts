@@ -3,8 +3,37 @@ import fs from "fs/promises";
 import path from "path";
 import { parseAstroFileAsync, buildNodeMap } from "../services/astro-parser.js";
 import { getComponentPropSchema } from "../services/component-props.js";
+import { getComponentSlots } from "../services/component-slots.js";
+import { validateElementRange } from "../services/source-range.js";
 
 export const componentsRouter = Router();
+
+/** GET /api/components/slots?path=<relPath> — Return the `<slot>` declarations
+ *  found in a component's source. Drives the tree's per-slot drop targets so
+ *  inserted children get the right `slot="..."` attribute and named-slot
+ *  components don't silently swallow content. */
+componentsRouter.get("/slots", async (req, res) => {
+  try {
+    const projectPath = req.app.locals.projectPath as string;
+    const relPath = (req.query.path as string | undefined)?.replace(/\\/g, "/");
+    if (!relPath) {
+      res.status(400).json({ error: "path query param is required" });
+      return;
+    }
+    if (relPath.includes("..")) {
+      res.status(400).json({ error: "invalid path" });
+      return;
+    }
+    const result = await getComponentSlots(projectPath, relPath);
+    res.json(result);
+  } catch (err: any) {
+    if (err?.code === "ENOENT") {
+      res.status(404).json({ error: "component not found" });
+      return;
+    }
+    res.status(500).json({ error: err?.message || "failed to parse slots" });
+  }
+});
 
 /** GET /api/components/props?path=<relPath> — Return typed Props schema for a component */
 componentsRouter.get("/props", async (req, res) => {
@@ -242,11 +271,14 @@ componentsRouter.post("/extract", async (req, res) => {
       return;
     }
 
+    const validatedRange = validateElementRange(source, node);
+    if (!validatedRange) {
+      res.status(400).json({ error: `Could not validate range for ${node.tagName}` });
+      return;
+    }
+
     // Extract the element's HTML from source
-    const elementHtml = source.slice(
-      node.position.start.offset,
-      node.position.end.offset
-    );
+    const elementHtml = source.slice(validatedRange.start, validatedRange.end);
 
     // Create the component file
     await fs.mkdir(componentDir, { recursive: true });
@@ -275,18 +307,27 @@ ${elementHtml}
     // Replace element with component tag
     const componentTag = `<${componentName} />`;
     newSource =
-      newSource.slice(0, node.position.start.offset) +
+      newSource.slice(0, validatedRange.start) +
       componentTag +
-      newSource.slice(node.position.end.offset);
+      newSource.slice(validatedRange.end);
 
     // Add import to frontmatter
-    const frontmatterEnd = newSource.indexOf("---", 3);
+    const importStatement = `import ${componentName} from '${importPath}';`;
+    const frontmatterStart = newSource.indexOf("---");
+    const hasFrontmatter =
+      frontmatterStart !== -1 &&
+      (frontmatterStart === 0 || newSource.slice(0, frontmatterStart).trim() === "");
+    const frontmatterEnd = hasFrontmatter
+      ? newSource.indexOf("---", frontmatterStart + 3)
+      : -1;
     if (frontmatterEnd !== -1) {
-      const importStatement = `import ${componentName} from '${importPath}';\n`;
       newSource =
         newSource.slice(0, frontmatterEnd) +
         importStatement +
+        "\n" +
         newSource.slice(frontmatterEnd);
+    } else {
+      newSource = `---\n${importStatement}\n---\n\n${newSource}`;
     }
 
     await fs.writeFile(sourceFullPath, newSource, "utf-8");

@@ -18,6 +18,7 @@ import { connectWebSocket, onWsMessage } from "../lib/ws-client";
 import { useHistoryStore, computeInverse } from "./history-store";
 import { toast } from "./toast-store";
 import { useGitStore } from "./git-store";
+import { useComponentSlotsStore } from "./component-slots-store";
 
 function describeMutation(mutation: Mutation): string {
   switch (mutation.type) {
@@ -148,6 +149,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         if (msg.type === "file:changed") {
           // Any source-file change can affect the working-tree status
           useGitStore.getState().refreshDebounced();
+          // If a component's source changed, drop its slot cache so the
+          // tree picks up renamed/added/removed slots on the next render.
+          if (msg.path.startsWith("src/components/")) {
+            useComponentSlotsStore.getState().invalidate(msg.path);
+          }
           const state = get();
           if (state.currentFile === msg.path) {
             const newMap = buildNodeMap(msg.ast);

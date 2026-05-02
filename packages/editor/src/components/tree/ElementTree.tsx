@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useMemo } from "react";
+import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -15,9 +15,47 @@ import type { ASTNode } from "@tve/shared";
 import { useEditorStore } from "../../store/editor-store";
 import { useModeStore } from "../../store/mode-store";
 import { useTreeUIStore } from "../../store/tree-ui-store";
+import { useComponentSlotsStore } from "../../store/component-slots-store";
 import { highlightNodeInIframe } from "../../lib/iframe-bridge";
 import { ContextMenu } from "./ContextMenu";
 import { AddElementPanel } from "./AddElementPanel";
+
+/** Insert (or replace) a `slot="..."` attribute on the first opening tag of
+ *  an HTML snippet so children dropped into a named slot get the right
+ *  routing without the user having to know slot names. Self-closing tags
+ *  preserve `/>`; bare tags get the attribute appended right after the tag
+ *  name. Empty slot name (default slot) is a no-op. */
+function injectSlotAttr(html: string, slotName: string | null): string {
+  if (!slotName) return html;
+  const m = html.match(/^\s*<([A-Za-z][\w-]*)\b/);
+  if (!m) return html;
+  const tagEnd = m.index! + m[0].length;
+  // Replace existing slot=... if present in this opening tag, else inject one.
+  const openTagEnd = findOpenTagEnd(html, m.index!);
+  if (openTagEnd === -1) return html;
+  const openTag = html.slice(m.index!, openTagEnd);
+  const slotRe = /\sslot\s*=\s*("[^"]*"|'[^']*')/;
+  if (slotRe.test(openTag)) {
+    return html.slice(0, m.index!) + openTag.replace(slotRe, ` slot="${slotName}"`) + html.slice(openTagEnd);
+  }
+  return html.slice(0, tagEnd) + ` slot="${slotName}"` + html.slice(tagEnd);
+}
+
+function findOpenTagEnd(source: string, tagStart: number): number {
+  let i = tagStart;
+  let inQuote: string | null = null;
+  while (i < source.length) {
+    const ch = source[i];
+    if (inQuote) {
+      if (ch === inQuote) inQuote = null;
+    } else {
+      if (ch === '"' || ch === "'") inQuote = ch;
+      else if (ch === ">") return i + 1;
+    }
+    i++;
+  }
+  return -1;
+}
 
 interface ElementTreeProps {
   nodes: ASTNode[];
@@ -178,9 +216,21 @@ export function ElementTree({ nodes, depth }: ElementTreeProps) {
     const { nodeId: targetId, position } = dropTarget;
     setDropTarget(null);
 
-    // Handle slot drop targets (e.g., "nodeId__slot")
-    const isSlotDrop = targetId.endsWith("__slot");
-    const realTargetId = isSlotDrop ? targetId.replace("__slot", "") : targetId;
+    // Handle slot drop targets. Two flavours:
+    //   "nodeId__slot"          — legacy / default slot
+    //   "nodeId__slot:<name>"   — named slot; we'll also set slot="<name>"
+    //                              on the moved element so it routes correctly.
+    let slotName: string | null | undefined; // undefined = not a slot drop
+    let realTargetId = targetId;
+    const namedSlotMatch = /__slot:(.+)$/.exec(targetId);
+    if (namedSlotMatch) {
+      slotName = namedSlotMatch[1];
+      realTargetId = targetId.slice(0, namedSlotMatch.index);
+    } else if (targetId.endsWith("__slot")) {
+      slotName = null;
+      realTargetId = targetId.replace("__slot", "");
+    }
+    const isSlotDrop = slotName !== undefined;
 
     // Don't drop onto self
     if (activeId === realTargetId) return;
@@ -209,12 +259,30 @@ export function ElementTree({ nodes, depth }: ElementTreeProps) {
       newPosition = position === "before" ? parentInfo.index : parentInfo.index + 1;
     }
 
+    // Mutation positions are final child indexes after the dragged node is
+    // removed. Tree sibling targets are measured against the pre-move AST, so
+    // same-parent forward moves need to shift back by one.
+    const oldParentInfo = findParent(ast, activeId);
+    if (
+      oldParentInfo &&
+      oldParentInfo.parent.nodeId === newParentId &&
+      newPosition > oldParentInfo.index
+    ) {
+      newPosition -= 1;
+    }
+
     applyMutation({
       type: "move-element",
       nodeId: activeId,
       newParentId,
       newPosition,
     });
+    // Note: when dragging an existing element into a named slot we do NOT
+    // chain an update-attribute mutation. Positional nodeIds get re-assigned
+    // after a move, so the second mutation would race against the AST refresh
+    // and likely target the wrong element. The slot-routing benefit lives on
+    // the insert path (AddElementPanel → injectSlotAttr), which can bake
+    // `slot="..."` into the freshly emitted HTML.
   }
 
   function handleDragCancel() {
@@ -504,14 +572,159 @@ function TreeNode({
         />
       )}
 
-      {/* Children */}
-      {expanded && hasChildren && (
+      {/* Children + slots. For non-components we just render children in
+          source order. For components we group children by their `slot`
+          attribute so each declared slot gets its own labelled section,
+          even when empty — drop targets carry the slot name so inserted
+          children pick up `slot="..."` automatically. */}
+      {expanded && (
+        node.isComponent ? (
+          <ComponentChildren
+            node={node}
+            depth={depth}
+            dropTarget={dropTarget}
+            draggedNodeId={draggedNodeId}
+            zoomActive={zoomActive}
+            query={query}
+          />
+        ) : hasChildren ? (
+          <div>
+            {node.children.map((child) => (
+              <TreeNode
+                key={child.nodeId}
+                node={child}
+                depth={depth + 1}
+                dropTarget={dropTarget}
+                draggedNodeId={draggedNodeId}
+                zoomActive={zoomActive}
+                query={query}
+              />
+            ))}
+          </div>
+        ) : null
+      )}
+    </div>
+  );
+}
+
+/** Renders a component's children grouped by the slot they target. Looks up
+ *  the component's `<slot>` declarations from the cache (fetched on first
+ *  render) and renders one section per declared slot. Children whose
+ *  `slot=` doesn't match any declared name are surfaced under an
+ *  "unmatched" section so authors can spot mistakes (typos, casing). */
+function ComponentChildren({
+  node,
+  depth,
+  dropTarget,
+  draggedNodeId,
+  zoomActive,
+  query,
+}: {
+  node: ASTNode;
+  depth: number;
+  dropTarget: DropTarget | null;
+  draggedNodeId: string | null;
+  zoomActive: boolean;
+  query: string;
+}) {
+  const files = useEditorStore((s) => s.files);
+  const ensureSlots = useComponentSlotsStore((s) => s.ensure);
+  const cachedSlots = useComponentSlotsStore((s) => s.cache[componentPathFor(files, node.tagName) ?? ""]);
+
+  const componentPath = componentPathFor(files, node.tagName);
+
+  useEffect(() => {
+    if (componentPath) ensureSlots(componentPath);
+  }, [componentPath, ensureSlots]);
+
+  // While slots are loading or the component isn't a project file (external
+  // packages — Icon, etc.), fall back to the legacy "children + single slot
+  // placeholder" layout so the user can still navigate.
+  const slotsKnown = Array.isArray(cachedSlots);
+
+  if (!slotsKnown || cachedSlots!.length === 0) {
+    // Legacy path: render children in order, plus a single anonymous slot
+    // placeholder when empty. Either we don't know the slots, or the
+    // component declared none.
+    const hasChildren = node.children.length > 0;
+    return (
+      <>
+        {hasChildren && (
+          <div>
+            {node.children.map((child) => (
+              <TreeNode
+                key={child.nodeId}
+                node={child}
+                depth={depth + 1}
+                dropTarget={dropTarget}
+                draggedNodeId={draggedNodeId}
+                zoomActive={zoomActive}
+                query={query}
+              />
+            ))}
+          </div>
+        )}
+        {!hasChildren && (
+          <SlotPlaceholder nodeId={node.nodeId} depth={depth + 1} slotName={null} />
+        )}
+      </>
+    );
+  }
+
+  // Group children by their slot attribute. `null` key collects children
+  // without a slot attribute (i.e. default-slot content).
+  const childrenBySlot = new Map<string | null, ASTNode[]>();
+  const matched = new Set<string>();
+  for (const child of node.children) {
+    const slotAttr = child.attributes.slot ?? null;
+    const list = childrenBySlot.get(slotAttr) ?? [];
+    list.push(child);
+    childrenBySlot.set(slotAttr, list);
+    matched.add(child.nodeId);
+  }
+
+  // Children whose slot doesn't match any declared slot — typo / casing
+  // mistake. Surface them so they're visible (and editable) instead of
+  // disappearing from the tree.
+  const declaredNames = new Set(cachedSlots!.map((s) => s.name));
+  const unmatched: ASTNode[] = [];
+  for (const [slotName, kids] of childrenBySlot) {
+    if (!declaredNames.has(slotName)) unmatched.push(...kids);
+  }
+
+  return (
+    <div>
+      {cachedSlots!.map((slotDef) => {
+        const kids = childrenBySlot.get(slotDef.name) ?? [];
+        return (
+          <SlotSection
+            key={slotDef.name ?? "__default__"}
+            parentNodeId={node.nodeId}
+            slotName={slotDef.name}
+            children={kids}
+            depth={depth + 1}
+            dropTarget={dropTarget}
+            draggedNodeId={draggedNodeId}
+            zoomActive={zoomActive}
+            query={query}
+          />
+        );
+      })}
+      {unmatched.length > 0 && (
         <div>
-          {node.children.map((child) => (
+          <div
+            className="flex items-center gap-1.5 px-2 py-1 text-[10px] italic text-amber-400/70"
+            style={{ marginLeft: `${(depth + 1) * 12 + 4}px` }}
+            title="These children target slot names that the component doesn't declare — likely a typo. They will not render."
+          >
+            <SlotIcon size={11} />
+            <span>unmatched slot</span>
+          </div>
+          {unmatched.map((child) => (
             <TreeNode
               key={child.nodeId}
               node={child}
-              depth={depth + 1}
+              depth={depth + 2}
               dropTarget={dropTarget}
               draggedNodeId={draggedNodeId}
               zoomActive={zoomActive}
@@ -520,13 +733,64 @@ function TreeNode({
           ))}
         </div>
       )}
-
-      {/* Slot placeholder for empty components — droppable target */}
-      {expanded && node.isComponent && !hasChildren && (
-        <SlotPlaceholder nodeId={node.nodeId} depth={depth + 1} />
-      )}
     </div>
   );
+}
+
+/** A single labelled slot section: header row + child nodes + drop target.
+ *  Even non-empty named slots show the header so the user can tell which
+ *  slot a child belongs to without reading the source. */
+function SlotSection({
+  parentNodeId,
+  slotName,
+  children,
+  depth,
+  dropTarget,
+  draggedNodeId,
+  zoomActive,
+  query,
+}: {
+  parentNodeId: string;
+  slotName: string | null;
+  children: ASTNode[];
+  depth: number;
+  dropTarget: DropTarget | null;
+  draggedNodeId: string | null;
+  zoomActive: boolean;
+  query: string;
+}) {
+  return (
+    <>
+      <SlotPlaceholder
+        nodeId={parentNodeId}
+        depth={depth}
+        slotName={slotName}
+        empty={children.length === 0}
+      />
+      {children.map((child) => (
+        <TreeNode
+          key={child.nodeId}
+          node={child}
+          depth={depth + 1}
+          dropTarget={dropTarget}
+          draggedNodeId={draggedNodeId}
+          zoomActive={zoomActive}
+          query={query}
+        />
+      ))}
+    </>
+  );
+}
+
+/** Resolve a tagName to its project component path so we can look up its
+ *  slot declarations. Returns null for external/non-project tags (Icon
+ *  from astro-icon, etc.) — the caller falls back to the legacy view. */
+function componentPathFor(
+  files: import("@tve/shared").FileInfo[],
+  tagName: string
+): string | null {
+  const f = files.find((f) => f.type === "component" && f.path.endsWith(`/${tagName}.astro`));
+  return f?.path ?? null;
 }
 
 // ── Slot placeholder for empty components ──────────────────────
@@ -544,31 +808,74 @@ function SlotIcon({ size = 12 }: { size?: number }) {
   );
 }
 
-function SlotPlaceholder({ nodeId, depth, slotName }: { nodeId: string; depth: number; slotName?: string }) {
+function SlotPlaceholder({
+  nodeId,
+  depth,
+  slotName,
+  empty = true,
+}: {
+  nodeId: string;
+  depth: number;
+  /** Named slot key to inject into inserted HTML. null = default slot
+   *  (no `slot=` attribute applied). undefined = legacy "single slot
+   *  placeholder" mode (treated as default). */
+  slotName?: string | null;
+  /** Whether the slot currently has children. Non-empty slots show a
+   *  smaller header label rather than the dashed dropzone. */
+  empty?: boolean;
+}) {
   const [showAdd, setShowAdd] = useState(false);
   const applyMutation = useEditorStore((s) => s.applyMutation);
-  const { setNodeRef } = useDroppable({ id: `${nodeId}__slot` });
+  const dropId = slotName
+    ? `${nodeId}__slot:${slotName}`
+    : `${nodeId}__slot`;
+  const { setNodeRef, isOver } = useDroppable({ id: dropId });
+
+  // Non-empty named slot: small header strip, still a drop target so users
+  // can append more children to it. Empty: full dashed dropzone with the
+  // "drop or click" affordance.
+  if (!empty) {
+    return (
+      <div ref={setNodeRef}>
+        <div
+          className={`flex items-center gap-1.5 px-2 py-0.5 text-[10px] italic transition-colors ${
+            isOver ? "text-green-300" : "text-green-500/50"
+          }`}
+          style={{ marginLeft: `${depth * 12 + 4}px` }}
+        >
+          <SlotIcon size={11} />
+          <span>{slotName ?? "default slot"}</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div ref={setNodeRef}>
       <div
-        className="flex cursor-pointer items-center gap-1.5  border border-dashed border-green-500/30 mx-1 my-0.5 px-2 py-1 text-[10px] leading-5 text-green-500/60 hover:border-green-500/60 hover:text-green-400 transition-colors"
+        className={`flex cursor-pointer items-center gap-1.5 border border-dashed mx-1 my-0.5 px-2 py-1 text-[10px] leading-5 transition-colors ${
+          isOver
+            ? "border-green-400 text-green-400"
+            : "border-green-500/30 text-green-500/60 hover:border-green-500/60 hover:text-green-400"
+        }`}
         style={{ marginLeft: `${depth * 12 + 4}px` }}
         onClick={() => setShowAdd(!showAdd)}
       >
         <SlotIcon size={11} />
-        <span className="italic">{slotName ? `slot: ${slotName}` : "default slot"}</span>
+        <span className="italic">{slotName ? slotName : "default slot"}</span>
         <span className="ml-auto text-[8px] text-zinc-600">drop or click</span>
       </div>
       {showAdd && (
         <div className="ml-4">
           <AddElementPanel
-            onSelect={(html) => {
+            onSelect={(html, options) => {
+              const finalHtml = injectSlotAttr(html, slotName ?? null);
               applyMutation({
                 type: "add-element",
                 parentNodeId: nodeId,
                 position: 0,
-                html,
+                html: finalHtml,
+                componentPath: options?.componentPath,
               });
               setShowAdd(false);
             }}
