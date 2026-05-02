@@ -5,6 +5,10 @@ import {
   writeContentFile,
   createContentFile,
 } from "../services/content-files.js";
+import {
+  getCollectionRouting,
+  resolveEntryUrl,
+} from "../services/collection-routing.js";
 import { resolveProjectPath, PathTraversalError } from "../lib/path-guard.js";
 
 export const contentRouter = Router();
@@ -117,5 +121,44 @@ contentRouter.post("/create", async (req, res) => {
       return;
     }
     res.status(400).json({ error: err.message });
+  }
+});
+
+/** GET /api/content/routing — classify every collection as routed / embedded /
+ *  orphan. Drives the editor's preview affordance: routed collections get an
+ *  iframe preview at the real URL, embedded ones get form-only editing, and
+ *  orphans get a banner pointing out the unused content. */
+contentRouter.get("/routing", async (req, res) => {
+  try {
+    const projectPath = req.app.locals.projectPath as string;
+    const map = await getCollectionRouting(projectPath);
+    res.json({ collections: Object.fromEntries(map) });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/** GET /api/content/preview-url?collection=blog&slug=my-post — resolve a
+ *  single entry to a URL using the same routing map. Returns null when the
+ *  collection isn't routed; caller is expected to fall back to a synthetic
+ *  preview for embedded/orphan collections. */
+contentRouter.get("/preview-url", async (req, res) => {
+  try {
+    const projectPath = req.app.locals.projectPath as string;
+    const collection = String(req.query.collection ?? "");
+    const slug = String(req.query.slug ?? "");
+    if (!collection || !slug) {
+      res.status(400).json({ error: "collection and slug query params are required" });
+      return;
+    }
+    const map = await getCollectionRouting(projectPath);
+    const status = map.get(collection);
+    if (!status) {
+      res.json({ url: null, status: { kind: "orphan", collection } });
+      return;
+    }
+    res.json({ url: resolveEntryUrl(status, slug), status });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
   }
 });
