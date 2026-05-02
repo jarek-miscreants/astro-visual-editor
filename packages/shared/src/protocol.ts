@@ -1,4 +1,4 @@
-import type { ASTNode, ElementInfo } from "./types.js";
+import type { ASTNode, ElementInfo, DevServerStartError } from "./types.js";
 
 /** Messages sent from the injected iframe script to the editor */
 export type IframeToEditorMessage =
@@ -35,7 +35,7 @@ export type ServerWsMessage =
   | { type: "file:changed"; path: string; ast: ASTNode[] }
   | { type: "dev-server:ready"; url: string }
   | { type: "dev-server:log"; line: string }
-  | { type: "dev-server:error"; message: string };
+  | { type: "dev-server:error"; message: string; error?: DevServerStartError };
 
 /** WebSocket events from client to server */
 export type ClientWsMessage =

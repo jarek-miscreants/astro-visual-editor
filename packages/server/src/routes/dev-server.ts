@@ -5,6 +5,7 @@ import {
   startDevServer,
   stopDevServer,
   getDevServerStatus,
+  DevServerStartFailure,
 } from "../services/astro-dev-server.js";
 
 export const devServerRouter = Router();
@@ -30,6 +31,13 @@ devServerRouter.post("/start", async (req, res) => {
     const url = await startDevServer(projectPath, broadcast);
     res.json({ success: true, url });
   } catch (err: any) {
+    // Structured failures are returned as 200 so the client can render them
+    // as a normal app state instead of a thrown error. Generic failures still
+    // surface as 500 with a string message.
+    if (err instanceof DevServerStartFailure) {
+      res.json({ success: false, error: err.cause });
+      return;
+    }
     res.status(500).json({ success: false, error: err.message });
   }
 });

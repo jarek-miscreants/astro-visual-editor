@@ -6,6 +6,7 @@ export type {
   Mutation,
   MutationWithInverse,
   DevServerStatus,
+  DevServerStartError,
   ProjectInfo,
   ContentFileInfo,
   ContentFile,

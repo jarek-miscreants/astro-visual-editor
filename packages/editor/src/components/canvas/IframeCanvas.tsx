@@ -6,11 +6,13 @@ import { SelectionToolbar } from "./SelectionToolbar";
 
 export function IframeCanvas() {
   const devServerStatus = useEditorStore((s) => s.devServerStatus);
+  const devServerError = useEditorStore((s) => s.devServerError);
   const currentFile = useEditorStore((s) => s.currentFile);
   const ast = useEditorStore((s) => s.ast);
   const iframeReady = useEditorStore((s) => s.iframeReady);
   const startDevServer = useEditorStore((s) => s.startDevServer);
   const devicePreset = useEditorStore((s) => s.devicePreset);
+  const [showRawError, setShowRawError] = useState(false);
   const [componentPreviewUrl, setComponentPreviewUrl] = useState<string | null>(null);
 
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
@@ -114,14 +116,53 @@ export function IframeCanvas() {
             <p className="text-xs text-yellow-400">Starting...</p>
           )}
           {devServerStatus === "error" && (
-            <div>
-              <p className="mb-2 text-xs text-red-400">Failed to start dev server</p>
-              <button
-                onClick={startDevServer}
-                className=" bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500"
-              >
-                Retry
-              </button>
+            <div className="mx-auto max-w-md text-left">
+              <p className="mb-2 text-xs font-medium text-red-400">
+                {devServerError?.kind === "schema"
+                  ? "Content collection schema mismatch"
+                  : devServerError?.kind === "config"
+                    ? "Astro config error"
+                    : devServerError?.kind === "syntax"
+                      ? "Syntax error"
+                      : devServerError?.kind === "missing-dep"
+                        ? "Missing dependency"
+                        : devServerError?.kind === "port"
+                          ? "Port conflict"
+                          : "Failed to start dev server"}
+              </p>
+              {devServerError && (
+                <p className="mb-2 text-xs text-zinc-300">{devServerError.message}</p>
+              )}
+              {devServerError?.kind === "schema" && devServerError.file && (
+                <p className="mb-2 break-all font-mono text-[11px] text-zinc-500">{devServerError.file}</p>
+              )}
+              {devServerError?.kind === "schema" && devServerError.missingFields && devServerError.missingFields.length > 0 && (
+                <p className="mb-3 text-[11px] text-zinc-400">
+                  Missing required field{devServerError.missingFields.length === 1 ? "" : "s"}:{" "}
+                  <span className="font-mono text-zinc-300">{devServerError.missingFields.join(", ")}</span>
+                </p>
+              )}
+              <div className="flex gap-2">
+                <button
+                  onClick={startDevServer}
+                  className="bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500"
+                >
+                  Retry
+                </button>
+                {devServerError && (
+                  <button
+                    onClick={() => setShowRawError((v) => !v)}
+                    className="bg-zinc-800 px-4 py-2 text-sm font-medium text-zinc-200 hover:bg-zinc-700"
+                  >
+                    {showRawError ? "Hide details" : "Show details"}
+                  </button>
+                )}
+              </div>
+              {showRawError && devServerError && (
+                <pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap break-all bg-zinc-900 p-3 text-[10px] text-zinc-400">
+                  {devServerError.raw}
+                </pre>
+              )}
             </div>
           )}
         </div>

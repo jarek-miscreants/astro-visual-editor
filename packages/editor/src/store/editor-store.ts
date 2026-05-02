@@ -5,6 +5,7 @@ import type {
   ElementInfo,
   Mutation,
   DevServerStatus,
+  DevServerStartError,
 } from "@tve/shared";
 import { api } from "../lib/api-client";
 import {
@@ -62,6 +63,7 @@ interface EditorState {
   devicePreset: "desktop" | "tablet" | "mobile";
   devServerStatus: DevServerStatus;
   devServerUrl: string | null;
+  devServerError: DevServerStartError | null;
   iframeReady: boolean;
 
   // Actions
@@ -103,6 +105,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   devicePreset: "desktop",
   devServerStatus: "stopped",
   devServerUrl: null,
+  devServerError: null,
   iframeReady: false,
 
   resetProject() {
@@ -120,6 +123,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       hoveredNodeId: null,
       devServerStatus: "stopped",
       devServerUrl: null,
+      devServerError: null,
       iframeReady: false,
     });
     useGitStore.getState().reset();
@@ -133,10 +137,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       // Listen for server events
       onWsMessage((msg) => {
         if (msg.type === "dev-server:ready") {
-          set({ devServerStatus: "running", devServerUrl: msg.url });
+          set({ devServerStatus: "running", devServerUrl: msg.url, devServerError: null });
         }
         if (msg.type === "dev-server:error") {
-          set({ devServerStatus: "error" });
+          set({
+            devServerStatus: "error",
+            devServerError: msg.error ?? { kind: "unknown", message: msg.message, raw: msg.message },
+          });
         }
         if (msg.type === "file:changed") {
           // Any source-file change can affect the working-tree status
@@ -336,15 +343,26 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   async startDevServer() {
-    set({ devServerStatus: "starting" });
+    set({ devServerStatus: "starting", devServerError: null });
     try {
       const result = await api.startDevServer();
       if (result.success && result.url) {
-        set({ devServerStatus: "running", devServerUrl: result.url });
+        set({ devServerStatus: "running", devServerUrl: result.url, devServerError: null });
+        return;
       }
-    } catch (err) {
+      // success: false — server returned a structured error
+      const err = result.error;
+      const structured: DevServerStartError =
+        typeof err === "string" || !err
+          ? { kind: "unknown", message: typeof err === "string" ? err : "Failed to start dev server", raw: typeof err === "string" ? err : "" }
+          : err;
+      set({ devServerStatus: "error", devServerError: structured });
+    } catch (err: any) {
       console.error("Failed to start dev server:", err);
-      set({ devServerStatus: "error" });
+      set({
+        devServerStatus: "error",
+        devServerError: { kind: "unknown", message: err?.message ?? "Failed to start dev server", raw: err?.stack ?? String(err) },
+      });
     }
   },
 

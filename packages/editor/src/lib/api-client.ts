@@ -12,6 +12,7 @@ import type {
   GitDiffEntry,
   GitCommitInfo,
   TveBranchConfig,
+  DevServerStartError,
 } from "@tve/shared";
 
 const API_BASE = "/api";
@@ -90,7 +91,7 @@ export const api = {
   },
 
   /** Start the Astro dev server */
-  startDevServer(): Promise<{ success: boolean; url?: string; error?: string }> {
+  startDevServer(): Promise<{ success: boolean; url?: string; error?: DevServerStartError | string }> {
     return fetchJson("/dev-server/start", { method: "POST" });
   },
 

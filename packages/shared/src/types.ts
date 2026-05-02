@@ -116,6 +116,50 @@ export interface ContentFile {
 /** Dev server status */
 export type DevServerStatus = "stopped" | "starting" | "running" | "error";
 
+/** Structured reason why the Astro dev server failed to start. Produced by
+ *  the server-side preflight (astro sync) so the editor can show actionable
+ *  errors instead of a generic "Failed to start". */
+export type DevServerStartError =
+  | {
+      kind: "schema";
+      message: string;
+      collection?: string;
+      entry?: string;
+      file?: string;
+      missingFields?: string[];
+      raw: string;
+    }
+  | {
+      kind: "config";
+      message: string;
+      file?: string;
+      raw: string;
+    }
+  | {
+      kind: "syntax";
+      message: string;
+      file?: string;
+      line?: number;
+      raw: string;
+    }
+  | {
+      kind: "missing-dep";
+      message: string;
+      dep?: string;
+      raw: string;
+    }
+  | {
+      kind: "port";
+      message: string;
+      port?: number;
+      raw: string;
+    }
+  | {
+      kind: "unknown";
+      message: string;
+      raw: string;
+    };
+
 /** Project info returned by the API */
 export interface ProjectInfo {
   path: string | null;
