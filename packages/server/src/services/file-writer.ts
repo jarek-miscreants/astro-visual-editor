@@ -19,7 +19,17 @@ export async function applyMutation(
         const node = nodeMap.get(mutation.nodeId);
         if (!node) return { success: false, error: `Node ${mutation.nodeId} not found` };
 
-        const tagStart = node.position.start.offset;
+        // Resolve the real `<TagName` start. The Astro compiler can report an
+        // off-by-N start offset (notably for components like <SectionMain />),
+        // which would land `tagStart + tagName.length + 1` AFTER the opening
+        // tag's `>` and leak the inserted ` class="..."` into the page as
+        // visible text. validateElementRange always lands on `<`.
+        const validated = validateElementRange(source, node);
+        if (!validated) {
+          return { success: false, error: `Could not validate range for <${node.tagName}>` };
+        }
+        const tagStart = validated.start;
+
         // CRITICAL: Limit search to the opening tag only — find the first `>`
         // that's not inside a quoted attribute value. Otherwise the regex would
         // match a child element's class attribute and corrupt the file.
@@ -50,7 +60,7 @@ export async function applyMutation(
           const newAttr = `class="${mutation.classes}"`;
           s.overwrite(attrStart, attrStart + fullMatch.length, newAttr);
         } else {
-          // No class attribute exists — insert one after the tag name
+          // No class attribute exists — insert one right after the tag name.
           const tagNameEnd = tagStart + node.tagName.length + 1; // +1 for <
           s.appendRight(tagNameEnd, ` class="${mutation.classes}"`);
         }
@@ -79,7 +89,12 @@ export async function applyMutation(
         const node = nodeMap.get(mutation.nodeId);
         if (!node) return { success: false, error: `Node ${mutation.nodeId} not found` };
 
-        const tagStart = node.position.start.offset;
+        // Resolve the real `<TagName` start (handles parser off-by-N).
+        const validated = validateElementRange(source, node);
+        if (!validated) {
+          return { success: false, error: `Could not validate range for <${node.tagName}>` };
+        }
+        const tagStart = validated.start;
         const openTagEnd = findOpenTagEnd(source, tagStart);
         const tagSource = source.slice(tagStart, openTagEnd);
 
@@ -120,51 +135,64 @@ export async function applyMutation(
         if (!parentNode)
           return { success: false, error: `Parent node ${mutation.parentNodeId} not found` };
 
-        // Detect indentation of parent
-        const parentLine = source.lastIndexOf("\n", parentNode.position.start.offset);
-        const parentIndent = source.slice(
-          parentLine + 1,
-          parentNode.position.start.offset
-        );
+        // Resolve the parent's real source range. The Astro compiler can
+        // report off-by-N start/end offsets for some elements (notably
+        // self-closing components like <SectionMain />), and the previous
+        // implementation's "search +2 bytes for /\/\s*>/" window wasn't wide
+        // enough to find `/>` when the parser reported `end.offset` well
+        // before the trailing `/>`. validateElementRange locates the opening
+        // tag from `<TagName` and walks forward, so it always finds the real
+        // bounds.
+        const validated = validateElementRange(source, parentNode);
+        if (!validated) {
+          return {
+            success: false,
+            error: `Could not validate range for <${parentNode.tagName}>`,
+          };
+        }
+
+        const parentLine = source.lastIndexOf("\n", validated.start);
+        const parentIndent = source.slice(parentLine + 1, validated.start);
         const childIndent = parentIndent + "  ";
 
-        // Check if parent is self-closing (e.g., <Component /> or <slot />).
-        // The Astro parser sometimes reports an end offset that doesn't include
-        // the trailing `>` for self-closing tags, so extend the search by a
-        // couple of bytes to reliably find `/>`.
-        const selfCloseSearchEnd = Math.min(
-          parentNode.position.end.offset + 2,
-          source.length
-        );
-        const parentSource = source.slice(
-          parentNode.position.start.offset,
-          selfCloseSearchEnd
-        );
-        const selfCloseMatch = parentSource.match(/\/\s*>/);
+        // Locate the opening-tag terminator (`>`) and check for self-close.
+        // For non-self-closing elements `validated.end` already includes the
+        // close tag; for self-closing it's the offset right after `/>`.
+        const openTagEnd = findOpenTagEnd(source, validated.start);
+        if (openTagEnd === -1) {
+          return {
+            success: false,
+            error: `Could not locate opening tag terminator for <${parentNode.tagName}>`,
+          };
+        }
         const isSelfClosing =
-          selfCloseMatch !== null && parentNode.children.length === 0;
+          source[openTagEnd - 2] === "/" && parentNode.children.length === 0;
 
         if (isSelfClosing) {
-          // Convert self-closing to open/close: <Tag /> → <Tag>\n  child\n</Tag>
-          const matchIdx = selfCloseMatch!.index!;
-          const matchLen = selfCloseMatch![0].length;
-          // Find the space before /> to trim it
-          let trimStart = matchIdx;
-          while (trimStart > 0 && parentSource[trimStart - 1] === " ") {
+          // Convert self-closing to open/close:
+          //   `<Tag />`           → `<Tag>\n  child\n</Tag>`
+          //   `<Tag attr="x" />`  → `<Tag attr="x">\n  child\n</Tag>`
+          // Walk back over whitespace before `/>` so we don't leave a stray
+          // space-before-`>` like `<Tag >`.
+          let trimStart = openTagEnd - 2; // position of '/'
+          while (
+            trimStart > 0 &&
+            (source[trimStart - 1] === " " || source[trimStart - 1] === "\t")
+          ) {
             trimStart--;
           }
-          const absStart = parentNode.position.start.offset + trimStart;
-          const absEnd = parentNode.position.start.offset + matchIdx + matchLen;
           const replacement = `>\n${childIndent}${mutation.html}\n${parentIndent}</${parentNode.tagName}>`;
-          s.overwrite(absStart, absEnd, replacement);
+          s.overwrite(trimStart, openTagEnd, replacement);
         } else if (
           mutation.position >= parentNode.children.length ||
           parentNode.children.length === 0
         ) {
-          // Insert at end of parent (before closing tag)
+          // Insert at end of parent (before closing tag). Use validated.end
+          // — the offset right after `</TagName>` — so findCloseTagStart's
+          // backwards scan reliably lands on the close tag.
           const closeTagStart = findCloseTagStart(
             source,
-            parentNode.position.end.offset,
+            validated.end,
             parentNode.tagName
           );
           const insertHtml = `\n${childIndent}${mutation.html}\n${parentIndent}`;
