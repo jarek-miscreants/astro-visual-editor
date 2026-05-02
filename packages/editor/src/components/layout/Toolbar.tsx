@@ -10,6 +10,7 @@ import {
   Undo2,
   Redo2,
   Plus,
+  FilePlus2,
   Palette,
   Code2,
   Sparkles,
@@ -21,6 +22,7 @@ import { useHistoryStore } from "../../store/history-store";
 import { useModeStore } from "../../store/mode-store";
 import { PageSelector } from "../page-selector/PageSelector";
 import { ComponentDialog } from "../dialogs/ComponentDialog";
+import { PageDialog } from "../dialogs/PageDialog";
 import { ProjectPickerDialog } from "../dialogs/ProjectPickerDialog";
 import { DesignSystemPanel } from "../design-system/DesignSystemPanel";
 import { Tooltip } from "../ui/Tooltip";
@@ -29,6 +31,7 @@ import { GitToolbarWidget } from "../git/GitToolbarWidget";
 
 export function Toolbar() {
   const [showNewComponent, setShowNewComponent] = useState(false);
+  const [showNewPage, setShowNewPage] = useState(false);
   const [showDesignSystem, setShowDesignSystem] = useState(false);
   const [showProjectPicker, setShowProjectPicker] = useState(false);
   const mode = useEditorStore((s) => s.mode);
@@ -149,9 +152,18 @@ export function Toolbar() {
 
       <Divider />
 
-      {/* Dev-only: New Component + Design System */}
+      {/* Dev-only: New Page + New Component + Design System */}
       {userMode === "dev" && (
         <>
+          <Tooltip content="Create new static page">
+            <button onClick={() => setShowNewPage(true)} className="tve-button-secondary">
+              <FilePlus2 size={11} />
+              Page
+            </button>
+          </Tooltip>
+
+          {showNewPage && <PageDialog onClose={() => setShowNewPage(false)} />}
+
           <Tooltip content="Create new component">
             <button onClick={() => setShowNewComponent(true)} className="tve-button-secondary">
               <Plus size={11} />

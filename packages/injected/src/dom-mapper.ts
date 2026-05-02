@@ -141,35 +141,82 @@ export class DomMapper {
     return 1;
   }
 
-  /** BFS the wrapper's subtree for the best set of siblings to host astChildren. */
+  /** BFS the wrapper's subtree for the best set of siblings to host
+   *  astChildren. Then run a second pass to catch any AST children still
+   *  unmapped — typical for components like CardIcon whose `<slot name="icon" />`
+   *  and `<slot name="content" />` render into separate sub-divs of the
+   *  wrapper, so the children aren't actually DOM siblings. */
   private findAndMatchInSubtree(astChildren: ASTNodeLike[], root: Element) {
     const firstAst = this.firstNonComponentDescendant(astChildren);
     if (!firstAst) {
       // All children are components — match them at the wrapper's direct content level.
       const direct = this.getContentElements(root);
       if (direct.length > 0) this.matchChildren(astChildren, direct);
-      return;
+    } else {
+      let bestChildren: Element[] | null = null;
+      let bestScore = 0;
+
+      const walk = (el: Element, depth: number) => {
+        if (depth > 8) return;
+        const siblings = this.getContentElements(el);
+        if (siblings.length > 0) {
+          const score = this.scoreMatch(firstAst, siblings[0]);
+          if (score > bestScore) {
+            bestScore = score;
+            bestChildren = siblings;
+          }
+        }
+        for (const child of siblings) walk(child, depth + 1);
+      };
+      walk(root, 0);
+
+      if (bestChildren) {
+        this.matchChildren(astChildren, bestChildren);
+      }
     }
 
-    let bestChildren: Element[] | null = null;
-    let bestScore = 0;
+    // Second pass: each unmapped child searches the wrapper subtree on its
+    // own. Astro preserves the `slot=` attribute on user-passed slot
+    // content, so scoreMatch can usually anchor on tag + classes + slot
+    // attribute and find the right element.
+    for (const astChild of astChildren) {
+      if (this.nodeIdToElement.has(astChild.nodeId)) continue;
+      this.matchAstChildAnywhere(astChild, root);
+    }
+  }
 
+  /** Find the best DOM match for a single AST child anywhere in `root`'s
+   *  subtree. For components, anchor on their first non-component
+   *  descendant since components don't have a DOM tag of their own. */
+  private matchAstChildAnywhere(astChild: ASTNodeLike, root: Element) {
+    const target =
+      astChild.isComponent || this.isPascalCase(astChild.tagName)
+        ? this.firstNonComponentDescendant(astChild.children)
+        : astChild;
+    if (!target) return;
+
+    let best: Element | null = null;
+    let bestScore = 0;
     const walk = (el: Element, depth: number) => {
-      if (depth > 8) return;
-      const siblings = this.getContentElements(el);
-      if (siblings.length > 0) {
-        const score = this.scoreMatch(firstAst, siblings[0]);
-        if (score > bestScore) {
-          bestScore = score;
-          bestChildren = siblings;
+      if (depth > 10) return;
+      if (!this.elementToNodeId.has(el)) {
+        const s = this.scoreMatch(target, el);
+        if (s > bestScore) {
+          bestScore = s;
+          best = el;
         }
       }
-      for (const child of siblings) walk(child, depth + 1);
+      for (const child of Array.from(el.children)) walk(child, depth + 1);
     };
     walk(root, 0);
 
-    if (bestChildren) {
-      this.matchChildren(astChildren, bestChildren);
+    if (best && bestScore > 0) {
+      this.elementToNodeId.set(best, astChild.nodeId);
+      this.nodeIdToElement.set(astChild.nodeId, best);
+      if (astChild.children.length > 0) {
+        const childEls = this.getContentElements(best);
+        if (childEls.length > 0) this.matchChildren(astChild.children, childEls);
+      }
     }
   }
 

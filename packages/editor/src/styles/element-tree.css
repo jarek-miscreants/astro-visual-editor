@@ -234,17 +234,23 @@
   color: var(--tree-slot-hint);
 }
 
-/* Compact label shown above non-empty named slots */
+/* Compact label shown above non-empty named slots. Clickable — opens the
+   AddElementPanel so users can append more children to a slot that
+   already has content. */
 .tve-slot-header {
   display: flex;
   align-items: center;
   gap: 6px;
   padding: 4px 10px;
-  
+
   font-size: 12px;
   font-style: normal;
-  color: var(--tree-slot-color-muted);
+  color: var(--tree-slot-color);
   transition: color 100ms;
+}
+.tve-slot-header[data-clickable="true"] { cursor: pointer; }
+.tve-slot-header[data-clickable="true"]:hover {
+  color: var(--tree-slot-placeholder-text-hover);
 }
 .tve-slot-header[data-over="true"] {
   color: var(--tree-slot-placeholder-text-over);

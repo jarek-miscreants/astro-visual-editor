@@ -811,6 +811,7 @@ function SlotPlaceholder({
   empty?: boolean;
 }) {
   const applyMutation = useEditorStore((s) => s.applyMutation);
+  const nodeMap = useEditorStore((s) => s.nodeMap);
   const openSlotId = useTreeUIStore((s) => s.openSlotId);
   const openSlot = useTreeUIStore((s) => s.openSlot);
   const dropId = slotName
@@ -845,36 +846,42 @@ function SlotPlaceholder({
     };
   }, [showAdd, openSlot]);
 
-  // Non-empty named slot: small header strip, still a drop target so users
-  // can append more children to it. Empty: full dashed dropzone with the
-  // "drop or click" affordance.
-  if (!empty) {
-    return (
-      <div ref={setNodeRef}>
+  // Both empty and non-empty slot rows are clickable: empty gets the dashed
+  // dropzone, non-empty gets the slim italic header. Either way, clicking
+  // opens the AddElementPanel and inserts a new child with the right
+  // `slot="..."` baked in. Insertion position is the END of the parent's
+  // children — Astro routes by slot attribute, not source order, so where in
+  // the parent we land doesn't matter for slot binding, but appending keeps
+  // ordering predictable for slots that already have content.
+  const handleClick = () => openSlot(showAdd ? null : slotKey);
+  const insertAt = nodeMap.get(nodeId)?.children.length ?? 0;
+
+  return (
+    <div ref={setNodeRef}>
+      {empty ? (
         <div
-          className="tve-slot-header"
+          ref={placeholderRef}
+          className="tve-slot-placeholder"
           data-over={isOver || undefined}
           style={{ marginLeft: `${depth * 12 + 4 + SLOT_GUTTER_PX}px` }}
+          onClick={handleClick}
+        >
+          <SlotIcon size={11} />
+          <span className="tve-slot-placeholder__name">{slotName ? slotName : "default slot"}</span>
+        </div>
+      ) : (
+        <div
+          ref={placeholderRef}
+          className="tve-slot-header"
+          data-over={isOver || undefined}
+          data-clickable="true"
+          style={{ marginLeft: `${depth * 12 + 4 + SLOT_GUTTER_PX}px` }}
+          onClick={handleClick}
         >
           <SlotIcon size={11} />
           <span>{slotName ?? "default slot"}</span>
         </div>
-      </div>
-    );
-  }
-
-  return (
-    <div ref={setNodeRef}>
-      <div
-        ref={placeholderRef}
-        className="tve-slot-placeholder"
-        data-over={isOver || undefined}
-        style={{ marginLeft: `${depth * 12 + 4 + SLOT_GUTTER_PX}px` }}
-        onClick={() => openSlot(showAdd ? null : slotKey)}
-      >
-        <SlotIcon size={11} />
-        <span className="tve-slot-placeholder__name">{slotName ? slotName : "default slot"}</span>
-      </div>
+      )}
       {showAdd && (
         <div ref={popoverRef} className="ml-4">
           <AddElementPanel
@@ -883,7 +890,7 @@ function SlotPlaceholder({
               applyMutation({
                 type: "add-element",
                 parentNodeId: nodeId,
-                position: 0,
+                position: insertAt,
                 html: finalHtml,
                 componentPath: options?.componentPath,
               });

@@ -124,6 +124,25 @@ export const api = {
     });
   },
 
+  /** Create a new static .astro page under src/pages.
+   *  `route` may include slashes for nested routes ("blog/welcome").
+   *  template "layout" auto-detects the project's first src/layouts/*.astro
+   *  and wraps the starter heading in it; falls back to "blank" otherwise. */
+  createPage(
+    route: string,
+    template: "blank" | "layout"
+  ): Promise<{
+    success: boolean;
+    path: string;
+    route: string;
+    layout: string | null;
+  }> {
+    return fetchJson("/pages/create", {
+      method: "POST",
+      body: JSON.stringify({ route, template }),
+    });
+  },
+
   /** Generate a preview page for a component */
   previewComponent(
     componentPath: string

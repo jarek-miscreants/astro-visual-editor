@@ -17,14 +17,14 @@
 
   /* ── Borders ────────────────────────────────────────────────── */
   --shell-border: #212121;
-  --shell-border-strong: #363636;
+  --shell-border-strong: #3f3f46;
   --shell-border-focus: #3b82f6;
 
   /* ── Text ───────────────────────────────────────────────────── */
   --shell-text: #fafafa;            /* primary headings/labels */
   --shell-text-secondary: #d4d4d8;  /* body */
   --shell-text-muted: #a1a1aa;      /* secondary copy */
-  --shell-text-subtle: #71717a;     /* placeholders, hints */
+  --shell-text-subtle: rgba(255, 255, 255, 0.6);     /* placeholders, hints */
   --shell-text-faint: #52525b;      /* disabled, separators */
 
   /* ── Accent (primary action) ────────────────────────────────── */
