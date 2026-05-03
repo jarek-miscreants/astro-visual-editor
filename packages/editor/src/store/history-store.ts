@@ -79,7 +79,14 @@ function findParentInAst(
 
 /**
  * Compute the inverse of a mutation for undo support.
- * Pass the current AST to enable proper inverse computation for structural mutations.
+ *
+ * Returns `null` when no honest inverse can be derived from the available
+ * context — the caller should skip recording the entry rather than push a
+ * placeholder that would silently no-op (or worse, replay) on undo.
+ *
+ * Currently inverted: update-classes, update-text, move-element (with AST).
+ * Structural mutations (add/remove/duplicate/wrap) and update-attribute would
+ * need pre-mutation snapshots, which we don't capture yet.
  */
 export function computeInverse(
   mutation: Mutation,
@@ -89,38 +96,23 @@ export function computeInverse(
     ast?: ASTNode[];
     nodeMap?: Map<string, ASTNode>;
   }
-): Mutation {
-  const { previousClasses, previousText, ast, nodeMap } = opts || {};
+): Mutation | null {
+  const { previousClasses, previousText, ast } = opts || {};
 
   switch (mutation.type) {
     case "update-classes":
       return {
         type: "update-classes",
         nodeId: mutation.nodeId,
-        classes: previousClasses || "",
+        classes: previousClasses ?? "",
       };
     case "update-text":
       return {
         type: "update-text",
         nodeId: mutation.nodeId,
-        text: previousText || "",
-      };
-    case "update-attribute":
-      return mutation;
-    case "add-element":
-      return {
-        type: "remove-element",
-        nodeId: "",
-      };
-    case "remove-element":
-      return {
-        type: "add-element",
-        parentNodeId: "",
-        position: 0,
-        html: "",
+        text: previousText ?? "",
       };
     case "move-element": {
-      // Compute the original parent and position from the current AST
       if (ast) {
         const original = findParentInAst(ast, mutation.nodeId);
         if (original) {
@@ -132,21 +124,16 @@ export function computeInverse(
           };
         }
       }
-      return {
-        type: "move-element",
-        nodeId: mutation.nodeId,
-        newParentId: "",
-        newPosition: 0,
-      };
+      return null;
     }
+    // No honest inverse yet — skip recording so undo doesn't lie.
+    case "update-attribute":
+    case "add-element":
+    case "remove-element":
     case "duplicate-element":
-      return {
-        type: "remove-element",
-        nodeId: "",
-      };
     case "wrap-element":
-      return mutation;
+      return null;
     default:
-      return mutation;
+      return null;
   }
 }

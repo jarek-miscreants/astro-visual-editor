@@ -92,6 +92,45 @@ function buildNodeMap(nodes: ASTNode[]): Map<string, ASTNode> {
   return map;
 }
 
+/** Synthesise a selection ElementInfo from an AST node. The DOM rect/computed
+ *  styles aren't available yet (the iframe hasn't re-rendered the new node);
+ *  we pass through the previous selection's geometry as a placeholder so the
+ *  panels render without layout jumps until the iframe replays selection. */
+function elementInfoFromNode(node: ASTNode, prev: ElementInfo | null): ElementInfo {
+  return {
+    nodeId: node.nodeId,
+    tagName: node.tagName,
+    classes: node.classes,
+    textContent: node.textContent,
+    attributes: node.attributes,
+    rect: prev?.rect ?? { x: 0, y: 0, width: 0, height: 0 },
+    computedStyles: prev?.computedStyles ?? {
+      display: "", position: "", padding: "", margin: "",
+      fontSize: "", color: "", backgroundColor: "",
+    },
+  };
+}
+
+/** Walk the AST forest looking for the parent of a node. Returns null at root. */
+function findParentInfo(
+  nodes: ASTNode[],
+  targetId: string
+): { parent: ASTNode; index: number } | null {
+  for (const n of nodes) {
+    for (let i = 0; i < n.children.length; i++) {
+      if (n.children[i].nodeId === targetId) return { parent: n, index: i };
+    }
+    const found = findParentInfo(n.children, targetId);
+    if (found) return found;
+  }
+  return null;
+}
+
+/** Module-scoped unsubscribe handle for the WS listener registered in
+ *  initProject. Without this, StrictMode's double-invoke or a project switch
+ *  would stack identical handlers and fire side effects multiple times. */
+let wsUnsubscribe: (() => void) | null = null;
+
 export const useEditorStore = create<EditorState>((set, get) => ({
   projectPath: null,
   projectName: null,
@@ -111,7 +150,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   resetProject() {
     // Clear all project-scoped state so the editor can load a fresh project.
-    // Does not touch user preferences (mode, devicePreset) or WebSocket listeners.
+    // Does not touch user preferences (mode, devicePreset).
+    if (wsUnsubscribe) {
+      wsUnsubscribe();
+      wsUnsubscribe = null;
+    }
     set({
       projectPath: null,
       projectName: null,
@@ -128,6 +171,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       iframeReady: false,
     });
     useGitStore.getState().reset();
+    useHistoryStore.getState().clear();
   },
 
   async initProject() {
@@ -135,8 +179,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       // Connect WebSocket
       connectWebSocket();
 
+      // If a previous init already registered a handler (StrictMode double-
+      // invoke or project switch without resetProject), drop it first.
+      if (wsUnsubscribe) {
+        wsUnsubscribe();
+        wsUnsubscribe = null;
+      }
+
       // Listen for server events
-      onWsMessage((msg) => {
+      wsUnsubscribe = onWsMessage((msg) => {
         if (msg.type === "dev-server:ready") {
           set({ devServerStatus: "running", devServerUrl: msg.url, devServerError: null });
         }
@@ -269,7 +320,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         ast: state.ast || undefined,
         nodeMap: state.nodeMap,
       });
-      useHistoryStore.getState().push({ mutation, inverse });
+      if (inverse) {
+        useHistoryStore.getState().push({ mutation, inverse });
+      }
     }
 
     // Optimistic update in iframe
@@ -322,18 +375,56 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             nextState.selectedNodeId = null;
             nextState.selectedElementInfo = null;
           }
-        } else if (
-          mutation.type === "duplicate-element" ||
-          mutation.type === "wrap-element" ||
-          mutation.type === "add-element"
-        ) {
-          // These all shift indices downstream. Dropping selection is safer
-          // than risking a subsequent action on the wrong element.
-          nextState.selectedNodeId = null;
-          nextState.selectedElementInfo = null;
+        } else if (mutation.type === "add-element") {
+          // Re-locate the inserted child so the properties panel populates
+          // immediately (especially for components — without this, CONTENT/Props
+          // stays empty until the user clicks the new instance).
+          const parent = newNodeMap.get(mutation.parentNodeId);
+          if (parent) {
+            const idx = Math.min(mutation.position, parent.children.length - 1);
+            const inserted = parent.children[idx >= 0 ? idx : 0];
+            if (inserted) {
+              nextState.selectedNodeId = inserted.nodeId;
+              nextState.selectedElementInfo = elementInfoFromNode(inserted, state.selectedElementInfo);
+            }
+          }
+          if (!nextState.selectedNodeId) {
+            nextState.selectedNodeId = null;
+            nextState.selectedElementInfo = null;
+          }
+        } else if (mutation.type === "duplicate-element") {
+          // The duplicate sits right after the original. Find original's parent
+          // in the new AST and select index+1.
+          const findEntry = findParentInfo(result.ast, mutation.nodeId);
+          if (findEntry) {
+            const dup = findEntry.parent.children[findEntry.index + 1];
+            if (dup) {
+              nextState.selectedNodeId = dup.nodeId;
+              nextState.selectedElementInfo = elementInfoFromNode(dup, state.selectedElementInfo);
+            }
+          }
+        } else if (mutation.type === "wrap-element") {
+          // The wrapper is the new ancestor of the wrapped node. Select it.
+          const findEntry = findParentInfo(result.ast, mutation.nodeId);
+          if (findEntry) {
+            nextState.selectedNodeId = findEntry.parent.nodeId;
+            nextState.selectedElementInfo = elementInfoFromNode(findEntry.parent, state.selectedElementInfo);
+          }
         }
 
         set(nextState);
+        // Push the new selection to the iframe overlay so the highlight ring
+        // tracks the freshly-inserted/duplicated/wrapped element. The iframe
+        // may not have re-mapped yet (Astro HMR is mid-flight); the next
+        // dom-ready re-applies selection automatically.
+        if (
+          (mutation.type === "add-element" ||
+            mutation.type === "duplicate-element" ||
+            mutation.type === "wrap-element") &&
+          nextState.selectedNodeId
+        ) {
+          selectNodeInIframe(nextState.selectedNodeId);
+        }
         toast.success(describeMutation(mutation), state.currentFile);
         // Working tree is now dirty — refresh the git widget. Debounced so
         // that rapid-fire mutations don't hammer the API.

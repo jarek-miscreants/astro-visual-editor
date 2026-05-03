@@ -43,6 +43,13 @@ async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
   return res.json();
 }
 
+/** Encode a project-relative path for use in a URL segment without losing the
+ *  `/` separators. Filenames with `#`, `?`, `%`, or spaces would otherwise
+ *  break the route or get re-parsed as querystring/fragment. */
+function encodePath(p: string): string {
+  return p.split("/").map(encodeURIComponent).join("/");
+}
+
 export const api = {
   /** Get project info */
   getProjectInfo(): Promise<ProjectInfo> {
@@ -71,7 +78,7 @@ export const api = {
 
   /** Get raw file content */
   getFileContent(path: string): Promise<{ path: string; content: string }> {
-    return fetchJson(`/files/${path}`);
+    return fetchJson(`/files/${encodePath(path)}`);
   },
 
   /** Frontmatter imports for a single .astro file. Used by AddElementPanel
@@ -84,12 +91,12 @@ export const api = {
       isExternal: boolean;
     }[];
   }> {
-    return fetchJson(`/files/imports/${path}`);
+    return fetchJson(`/files/imports/${encodePath(path)}`);
   },
 
   /** Parse file into AST */
   getAst(path: string): Promise<{ path: string; ast: ASTNode[] }> {
-    return fetchJson(`/ast/${path}`);
+    return fetchJson(`/ast/${encodePath(path)}`);
   },
 
   /** Apply a mutation to a file */
@@ -97,7 +104,7 @@ export const api = {
     path: string,
     mutation: Mutation
   ): Promise<{ success: boolean; ast?: ASTNode[]; error?: string }> {
-    return fetchJson(`/mutations/${path}`, {
+    return fetchJson(`/mutations/${encodePath(path)}`, {
       method: "POST",
       body: JSON.stringify(mutation),
     });
@@ -208,7 +215,7 @@ export const api = {
 
   /** Read a markdown file into { frontmatter, body } */
   readContentFile(path: string): Promise<ContentFile> {
-    return fetchJson(`/content/read/${path}`);
+    return fetchJson(`/content/read/${encodePath(path)}`);
   },
 
   /** Write { frontmatter, body } back to disk */
@@ -217,7 +224,7 @@ export const api = {
     frontmatter: Record<string, any>,
     body: string
   ): Promise<{ success: boolean }> {
-    return fetchJson(`/content/write/${path}`, {
+    return fetchJson(`/content/write/${encodePath(path)}`, {
       method: "POST",
       body: JSON.stringify({ frontmatter, body }),
     });

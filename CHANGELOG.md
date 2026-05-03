@@ -11,15 +11,30 @@ Categories: `Added`, `Changed`, `Fixed`, `Removed`, `Deprecated`, `Security`.
 
 ### Added
 - Geist as the single editor font; replaced every monospace declaration with `var(--font-sans)` so the entire interface renders in Geist.
+- `resolveTwColorRef()` resolver in `tailwind-config.ts` that maps token class refs (`blue-600`) to real hex values when syncing design tokens to Tailwind v3 configs.
+- Vite client typings on the `@tve/injected` package so `import.meta.hot` typechecks cleanly.
 
 ### Fixed
 - `.tve-prop-select` vertical centering — switched to `padding: 0 10px` + `line-height: 28px` so option text no longer clips inside the 28px control.
 - Native dropdown colors — added `color-scheme: dark` and explicit `option` / `optgroup` styling so popups match the dark theme.
 - Static page creation flow.
 - Slot-content selection in the iframe.
+- Component Props parser now tolerates indented frontmatter fences (`  ---`); previously the panel showed no fields for components whose authors indented their frontmatter.
+- Tailwind v3 design-token sync now writes real hex values into `extend.colors` instead of class-name strings, so generated classes like `bg-primary` compile to valid CSS.
+- Re-selection after structural mutations (`add-element`, `duplicate-element`, `wrap-element`) — the new node is selected and the iframe overlay tracks it, so the Properties panel populates immediately instead of going blank.
+- Honest undo: `computeInverse` returns `null` for mutations without a recorded pre-state (`add-element`, `remove-element`, `duplicate-element`, `wrap-element`, `update-attribute`, `move-element` without AST). The editor skips recording these so undo no longer silently no-ops or replays the original change.
+- Injected overlay now typechecks — added `tve:select-node` to the editor-to-iframe message union.
+- `components.ts` routes hardened: every `path.join(projectPath, userInput)` and `relPath.includes("..")` site now flows through `resolveProjectPath()` plus a `validateAstroPath` extension check, restoring the documented path-guard contract.
+- WebSocket handler leak in `editor-store.initProject()` — the registered `onWsMessage` unsubscribe is now captured and called on `resetProject` and on re-init (StrictMode double-invoke / project switch). `resetProject` also clears the history store so undo doesn't apply to a different project's state.
+- API client now URL-encodes path segments for `getFileContent`, `getFileImports`, `getAst`, `applyMutation`, `readContentFile`, and `writeContentFile`, so files with `#`, `?`, `%`, or spaces no longer break routing.
 
 ### Changed
 - Softened shell borders and elevated surfaces with translucent tones for depth.
+- Properties panel's Advanced section defaults to **open** when a project component has an introspected Props schema, so every declared frontmatter prop is visible without an extra click.
+- Port references in README, AGENTS.md, and CLAUDE.md corrected from `3001` → `3011` to match runtime; documented the `PORT` env override.
+
+### Removed
+- ~140 lines of dead code in `file-writer.ts` (`validateElementRange`, `VOID_ELEMENTS`, `findOpenTagEnd`, `findCloseTagStart`) — every call site already uses the imported `sourceRange.*` versions.
 
 ## 2026-05-02
 

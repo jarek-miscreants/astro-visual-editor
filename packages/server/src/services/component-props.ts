@@ -33,9 +33,13 @@ export async function getComponentPropSchema(
   return schema;
 }
 
-/** Extract the content between the first pair of `---` fences in an .astro file. */
+/** Extract the content between the first pair of `---` fences in an .astro file.
+ *  Astro accepts an indented closing fence (e.g. `  ---`), so the trailing
+ *  match allows leading spaces/tabs. Without this tolerance, components whose
+ *  authors indented the frontmatter block (common style) silently parse as
+ *  having no Props, so the editor's CONTENT panel never shows fields. */
 function extractFrontmatter(source: string): string | null {
-  const match = source.match(/^---\s*\n([\s\S]*?)\n---/);
+  const match = source.match(/^---\s*\n([\s\S]*?)\n[ \t]*---/);
   return match ? match[1] : null;
 }
 

@@ -190,5 +190,5 @@ Controls follow Tailwind's mobile-first responsive system. Base classes = mobile
 
 ## Port Assignments
 - 3005: Editor (Vite dev server)
-- 3001: Backend (Express API + proxy)
+- 3011: Backend (Express API + proxy, override with `PORT` env var)
 - 4321+: Astro dev server (auto-assigned, may increment if ports busy)

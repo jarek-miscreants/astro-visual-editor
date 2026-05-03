@@ -47,14 +47,14 @@ describe("computeInverse", () => {
   });
 
   describe("update-attribute", () => {
-    it("returns the same mutation (no proper inverse without prior value)", () => {
+    it("returns null — no honest inverse without prior value", () => {
       const m: Mutation = {
         type: "update-attribute",
         nodeId: "n1",
         attr: "href",
         value: "/about",
       };
-      expect(computeInverse(m)).toEqual(m);
+      expect(computeInverse(m)).toBeNull();
     });
   });
 
@@ -77,19 +77,14 @@ describe("computeInverse", () => {
       });
     });
 
-    it("returns empty parent when AST not provided", () => {
+    it("returns null when AST not provided (no way to know original position)", () => {
       const inv = computeInverse({
         type: "move-element",
         nodeId: "b",
         newParentId: "x",
         newPosition: 5,
       });
-      expect(inv).toEqual({
-        type: "move-element",
-        nodeId: "b",
-        newParentId: "",
-        newPosition: 0,
-      });
+      expect(inv).toBeNull();
     });
 
     it("walks deeply nested children", () => {
@@ -112,32 +107,31 @@ describe("computeInverse", () => {
     });
   });
 
-  describe("structural mutations with imperfect inverses", () => {
-    // These currently return placeholder/no-op inverses. Documented here so
-    // future work can tighten them without a silent regression.
-    it("add-element → remove-element placeholder", () => {
+  describe("structural mutations without honest inverses", () => {
+    // These return null so the editor-store skips recording them, keeping
+    // undo/redo honest. Restoring undo support for any of these requires
+    // capturing pre-mutation snapshots first.
+    it("add-element returns null", () => {
       const inv = computeInverse({
         type: "add-element",
         parentNodeId: "p",
         position: 0,
         html: "<div/>",
       });
-      expect(inv.type).toBe("remove-element");
+      expect(inv).toBeNull();
     });
 
-    it("remove-element → add-element placeholder", () => {
-      const inv = computeInverse({ type: "remove-element", nodeId: "n1" });
-      expect(inv.type).toBe("add-element");
+    it("remove-element returns null", () => {
+      expect(computeInverse({ type: "remove-element", nodeId: "n1" })).toBeNull();
     });
 
-    it("duplicate-element → remove-element placeholder", () => {
-      const inv = computeInverse({ type: "duplicate-element", nodeId: "n1" });
-      expect(inv.type).toBe("remove-element");
+    it("duplicate-element returns null", () => {
+      expect(computeInverse({ type: "duplicate-element", nodeId: "n1" })).toBeNull();
     });
 
-    it("wrap-element returns itself (no proper inverse)", () => {
+    it("wrap-element returns null", () => {
       const m: Mutation = { type: "wrap-element", nodeId: "n1", wrapperTag: "div" };
-      expect(computeInverse(m)).toEqual(m);
+      expect(computeInverse(m)).toBeNull();
     });
   });
 });

@@ -42,6 +42,7 @@ export type IframeToEditorMessage =
 export type EditorToIframeMessage =
   | { type: "tve:set-mode"; mode: "edit" | "preview" }
   | { type: "tve:highlight-node"; nodeId: string | null }
+  | { type: "tve:select-node"; nodeId: string | null }
   | { type: "tve:update-classes"; nodeId: string; classes: string }
   | { type: "tve:update-text"; nodeId: string; text: string }
   | { type: "tve:refresh" }

@@ -266,7 +266,13 @@ export function ComponentPropsPanel({ nodeId, tagName, attributes, mode }: Props
           fields={advancedFields}
           attributes={attributes}
           onChange={commit}
-          defaultOpen={contentFields.length === 0 && linkFields.length === 0}
+          // Default open whenever we have a project-introspected Props schema
+          // — the author declared these intentionally, so surface every one.
+          // Also open when there's nothing in Content/Link to anchor on.
+          defaultOpen={
+            (schema?.fields?.length ?? 0) > 0 ||
+            (contentFields.length === 0 && linkFields.length === 0)
+          }
         />
       )}
     </>

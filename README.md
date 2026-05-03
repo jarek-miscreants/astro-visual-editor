@@ -76,7 +76,7 @@ This starts the backend server, the editor frontend, and prints URLs:
 
   Project: C:\my-website
   Editor:  http://localhost:3005
-  Backend: http://localhost:3001
+  Backend: http://localhost:3011
 ```
 
 Open **http://localhost:3005** in your browser, click **Start** in the top-left to launch your project's Astro dev server, and begin editing.
@@ -172,7 +172,7 @@ Self-closing component instances like `<Card />` show a slot placeholder underne
 This is a **pnpm monorepo** with 4 packages:
 
 - `packages/editor` — React + Vite editor UI (port 3005)
-- `packages/server` — Express backend with `.astro` parser, file writer, dev server proxy (port 3001)
+- `packages/server` — Express backend with `.astro` parser, file writer, dev server proxy (port 3011)
 - `packages/injected` — IIFE script injected into the iframe for hover/select
 - `packages/shared` — Shared TypeScript types
 
@@ -180,7 +180,7 @@ See [CLAUDE.md](./CLAUDE.md) for technical implementation details.
 
 ## Troubleshooting
 
-**Editor won't start** — Make sure ports 3001 and 3005 are free, or kill existing instances.
+**Editor won't start** — Make sure ports 3011 and 3005 are free, or kill existing instances.
 
 **"Dev server not running"** — Click the **Start** button in the toolbar to spawn `astro dev` in your project.
 

@@ -5,8 +5,18 @@ import { parseAstroFileAsync, buildNodeMap } from "../services/astro-parser.js";
 import { getComponentPropSchema } from "../services/component-props.js";
 import { getComponentSlots } from "../services/component-slots.js";
 import { validateElementRange } from "../services/source-range.js";
+import { resolveProjectPath, PathTraversalError } from "../lib/path-guard.js";
 
 export const componentsRouter = Router();
+
+/** Reject anything that doesn't end in .astro before letting it through the
+ *  guard. Components endpoints only ever touch .astro files. */
+function validateAstroPath(projectPath: string, relPath: string): string {
+  if (!relPath.toLowerCase().endsWith(".astro")) {
+    throw new Error("path must reference a .astro file");
+  }
+  return resolveProjectPath(projectPath, relPath);
+}
 
 /** GET /api/components/slots?path=<relPath> — Return the `<slot>` declarations
  *  found in a component's source. Drives the tree's per-slot drop targets so
@@ -20,13 +30,14 @@ componentsRouter.get("/slots", async (req, res) => {
       res.status(400).json({ error: "path query param is required" });
       return;
     }
-    if (relPath.includes("..")) {
-      res.status(400).json({ error: "invalid path" });
-      return;
-    }
+    validateAstroPath(projectPath, relPath);
     const result = await getComponentSlots(projectPath, relPath);
     res.json(result);
   } catch (err: any) {
+    if (err instanceof PathTraversalError) {
+      res.status(400).json({ error: "invalid path" });
+      return;
+    }
     if (err?.code === "ENOENT") {
       res.status(404).json({ error: "component not found" });
       return;
@@ -44,13 +55,14 @@ componentsRouter.get("/props", async (req, res) => {
       res.status(400).json({ error: "path query param is required" });
       return;
     }
-    if (relPath.includes("..")) {
-      res.status(400).json({ error: "invalid path" });
-      return;
-    }
+    validateAstroPath(projectPath, relPath);
     const schema = await getComponentPropSchema(projectPath, relPath);
     res.json(schema);
   } catch (err: any) {
+    if (err instanceof PathTraversalError) {
+      res.status(400).json({ error: "invalid path" });
+      return;
+    }
     if (err?.code === "ENOENT") {
       res.status(404).json({ error: "component not found" });
       return;
@@ -72,13 +84,12 @@ componentsRouter.post("/preview", async (req, res) => {
       return;
     }
 
-    // Get component name from path
+    const componentFullPath = validateAstroPath(projectPath, componentPath);
     const componentName = path.basename(componentPath, ".astro");
     const pagesDir = path.join(projectPath, "src", "pages");
     const previewPagePath = path.join(pagesDir, PREVIEW_PAGE);
 
     // Calculate relative import from pages dir to component
-    const componentFullPath = path.join(projectPath, componentPath);
     let importPath = path.relative(pagesDir, componentFullPath).replace(/\\/g, "/");
     if (!importPath.startsWith(".")) importPath = "./" + importPath;
 
@@ -182,6 +193,10 @@ ${cssImport}import ${componentName} from '${importPath}';
       previewRoute: "/tve-preview",
     });
   } catch (err: any) {
+    if (err instanceof PathTraversalError) {
+      res.status(400).json({ error: "invalid componentPath" });
+      return;
+    }
     res.status(500).json({ error: err.message });
   }
 });
@@ -202,8 +217,8 @@ componentsRouter.post("/create", async (req, res) => {
       return;
     }
 
-    const componentDir = path.join(projectPath, "src", "components");
-    const componentPath = path.join(componentDir, `${name}.astro`);
+    const componentDir = resolveProjectPath(projectPath, "src/components");
+    const componentPath = resolveProjectPath(projectPath, `src/components/${name}.astro`);
 
     // Check if already exists
     try {
@@ -228,6 +243,10 @@ componentsRouter.post("/create", async (req, res) => {
       name,
     });
   } catch (err: any) {
+    if (err instanceof PathTraversalError) {
+      res.status(400).json({ error: "invalid path" });
+      return;
+    }
     res.status(500).json({ error: err.message });
   }
 });
@@ -247,9 +266,9 @@ componentsRouter.post("/extract", async (req, res) => {
       return;
     }
 
-    const sourceFullPath = path.join(projectPath, sourceFile);
-    const componentDir = path.join(projectPath, "src", "components");
-    const componentPath = path.join(componentDir, `${componentName}.astro`);
+    const sourceFullPath = validateAstroPath(projectPath, sourceFile);
+    const componentDir = resolveProjectPath(projectPath, "src/components");
+    const componentPath = resolveProjectPath(projectPath, `src/components/${componentName}.astro`);
 
     // Check if component already exists
     try {
@@ -341,6 +360,10 @@ ${elementHtml}
       sourceAst: newAst,
     });
   } catch (err: any) {
+    if (err instanceof PathTraversalError) {
+      res.status(400).json({ error: "invalid sourceFile" });
+      return;
+    }
     res.status(500).json({ error: err.message });
   }
 });
