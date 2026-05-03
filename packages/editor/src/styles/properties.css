@@ -16,17 +16,17 @@
   --prop-section-title-color-hover: #e4e4e7;
 
   /* ── Form controls (input, select, textarea) ───────────────── */
-  --prop-input-bg: rgba(0, 0, 0, 0.40);
+  --prop-input-bg: rgba(0, 0, 0, 0.22);
   --prop-input-bg-hover: #27272a;
   --prop-input-border: rgba(255, 255, 255, 0.15);
   --prop-input-border-hover: #3f3f46;
   --prop-input-border-focus: var(--shell-border-focus);
   --prop-input-text: #e4e4e7;
   --prop-input-text-prominent: #fafafa;
-  --prop-input-placeholder: #52525b;
+  --prop-input-placeholder: rgba(255, 255, 255, 0.70);
 
   /* ── Buttons in toggle groups ───────────────────────────────── */
-  --prop-toggle-bg: #27272a;
+  --prop-toggle-bg: rgba(0, 0, 0, 0.2);
   --prop-toggle-bg-hover: #3f3f46;
   --prop-toggle-text: #a1a1aa;
   --prop-toggle-text-hover: #e4e4e7;
@@ -90,7 +90,7 @@
   align-items: center;
   gap: 6px;
   margin-bottom: 8px;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -156,7 +156,7 @@
   padding: 2px 6px;
   border-radius: 6px;
   border: 1px solid;
-  font-family: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+  font-family: var(--font-sans);
   font-size: 11px;
   font-weight: 500;
 }
@@ -172,8 +172,8 @@
 }
 
 .tve-prop-attr-pill {
-  font-family: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
-  font-size: 10px;
+  font-family: var(--font-sans);
+  font-size: 11px;
   color: var(--prop-icon-color);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -192,17 +192,17 @@
   overflow-x: auto;
   padding: 6px var(--prop-section-pad-x);
   border-bottom: 1px solid var(--prop-section-border);
-  font-size: 10px;
+  font-size: 11px;
   color: var(--prop-icon-color);
 }
 .tve-prop-crumb-row { display: flex; align-items: center; gap: 2px; }
 .tve-prop-crumb-sep { color: var(--prop-input-placeholder); }
 .tve-prop-crumb {
-  padding: 2px 4px;
+  padding: 2px 6px;
   border-radius: 4px;
   background: transparent;
   border: 0;
-  font-family: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+  font-family: var(--font-sans);
   color: var(--prop-icon-color);
   cursor: pointer;
   transition: background-color 100ms, color 100ms;
@@ -269,6 +269,7 @@
   color: var(--prop-input-text);
   outline: none;
   transition: border-color 100ms;
+  border-radius: 4px;
 }
 .tve-prop-input::placeholder,
 .tve-prop-textarea::placeholder { color: var(--prop-input-placeholder); }
@@ -281,26 +282,45 @@
 .tve-prop-input,
 .tve-prop-select {
   height: 28px;
-  padding: 4px 10px;
+  padding: 0 10px;
   font-size: 11px;
   cursor: text;
+  border-radius: 4px;
+  line-height: 28px;
 }
-.tve-prop-select { cursor: pointer; }
+.tve-prop-select {
+  cursor: pointer;
+  color-scheme: dark;
+}
+.tve-prop-select option,
+.tve-prop-select optgroup {
+  background-color: var(--prop-popover-bg);
+  color: var(--prop-input-text);
+  font-family: var(--font-sans);
+}
+.tve-prop-select optgroup {
+  color: var(--prop-section-title-color);
+  font-weight: 600;
+}
+.tve-prop-select option:disabled {
+  color: var(--prop-input-placeholder);
+}
 
 /* Compact mono variant (used for attribute key/value rows) */
 .tve-prop-input--mono,
 .tve-prop-select--mono {
-  font-family: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
-  font-size: 10px;
+  font-family: var(--font-sans);
+  font-size: 11px;
   height: auto;
-  padding: 4px 6px;
+  padding: 8px 10px;
+  border-radius: 4px;
 }
 
 /* Smallest variant (e.g. inside the box-model) */
 .tve-prop-select--xs {
   width: 48px;
   padding: 2px;
-  font-size: 10px;
+  font-size: 11px;
   text-align: center;
   background-color: var(--prop-toggle-bg);
   border-color: transparent;
@@ -331,19 +351,19 @@
   gap: 4px;
 }
 .tve-prop-field__label {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 500;
   color: var(--prop-section-title-color);
 }
 .tve-prop-field__label--prominent {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 500;
   color: #d4d4d8;
   text-transform: capitalize;
 }
 .tve-prop-field__label--mono {
-  font-family: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
-  font-size: 10px;
+  font-family: var(--font-sans);
+  font-size: 11px;
   font-weight: 400;
   color: var(--prop-section-title-color);
 }
@@ -359,8 +379,8 @@
   width: 80px;
   flex-shrink: 0;
   padding-top: 4px;
-  font-family: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
-  font-size: 10px;
+  font-family: var(--font-sans);
+  font-size: 11px;
   color: var(--prop-section-title-color);
 }
 .tve-prop-field-row__control { flex: 1; min-width: 0; }
@@ -372,9 +392,9 @@
   gap: 4px;
   border: 1px solid var(--prop-input-border);
   background-color: rgba(24, 24, 27, 0.5);
-  padding: 4px 6px;
-  font-family: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
-  font-size: 10px;
+  padding: 8px 10px;
+  font-family: var(--font-sans);
+  font-size: 11px;
   color: var(--prop-amber-soft);
 }
 .tve-prop-expr__text {
@@ -399,7 +419,7 @@
   padding: 2px 6px;
   border: 1px solid transparent;
   background-color: var(--prop-toggle-bg);
-  font-size: 10px;
+  font-size: 11px;
   color: var(--prop-toggle-text);
   cursor: pointer;
   transition: background-color 100ms, color 100ms, border-color 100ms;
@@ -414,7 +434,7 @@
   color: var(--prop-toggle-active-text);
 }
 .tve-prop-toggle--mono {
-  font-family: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+  font-family: var(--font-sans);
   background-color: var(--prop-input-bg);
   border-color: var(--prop-input-border);
 }
@@ -452,7 +472,7 @@
   border-radius: 3px;
   border: 0;
   background: transparent;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 500;
   color: var(--prop-tab-text);
   cursor: pointer;
@@ -483,7 +503,7 @@
   
   background-color: var(--prop-chip-bg);
   color: var(--prop-chip-text);
-  font-family: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+  font-family: var(--font-sans);
   font-size: 11px;
   transition: background-color 100ms, color 100ms, border-color 100ms;
 }
@@ -558,11 +578,11 @@
   border: 1px solid var(--prop-input-border-hover);
 }
 .tve-prop-popover__name {
-  font-family: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+  font-family: var(--font-sans);
 }
 .tve-prop-popover__meta {
   margin-left: auto;
-  font-size: 10px;
+  font-size: 11px;
   color: var(--prop-icon-color);
 }
 
@@ -578,7 +598,7 @@
 .tve-prop-search__icon { color: var(--prop-icon-color); }
 .tve-prop-search__input {
   width: 100%;
-  padding: 4px 0;
+  padding: 8px 0;
   background: transparent;
   border: 0;
   outline: none;
@@ -598,15 +618,15 @@
   margin-bottom: 4px;
 }
 .tve-prop-color-row__label {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--prop-icon-color);
 }
 .tve-prop-color-row__value {
   display: flex;
   align-items: center;
   gap: 4px;
-  font-family: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
-  font-size: 10px;
+  font-family: var(--font-sans);
+  font-size: 11px;
   color: var(--prop-section-title-color);
 }
 .tve-prop-swatch {
@@ -624,7 +644,7 @@
   background-color: var(--prop-toggle-bg);
   color: var(--prop-section-title-color);
   text-align: left;
-  font-size: 10px;
+  font-size: 11px;
   cursor: pointer;
   transition: background-color 100ms;
 }
@@ -688,7 +708,7 @@
   margin-bottom: 6px;
 }
 .tve-prop-boxmodel-header__label {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -718,6 +738,7 @@
   text-align: center;
   font-size: 9px;
   color: var(--prop-icon-color);
+  border: 1px solid var(--prop-input-border);
 }
 
 /* ──────────────────────────────────────────────
@@ -729,10 +750,10 @@
   padding: 4px 8px;
   border: 1px solid var(--prop-amber-border);
   background-color: var(--prop-amber-bg);
-  font-size: 10px;
+  font-size: 11px;
   color: #fde68a;
 }
-.tve-prop-token-banner__name { font-family: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace; font-weight: 700; }
+.tve-prop-token-banner__name { font-family: var(--font-sans); font-weight: 700; }
 
 .tve-prop-token-group { margin-bottom: 8px; }
 .tve-prop-token-group__title {
@@ -749,7 +770,7 @@
   border: 1px solid transparent;
   background-color: var(--prop-toggle-bg);
   color: var(--prop-section-title-color);
-  font-size: 10px;
+  font-size: 11px;
   text-align: left;
   cursor: pointer;
   transition: background-color 100ms, color 100ms;
@@ -766,7 +787,7 @@
 }
 .tve-prop-token__name { font-weight: 500; width: 32px; }
 .tve-prop-token__detail {
-  font-family: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+  font-family: var(--font-sans);
   color: var(--prop-icon-color);
 }
 
@@ -798,7 +819,7 @@
   background-color: rgba(251, 191, 36, 0.05);
   border-radius: 6px;
   padding: 8px;
-  font-size: 10px;
+  font-size: 11px;
   color: rgba(253, 230, 138, 0.8);
 }
 .tve-prop-warning-card__title {
@@ -808,7 +829,7 @@
 }
 .tve-prop-warning-card__code {
   margin-bottom: 4px;
-  font-family: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+  font-family: var(--font-sans);
   color: rgba(254, 215, 170, 0.7);
 }
 .tve-prop-warning-card__desc { color: rgba(253, 230, 138, 0.6); }
@@ -884,7 +905,7 @@
 }
 .tve-prop-bool__check { width: 14px; height: 14px; accent-color: var(--shell-accent); }
 .tve-prop-bool__state {
-  font-family: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+  font-family: var(--font-sans);
   color: var(--prop-icon-color);
 }
 .tve-prop-bool__default {
@@ -897,7 +918,7 @@
 .tve-prop-status {
   padding: 10px var(--prop-section-pad-x);
   border-bottom: 1px solid var(--prop-section-border);
-  font-size: 10px;
+  font-size: 11px;
   color: var(--prop-icon-color);
 }
 .tve-prop-status--error { color: var(--prop-danger-hover); }

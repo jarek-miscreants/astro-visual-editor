@@ -36,8 +36,8 @@
   --tree-drop-inside-border: rgba(59, 130, 246, 0.3);
 
   /* Badges */
-  --tree-badge-comp-bg: rgba(22, 78, 99, 0.4);
-  --tree-badge-comp-fg: #22d3ee;
+  --tree-badge-comp-bg: rgba(255, 255, 255, 0.0);
+  --tree-badge-comp-fg: rgba(255, 255, 255, 0.7);
   --tree-badge-expr-bg: rgba(88, 28, 135, 0.4);
   --tree-badge-expr-fg: #c084fc;
 
@@ -152,7 +152,7 @@
 
 .tve-tree-row__label {
   flex-shrink: 0;
-  font-family: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+  font-family: var(--font-sans);
 }
 
 .tve-tree-row__text-preview {
@@ -170,7 +170,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--tree-class-preview-color);
-  font-family: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+  font-family: var(--font-sans);
 }
 
 /* ──────────────────────────────────────────────
@@ -260,7 +260,7 @@
 .tve-tree-drag-overlay {
   padding: 4px 8px;
   font-size: 12px;
-  font-family: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+  font-family: var(--font-sans);
   color: var(--tree-row-selected-text);
   background-color: var(--tree-row-selected-bg);
   border: 1px solid rgba(59, 130, 246, 0.4);
@@ -277,7 +277,7 @@
   align-items: center;
   gap: 6px;
   padding: 4px 8px;
-  font-size: 10px;
+  font-size: 11px;
   font-style: italic;
   color: var(--tree-unmatched-color);
 }

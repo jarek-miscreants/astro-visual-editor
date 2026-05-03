@@ -1,9 +1,18 @@
 @import "tailwindcss";
+@import url("https://fonts.googleapis.com/css2?family=Geist:wght@100..900&display=swap");
 @import "./styles/shell.css";
 @import "./styles/element-tree.css";
 @import "./styles/properties.css";
 
+:root {
+  --font-sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: var(--font-sans);
+}
+
 @theme {
+  --font-sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
   /* Editor color tokens — shadcn-inspired dark theme */
   --color-bg: #09090b;
   --color-bg-elevated: #18181b;
@@ -28,8 +37,7 @@ body,
 #root {
   height: 100%;
   margin: 0;
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
@@ -108,11 +116,10 @@ textarea:focus {
   box-shadow: 0 0 0 1px var(--color-border-focus);
 }
 
-/* Code/mono styling */
+/* Code/mono styling — interface uses Geist proportional, no monospace */
 code,
 .font-mono {
-  font-family: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
-  font-feature-settings: "calt" 0;
+  font-family: var(--font-sans);
 }
 
 /* Markdown preview — minimal dark-themed styles to avoid pulling in @tailwindcss/typography */

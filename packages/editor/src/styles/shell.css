@@ -187,7 +187,7 @@
   height: 100%;
   overflow: hidden;
   background-color: var(--shell-bg-iframe);
-  border: 1px solid var(--shell-border);
+ 
   transition: width 300ms;
 }
 .tve-canvas__iframe {
@@ -448,13 +448,13 @@
   align-items: center;
   gap: 6px;
   margin-top: 4px;
-  font-size: 10px;
+  font-size: 11px;
   color: var(--shell-text-faint);
 }
 .tve-empty__note {
   margin-top: 8px;
   max-width: 220px;
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.5;
   color: var(--shell-text-faint);
 }
@@ -481,7 +481,7 @@
 }
 .tve-error__file {
   margin-bottom: 8px;
-  font-family: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+  font-family: var(--font-sans);
   font-size: 11px;
   color: var(--shell-text-subtle);
   word-break: break-all;
@@ -492,7 +492,7 @@
   color: var(--shell-text-muted);
 }
 .tve-error__fields-list {
-  font-family: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+  font-family: var(--font-sans);
   color: var(--shell-text-secondary);
 }
 .tve-error__actions { display: flex; gap: 8px; }
@@ -504,6 +504,6 @@
   white-space: pre-wrap;
   word-break: break-all;
   background-color: var(--shell-bg-elevated);
-  font-size: 10px;
+  font-size: 11px;
   color: var(--shell-text-muted);
 }

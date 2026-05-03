@@ -318,8 +318,8 @@ export function LinkSection({
         )}
         {!href && mode === "url" && (
           <p className="tve-prop-section__hint">
-            Tip: use <span style={{ fontFamily: "ui-monospace, monospace" }}>/page</span> for
-            internal links, <span style={{ fontFamily: "ui-monospace, monospace" }}>#section</span>{" "}
+            Tip: use <span>/page</span> for
+            internal links, <span>#section</span>{" "}
             for in-page anchors, or a full URL for external sites.
           </p>
         )}

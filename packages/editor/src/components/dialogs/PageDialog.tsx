@@ -101,7 +101,6 @@ export function PageDialog({ onClose }: PageDialogProps) {
               onChange={(e) => setRoute(e.target.value)}
               placeholder="about, blog/welcome, services/pricing"
               className="tve-prop-input"
-              style={{ fontFamily: "ui-monospace, monospace" }}
             />
             {error && (
               <p
@@ -114,7 +113,7 @@ export function PageDialog({ onClose }: PageDialogProps) {
             {cleanRoute && !error && (
               <p
                 className="tve-prop-section__hint"
-                style={{ marginTop: 4, fontFamily: "ui-monospace, monospace" }}
+                style={{ marginTop: 4 }}
               >
                 {filePath} → {url}
               </p>
