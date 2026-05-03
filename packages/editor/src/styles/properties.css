@@ -18,7 +18,7 @@
   /* ── Form controls (input, select, textarea) ───────────────── */
   --prop-input-bg: rgba(0, 0, 0, 0.40);
   --prop-input-bg-hover: #27272a;
-  --prop-input-border: #27272a;
+  --prop-input-border: rgba(255, 255, 255, 0.15);
   --prop-input-border-hover: #3f3f46;
   --prop-input-border-focus: var(--shell-border-focus);
   --prop-input-text: #e4e4e7;

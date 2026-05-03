@@ -301,3 +301,4 @@ Real-git tests spawn fresh repos via `git init` in tmpdir per test (~50-200ms ea
 - **`tsc -b` editor build fails** on 18 pre-existing `import.meta.hot` errors in store files. The actual `vite build` succeeds and `vite dev` works fine. Fix is a tsconfig adjustment (add `vite/client` to `types`); deferred since it doesn't block development.
 - **Windows CRLF warnings** on git add. Cosmetic — git stores LF on the remote and converts on checkout. Set `core.autocrlf` if it bothers you.
 - **`packages/editor/tsconfig.tsbuildinfo`** appears as an untracked file. It's a TypeScript incremental-build cache; should probably be added to `.gitignore` but is currently just left alone.
+

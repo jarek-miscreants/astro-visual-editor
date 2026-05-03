@@ -9,14 +9,14 @@
 :root {
   /* ── Background hierarchy (darkest → lightest) ──────────────── */
   --shell-bg: #212121;              /* outermost canvas / panels */
-  --shell-bg-elevated: #404040;     /* inputs, secondary buttons, segmented tracks */
+  --shell-bg-elevated: rgba(0, 0, 0, 0.22);     /* inputs, secondary buttons, segmented tracks */
   --shell-bg-subtle: #27272a;       /* hover state, active segment, dividers */
   --shell-bg-hover: #27272a;
   --shell-bg-active: #3f3f46;       /* pressed / dragged-over */
   --shell-bg-iframe: #ffffff;       /* the rendered preview's frame bg */
 
   /* ── Borders ────────────────────────────────────────────────── */
-  --shell-border: #212121;
+  --shell-border: rgba(255, 255, 255, 0.19);
   --shell-border-strong: #3f3f46;
   --shell-border-focus: #3b82f6;
 
