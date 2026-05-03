@@ -189,14 +189,28 @@ export function PropertiesPanel({ nodeId, elementInfo }: PropertiesPanelProps) {
             )}
 
           {/* 3. Attributes — only the user-facing ones. Schema-owned props
-              are filtered out so each prop appears exactly once (the typed
-              control in Advanced is the canonical editor). Astro debug attrs
-              (data-astro-source-*) are pushed into Advanced below. */}
+              are filtered out so each prop appears exactly once (in the
+              Properties section below). Astro debug attrs are pushed into
+              Advanced below. */}
           <AttributesPanel
             nodeId={nodeId}
             attributes={userAttrs}
             schemaOwned={schemaOwned}
           />
+
+          {/* 4. Properties — typed component props from the .astro Props
+              interface. Lives directly under Attributes because these ARE
+              the component's API; pushing them into Advanced (next to
+              tokens/debug attrs) hid them in the day-to-day editing loop. */}
+          {isComponent && (
+            <ComponentPropsPanel
+              nodeId={nodeId}
+              tagName={astNode?.tagName ?? elementInfo.tagName}
+              attributes={attributes}
+              mode="advanced"
+              sectionTitle="Properties"
+            />
+          )}
 
           {/* 4. Tabs */}
           <div className="tve-prop-tabs">
@@ -234,10 +248,9 @@ export function PropertiesPanel({ nodeId, elementInfo }: PropertiesPanelProps) {
             )}
           </div>
 
-          {/* 5. Advanced — collapsed by default. Houses tokens, the
-              component's advanced typed props, and Astro debug attrs.
-              Lives at the bottom of the panel because none of these are
-              part of the day-to-day editing loop. */}
+          {/* 5. Advanced — collapsed by default. Tokens + Astro debug
+              attrs only; component Props moved up to its own Properties
+              section under Attributes. */}
           <CollapsibleSection
             storageKey="tve:props:advanced"
             title="Advanced"
@@ -248,14 +261,6 @@ export function PropertiesPanel({ nodeId, elementInfo }: PropertiesPanelProps) {
               classes={classes}
               onClassesChange={handleClassesChange}
             />
-            {isComponent && (
-              <ComponentPropsPanel
-                nodeId={nodeId}
-                tagName={astNode?.tagName ?? elementInfo.tagName}
-                attributes={attributes}
-                mode="advanced"
-              />
-            )}
             {Object.keys(debugAttrs).length > 0 && (
               <AttributesPanel
                 nodeId={nodeId}

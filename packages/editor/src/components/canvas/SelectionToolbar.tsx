@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { Copy, Trash2, ArrowUp, ArrowDown, PlusCircle } from "lucide-react";
 import { createPortal } from "react-dom";
 import { useEditorStore } from "../../store/editor-store";
@@ -26,6 +26,7 @@ export function SelectionToolbar({ iframeRef }: Props) {
   const [showAddChild, setShowAddChild] = useState(false);
   const addBtnRef = useRef<HTMLButtonElement | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
+  const toolbarRef = useRef<HTMLDivElement | null>(null);
 
   // Reset the panel when selection changes — otherwise it lingers anchored
   // to the previous element's coords.
@@ -61,10 +62,31 @@ export function SelectionToolbar({ iframeRef }: Props) {
       if (!iframe || !selectedElementInfo) return;
       const iframeRect = iframe.getBoundingClientRect();
       const sel = selectedElementInfo.rect;
-      // Position toolbar at top-right corner of selection, outside the iframe.
-      const top = iframeRect.top + sel.y - 38;
-      const left = iframeRect.left + sel.x + sel.width;
-      setCoords({ top: Math.max(4, top), left });
+
+      // Toolbar width — measure if rendered, otherwise fall back to a sensible
+      // estimate (5 buttons × 24px + gaps + padding ≈ 138px). Pre-render width
+      // matters because the FIRST recompute runs before the toolbar is mounted.
+      const tbWidth = toolbarRef.current?.offsetWidth ?? 138;
+      const tbHeight = toolbarRef.current?.offsetHeight ?? 30;
+
+      // Center horizontally over the selection. Clamp inside the iframe
+      // viewport so very small selections near the edges don't push the
+      // toolbar offscreen.
+      const selCenterX = iframeRect.left + sel.x + sel.width / 2;
+      let left = selCenterX - tbWidth / 2;
+      const minLeft = iframeRect.left + 4;
+      const maxLeft = iframeRect.left + iframeRect.width - tbWidth - 4;
+      if (left < minLeft) left = minLeft;
+      if (left > maxLeft) left = Math.max(minLeft, maxLeft);
+
+      // Vertical: place just above the selection. If there isn't room above
+      // (selection touches the iframe top), drop the toolbar inside the
+      // selection at its top edge so it stays visible without escaping.
+      const aboveTop = iframeRect.top + sel.y - tbHeight - 6;
+      const top = aboveTop >= iframeRect.top + 4
+        ? aboveTop
+        : iframeRect.top + sel.y + 6;
+      setCoords({ top, left });
     }
 
     recompute();
@@ -88,6 +110,34 @@ export function SelectionToolbar({ iframeRef }: Props) {
       window.removeEventListener("resize", onResize);
     };
   }, [selectedElementInfo, iframeRef]);
+
+  // After the toolbar first renders we have its real width — recompute once
+  // so the initial centering doesn't rely on the 138px estimate. Subsequent
+  // selection changes go through the main effect's recompute loop.
+  useLayoutEffect(() => {
+    if (!toolbarRef.current || !iframeRef.current || !selectedElementInfo) return;
+    const iframe = iframeRef.current;
+    const iframeRect = iframe.getBoundingClientRect();
+    const sel = selectedElementInfo.rect;
+    const tbWidth = toolbarRef.current.offsetWidth;
+    const tbHeight = toolbarRef.current.offsetHeight;
+    const selCenterX = iframeRect.left + sel.x + sel.width / 2;
+    let left = selCenterX - tbWidth / 2;
+    const minLeft = iframeRect.left + 4;
+    const maxLeft = iframeRect.left + iframeRect.width - tbWidth - 4;
+    if (left < minLeft) left = minLeft;
+    if (left > maxLeft) left = Math.max(minLeft, maxLeft);
+    const aboveTop = iframeRect.top + sel.y - tbHeight - 6;
+    const top = aboveTop >= iframeRect.top + 4
+      ? aboveTop
+      : iframeRect.top + sel.y + 6;
+    setCoords((prev) => {
+      if (prev && Math.abs(prev.left - left) < 0.5 && Math.abs(prev.top - top) < 0.5) {
+        return prev;
+      }
+      return { top, left };
+    });
+  }, [selectedNodeId, selectedElementInfo, iframeRef]);
 
   if (!selectedNodeId || !selectedElementInfo || !coords) return null;
 
@@ -132,6 +182,7 @@ export function SelectionToolbar({ iframeRef }: Props) {
 
   return (
     <div
+      ref={toolbarRef}
       className="fixed z-[60] flex items-center gap-0.5 rounded-md border border-zinc-700 bg-zinc-900/95 p-0.5 shadow-lg shadow-black/30 backdrop-blur"
       style={{ top: coords.top, left: coords.left }}
     >

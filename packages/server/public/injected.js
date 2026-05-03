@@ -560,7 +560,10 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
           if (depth > 8) return;
           const siblings = this.getContentElements(el);
           if (siblings.length > 0) {
-            const score = this.scoreMatch(firstAst, siblings[0]);
+            let score = this.scoreMatch(firstAst, siblings[0]);
+            if (astChildren.length > 1 && siblings.length === astChildren.length) {
+              score += 3;
+            }
             if (score > bestScore) {
               bestScore = score;
               bestChildren = siblings;

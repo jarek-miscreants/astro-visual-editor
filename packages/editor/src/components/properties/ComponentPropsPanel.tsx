@@ -14,6 +14,10 @@ interface Props {
    *    "advanced" → Advanced collapsible section only
    *    undefined  → everything (legacy behavior, used in marketer mode) */
   mode?: "content" | "advanced";
+  /** Title for the Advanced collapsible section. Defaults to "Advanced".
+   *  Override (e.g. with "Properties") when the panel hosts the component's
+   *  full typed prop API rather than a leftover bucket. */
+  sectionTitle?: string;
 }
 
 /** Prop names that almost always hold user-facing copy. */
@@ -105,7 +109,7 @@ function deriveSchemaFromPageUsages(
  * declared prop, falling back to the generic AttributesPanel for anything the
  * parser can't classify (returned as kind: "unknown").
  */
-export function ComponentPropsPanel({ nodeId, tagName, attributes, mode }: Props) {
+export function ComponentPropsPanel({ nodeId, tagName, attributes, mode, sectionTitle }: Props) {
   const files = useEditorStore((s) => s.files);
   const ast = useEditorStore((s) => s.ast);
   const applyMutation = useEditorStore((s) => s.applyMutation);
@@ -263,6 +267,7 @@ export function ComponentPropsPanel({ nodeId, tagName, attributes, mode }: Props
             (schema?.fields?.length ?? 0) > 0 ||
             (contentFields.length === 0 && linkFields.length === 0)
           }
+          title={sectionTitle ?? "Advanced"}
         />
       )}
     </>
@@ -275,12 +280,14 @@ function AdvancedSection({
   attributes,
   onChange,
   defaultOpen,
+  title,
 }: {
   nodeId: string;
   fields: ComponentPropField[];
   attributes: Record<string, string>;
   onChange: (attr: string, value: string | null) => void;
   defaultOpen: boolean;
+  title: string;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
@@ -291,7 +298,7 @@ function AdvancedSection({
         style={{ marginBottom: open ? 8 : 0 }}
       >
         {open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
-        Advanced
+        {title}
         <span className="tve-prop-section__count">({fields.length})</span>
       </button>
       {open && (

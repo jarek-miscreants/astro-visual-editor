@@ -160,7 +160,19 @@ export class DomMapper {
         if (depth > 8) return;
         const siblings = this.getContentElements(el);
         if (siblings.length > 0) {
-          const score = this.scoreMatch(firstAst, siblings[0]);
+          let score = this.scoreMatch(firstAst, siblings[0]);
+          // Multi-child components (e.g. Grid with N CardFeatured) almost
+          // never have firstAst directly match siblings[0] — the slot content
+          // is buried multiple levels deep inside each sibling's wrapper. A
+          // sibling list whose length matches the AST child count is itself
+          // a strong signal that we've found the right level. Boost so it
+          // wins over noisy 0-scores from deeper walks.
+          if (
+            astChildren.length > 1 &&
+            siblings.length === astChildren.length
+          ) {
+            score += 3;
+          }
           if (score > bestScore) {
             bestScore = score;
             bestChildren = siblings;
