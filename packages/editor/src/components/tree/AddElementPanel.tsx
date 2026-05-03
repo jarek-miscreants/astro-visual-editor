@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Search, Box, Type, Image, MousePointer, List, Component, Layers, Package } from "lucide-react";
 import type { ASTNode } from "@tve/shared";
 import { ELEMENT_TEMPLATES, templateToHtml, type TemplateGroup } from "../../lib/element-templates";
@@ -118,6 +118,71 @@ export function AddElementPanel({ onSelect, onClose, componentsOnly = false }: A
     (e) => !query || e.name.toLowerCase().includes(query) || e.source.toLowerCase().includes(query)
   );
 
+  // Flat ordered list of activatable items, in the order they're rendered
+  // below. Drives keyboard navigation: each item gets an index, and
+  // ArrowDown/Up move `activeIndex` while Enter triggers the item's
+  // activate(). Recomputed when the filtered lists change.
+  const activators = useMemo<Array<() => void>>(() => {
+    const list: Array<() => void> = [];
+    for (const comp of filteredComponents) {
+      const name = comp.path.split("/").pop()?.replace(".astro", "") || comp.path;
+      list.push(() => onSelect(`<${name} />`, { componentPath: comp.path }));
+    }
+    for (const ext of filteredExternals) {
+      list.push(() => onSelect(buildExternalComponentHtml(ext.name, ast)));
+    }
+    if (!componentsOnly) {
+      for (const group of ELEMENT_TEMPLATES) {
+        for (const template of group.templates) {
+          if (query && !template.tag.includes(query) && !template.label.toLowerCase().includes(query)) continue;
+          list.push(() => onSelect(templateToHtml(template)));
+        }
+      }
+    }
+    return list;
+  }, [filteredComponents, filteredExternals, componentsOnly, query, ast, onSelect]);
+
+  const [activeIndex, setActiveIndex] = useState(0);
+  const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
+
+  // Reset selection whenever the visible list changes (search edits, late
+  // external imports landing). Clamp to the new length so we don't hold an
+  // out-of-range index.
+  useEffect(() => {
+    setActiveIndex((i) => (activators.length === 0 ? 0 : Math.min(i, activators.length - 1)));
+  }, [activators.length]);
+
+  useEffect(() => {
+    setActiveIndex(0);
+  }, [query]);
+
+  // Keep the highlighted button in view as the user arrow-keys past the
+  // panel's scroll edge.
+  useEffect(() => {
+    itemRefs.current[activeIndex]?.scrollIntoView({ block: "nearest" });
+  }, [activeIndex]);
+
+  function handleSearchKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (activators.length === 0) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActiveIndex((i) => (i + 1) % activators.length);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActiveIndex((i) => (i - 1 + activators.length) % activators.length);
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      activators[activeIndex]?.();
+    }
+  }
+
+  // Counter used during render to assign each button its position in the
+  // flat `activators` list. Reset every render.
+  let renderIndex = 0;
+  function nextIndex() {
+    return renderIndex++;
+  }
+
   return (
     <div className="w-64 max-h-96 overflow-auto  border border-zinc-700 bg-zinc-800 shadow-xl">
       {/* Search */}
@@ -127,6 +192,7 @@ export function AddElementPanel({ onSelect, onClose, componentsOnly = false }: A
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={handleSearchKeyDown}
             placeholder="Search elements..."
             className="w-full bg-transparent py-1 text-xs text-zinc-200 outline-none placeholder:text-zinc-600"
             autoFocus
@@ -144,11 +210,15 @@ export function AddElementPanel({ onSelect, onClose, componentsOnly = false }: A
             </div>
             {filteredComponents.map((comp) => {
               const name = comp.path.split("/").pop()?.replace(".astro", "") || comp.path;
+              const idx = nextIndex();
               return (
                 <button
                   key={comp.path}
+                  ref={(el) => { itemRefs.current[idx] = el; }}
                   onClick={() => onSelect(`<${name} />`, { componentPath: comp.path })}
-                  className="flex w-full items-center gap-2  px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-700"
+                  onMouseEnter={() => setActiveIndex(idx)}
+                  data-active={activeIndex === idx || undefined}
+                  className="flex w-full items-center gap-2  px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-700 data-[active]:bg-zinc-700"
                 >
                   <Component size={11} className="text-cyan-400" />
                   <span className="font-mono">{name}</span>
@@ -179,18 +249,24 @@ export function AddElementPanel({ onSelect, onClose, componentsOnly = false }: A
               <Package size={10} />
               External
             </div>
-            {filteredExternals.map((ext) => (
-              <button
-                key={ext.name}
-                onClick={() => onSelect(buildExternalComponentHtml(ext.name, ast))}
-                className="flex w-full items-center gap-2 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-700"
-                title={`Imported from ${ext.source}`}
-              >
-                <Package size={11} className="text-amber-400" />
-                <span className="font-mono">{ext.name}</span>
-                <span className="ml-auto truncate text-[9px] text-zinc-600">{ext.source}</span>
-              </button>
-            ))}
+            {filteredExternals.map((ext) => {
+              const idx = nextIndex();
+              return (
+                <button
+                  key={ext.name}
+                  ref={(el) => { itemRefs.current[idx] = el; }}
+                  onClick={() => onSelect(buildExternalComponentHtml(ext.name, ast))}
+                  onMouseEnter={() => setActiveIndex(idx)}
+                  data-active={activeIndex === idx || undefined}
+                  className="flex w-full items-center gap-2 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-700 data-[active]:bg-zinc-700"
+                  title={`Imported from ${ext.source}`}
+                >
+                  <Package size={11} className="text-amber-400" />
+                  <span className="font-mono">{ext.name}</span>
+                  <span className="ml-auto truncate text-[9px] text-zinc-600">{ext.source}</span>
+                </button>
+              );
+            })}
           </div>
         )}
 
@@ -207,16 +283,22 @@ export function AddElementPanel({ onSelect, onClose, componentsOnly = false }: A
                 {GROUP_ICONS[group.label] || <Box size={10} />}
                 {group.label}
               </div>
-              {filtered.map((template) => (
-                <button
-                  key={template.tag + template.label}
-                  onClick={() => onSelect(templateToHtml(template))}
-                  className="flex w-full items-center gap-2  px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-700"
-                >
-                  <span className="font-mono text-blue-400">&lt;{template.tag}&gt;</span>
-                  <span className="text-zinc-500">{template.label}</span>
-                </button>
-              ))}
+              {filtered.map((template) => {
+                const idx = nextIndex();
+                return (
+                  <button
+                    key={template.tag + template.label}
+                    ref={(el) => { itemRefs.current[idx] = el; }}
+                    onClick={() => onSelect(templateToHtml(template))}
+                    onMouseEnter={() => setActiveIndex(idx)}
+                    data-active={activeIndex === idx || undefined}
+                    className="flex w-full items-center gap-2  px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-700 data-[active]:bg-zinc-700"
+                  >
+                    <span className="font-mono text-blue-400">&lt;{template.tag}&gt;</span>
+                    <span className="text-zinc-500">{template.label}</span>
+                  </button>
+                );
+              })}
             </div>
           );
         })}

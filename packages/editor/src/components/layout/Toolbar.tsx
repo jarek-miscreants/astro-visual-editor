@@ -105,7 +105,6 @@ export function Toolbar() {
       ) : (
         <span className="tve-status tve-status--running">
           <span className="tve-status__dot">
-            <span className="tve-status__dot-ping" />
             <span className="tve-status__dot-core" />
           </span>
           Running

@@ -393,6 +393,10 @@
   font-family: var(--font-sans);
   font-size: 11px;
   color: var(--prop-section-title-color);
+  /* Long camelCase prop names (closeOnSecondClick etc.) have no break
+     opportunities, so without this they overflow the 80px column and visually
+     collide with the control to their right. */
+  overflow-wrap: anywhere;
 }
 .tve-prop-field-row__control { flex: 1; min-width: 0; }
 
