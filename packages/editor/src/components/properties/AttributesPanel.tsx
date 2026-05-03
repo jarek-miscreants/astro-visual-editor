@@ -11,6 +11,11 @@ interface AttributesPanelProps {
   /** Hide the section's own border + header chrome — useful when nested
    *  inside another collapsible (Advanced) so we don't double-up dividers. */
   embedded?: boolean;
+  /** Attribute names that the schema-driven ComponentPropsPanel already owns.
+   *  These are filtered out so users don't see (and edit) the same prop in
+   *  two different controls — typed control wins, raw editor only shows
+   *  attributes the schema doesn't know about. */
+  schemaOwned?: Set<string>;
 }
 
 /**
@@ -21,12 +26,20 @@ interface AttributesPanelProps {
  * as `{expr}`) are shown read-only — overwriting them with `update-attribute`
  * would convert the expression to a string literal and corrupt the source.
  */
-export function AttributesPanel({ nodeId, attributes, title = "Attributes", embedded = false }: AttributesPanelProps) {
+export function AttributesPanel({
+  nodeId,
+  attributes,
+  title = "Attributes",
+  embedded = false,
+  schemaOwned,
+}: AttributesPanelProps) {
   const applyMutation = useEditorStore((s) => s.applyMutation);
   const [draftKey, setDraftKey] = useState("");
   const [draftValue, setDraftValue] = useState("");
 
-  const entries = Object.entries(attributes).filter(([k]) => k !== "class");
+  const entries = Object.entries(attributes).filter(
+    ([k]) => k !== "class" && !(schemaOwned && schemaOwned.has(k))
+  );
 
   function commitValue(attr: string, value: string) {
     applyMutation({ type: "update-attribute", nodeId, attr, value });

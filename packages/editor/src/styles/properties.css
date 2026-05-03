@@ -368,6 +368,17 @@
   color: var(--prop-section-title-color);
 }
 .tve-prop-field__required { color: var(--prop-required); margin-left: 2px; }
+.tve-prop-field__jsdoc {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 4px;
+  color: var(--prop-section-title-color);
+  opacity: 0.55;
+  cursor: help;
+  outline: none;
+}
+.tve-prop-field__jsdoc:hover,
+.tve-prop-field__jsdoc:focus-visible { opacity: 1; }
 
 /* Horizontal: label column + input column */
 .tve-prop-field-row {

@@ -26,7 +26,7 @@ export async function getComponentPropSchema(
 
   const source = await fs.readFile(full, "utf-8");
   const frontmatter = extractFrontmatter(source);
-  const fields = frontmatter ? parseProps(frontmatter) : [];
+  const fields = frontmatter ? parseProps(frontmatter, frontmatter) : [];
   const schema: ComponentPropSchema = { componentPath: relPath, fields };
 
   cache.set(full, { mtime: stat.mtimeMs, schema });
@@ -49,10 +49,13 @@ function extractFrontmatter(source: string): string | null {
  *  - `type Props = { ... }`
  *  - Optional markers (`?`)
  *  - String literal unions → enum
+ *  - Numeric literal unions (`1 | 2 | 3 | 4`) → number-enum, including
+ *    indirected unions like `type Cols = 1|...|12; mobile?: Cols`.
  *  - `boolean`, `string`, `number` primitives
  *  - Default values from `const { foo = "bar" } = Astro.props`
+ *  - Leading JSDoc comments — surfaced as `field.jsdoc` for editor tooltips
  */
-function parseProps(frontmatter: string): ComponentPropField[] {
+function parseProps(frontmatter: string, source: string): ComponentPropField[] {
   const sourceFile = ts.createSourceFile(
     "frontmatter.ts",
     frontmatter,
@@ -65,6 +68,7 @@ function parseProps(frontmatter: string): ComponentPropField[] {
   if (!members) return [];
 
   const defaults = findDefaults(sourceFile);
+  const typeAliases = collectTypeAliases(sourceFile);
   const fields: ComponentPropField[] = [];
 
   for (const member of members) {
@@ -75,11 +79,53 @@ function parseProps(frontmatter: string): ComponentPropField[] {
     // Skip `class` / `className` — handled by the class editor
     if (name === "class" || name === "className") continue;
     const required = !member.questionToken;
-    const field = classifyType(name, required, member.type, defaults[name]);
+    const jsdoc = readJsDoc(member, source);
+    const field = classifyType(
+      name,
+      required,
+      member.type,
+      defaults[name],
+      typeAliases,
+      jsdoc
+    );
     if (field) fields.push(field);
   }
 
   return fields;
+}
+
+/** Extract leading JSDoc text above a property signature. We strip the
+ *  `/**` framing and `*` line prefixes so the result reads as plain prose
+ *  for tooltip use. Empty or missing comments → undefined. */
+function readJsDoc(member: ts.PropertySignature, source: string): string | undefined {
+  const fullStart = member.getFullStart();
+  const start = member.getStart(undefined, false);
+  if (start <= fullStart) return undefined;
+  const leading = source.slice(fullStart, start);
+  // Match the LAST jsdoc-style block before the member — `/** ... */`. Some
+  // signatures have line comments mixed in; we want only the structured one.
+  const matches = [...leading.matchAll(/\/\*\*([\s\S]*?)\*\//g)];
+  if (matches.length === 0) return undefined;
+  const raw = matches[matches.length - 1][1];
+  const cleaned = raw
+    .split("\n")
+    .map((line) => line.replace(/^\s*\*\s?/, "").trim())
+    .filter((line) => line.length > 0)
+    .join(" ")
+    .trim();
+  return cleaned.length > 0 ? cleaned : undefined;
+}
+
+/** Build a name → TypeNode map for `type X = ...` aliases declared in the
+ *  frontmatter. Lets us resolve indirected unions like `mobile?: Cols`. */
+function collectTypeAliases(sf: ts.SourceFile): Map<string, ts.TypeNode> {
+  const out = new Map<string, ts.TypeNode>();
+  for (const stmt of sf.statements) {
+    if (ts.isTypeAliasDeclaration(stmt) && stmt.name.text !== "Props") {
+      out.set(stmt.name.text, stmt.type);
+    }
+  }
+  return out;
 }
 
 function findPropsMembers(sf: ts.SourceFile): ts.NodeArray<ts.TypeElement> | null {
@@ -125,12 +171,28 @@ function classifyType(
   name: string,
   required: boolean,
   typeNode: ts.TypeNode | undefined,
-  defaultExpr: ts.Expression | undefined
+  defaultExpr: ts.Expression | undefined,
+  typeAliases: Map<string, ts.TypeNode>,
+  jsdoc: string | undefined
 ): ComponentPropField | null {
   if (!typeNode) return null;
 
-  // Strip a trailing `| undefined` if present
-  const effectiveType = unwrapOptional(typeNode);
+  // Strip a trailing `| undefined` if present, then resolve through any
+  // `type X = ...` alias (e.g. `mobile?: Cols` where `Cols = 1|...|12`).
+  const effectiveType = resolveAlias(unwrapOptional(typeNode), typeAliases);
+
+  // Numeric literal union → number-enum (e.g. `Cols = 1 | 2 | ... | 12`)
+  const numEnumOptions = extractNumericLiteralUnion(effectiveType);
+  if (numEnumOptions) {
+    return {
+      kind: "number-enum",
+      name,
+      required,
+      options: numEnumOptions,
+      default: readNumberDefault(defaultExpr),
+      jsdoc,
+    };
+  }
 
   // String literal union → enum
   const enumOptions = extractStringLiteralUnion(effectiveType);
@@ -141,6 +203,7 @@ function classifyType(
       required,
       options: enumOptions,
       default: readStringDefault(defaultExpr),
+      jsdoc,
     };
   }
 
@@ -151,13 +214,26 @@ function classifyType(
       name,
       required,
       default: readBooleanDefault(defaultExpr),
+      jsdoc,
     };
   }
   if (effectiveType.kind === ts.SyntaxKind.StringKeyword) {
-    return { kind: "string", name, required, default: readStringDefault(defaultExpr) };
+    return {
+      kind: "string",
+      name,
+      required,
+      default: readStringDefault(defaultExpr),
+      jsdoc,
+    };
   }
   if (effectiveType.kind === ts.SyntaxKind.NumberKeyword) {
-    return { kind: "number", name, required, default: readNumberDefault(defaultExpr) };
+    return {
+      kind: "number",
+      name,
+      required,
+      default: readNumberDefault(defaultExpr),
+      jsdoc,
+    };
   }
 
   // Single string literal → treat as enum with one option
@@ -168,6 +244,7 @@ function classifyType(
       required,
       options: [effectiveType.literal.text],
       default: readStringDefault(defaultExpr),
+      jsdoc,
     };
   }
 
@@ -176,7 +253,41 @@ function classifyType(
     name,
     required,
     typeText: effectiveType.getText?.() ?? "",
+    jsdoc,
   };
+}
+
+/** Follow a `type X = Y` alias one hop. We deliberately don't recurse — that
+ *  would let us resolve `type A = B; type B = C` chains, but it also opens
+ *  the door to cycles. One hop covers the common case (`type Cols = 1|...|12;
+ *  mobile?: Cols`) without that risk. */
+function resolveAlias(
+  node: ts.TypeNode,
+  aliases: Map<string, ts.TypeNode>
+): ts.TypeNode {
+  if (ts.isTypeReferenceNode(node) && ts.isIdentifier(node.typeName)) {
+    const target = aliases.get(node.typeName.text);
+    if (target) return target;
+  }
+  return node;
+}
+
+function extractNumericLiteralUnion(node: ts.TypeNode): number[] | null {
+  // A single numeric literal type is a degenerate "union" with one option.
+  if (
+    ts.isLiteralTypeNode(node) &&
+    ts.isNumericLiteral(node.literal)
+  ) {
+    return [Number(node.literal.text)];
+  }
+  if (!ts.isUnionTypeNode(node)) return null;
+  const values: number[] = [];
+  for (const t of node.types) {
+    if (!ts.isLiteralTypeNode(t)) return null;
+    if (!ts.isNumericLiteral(t.literal)) return null;
+    values.push(Number(t.literal.text));
+  }
+  return values.length > 0 ? values : null;
 }
 
 function unwrapOptional(node: ts.TypeNode): ts.TypeNode {

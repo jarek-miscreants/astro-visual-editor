@@ -6,6 +6,7 @@ import type {
   ContentFileInfo,
   ContentFile,
   ComponentPropSchema,
+  ComponentSlotSchema,
   RecentProject,
   GitStatus,
   GitBranchInfo,
@@ -169,10 +170,7 @@ export const api = {
   /** Fetch the `<slot>` declarations a component exposes. Drives the tree's
    *  per-slot drop targets and the slot autocomplete on `slot=` attribute
    *  fields. */
-  getComponentSlots(componentPath: string): Promise<{
-    componentPath: string;
-    slots: { name: string | null }[];
-  }> {
+  getComponentSlots(componentPath: string): Promise<ComponentSlotSchema> {
     const qs = encodeURIComponent(componentPath);
     return fetchJson(`/components/slots?path=${qs}`);
   },

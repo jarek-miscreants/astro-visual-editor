@@ -1,9 +1,8 @@
 import { create } from "zustand";
+import type { ComponentSlotDef } from "@tve/shared";
 import { api } from "../lib/api-client";
 
-export interface ComponentSlotDef {
-  name: string | null;
-}
+export type { ComponentSlotDef };
 
 interface ComponentSlotsState {
   /** Cache keyed by component path. `null` is the loading marker, `undefined`

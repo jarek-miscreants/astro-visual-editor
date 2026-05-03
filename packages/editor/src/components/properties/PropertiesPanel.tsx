@@ -3,6 +3,7 @@ import { Paintbrush, LayoutGrid, Type as TypeIcon, Sparkles } from "lucide-react
 import type { ElementInfo, ASTNode } from "@tve/shared";
 import { useEditorStore } from "../../store/editor-store";
 import { useModeStore } from "../../store/mode-store";
+import { useComponentPropsStore } from "../../store/component-props-store";
 import { TailwindClassEditor } from "./TailwindClassEditor";
 import { AttributesPanel, splitAttributes } from "./AttributesPanel";
 import { ComponentPropsPanel } from "./ComponentPropsPanel";
@@ -43,6 +44,23 @@ export function PropertiesPanel({ nodeId, elementInfo }: PropertiesPanelProps) {
   const attributes = astNode?.attributes ?? elementInfo.attributes;
   const isComponent = astNode?.isComponent || /^[A-Z]/.test(elementInfo.tagName);
   const textContent = astNode?.textContent ?? elementInfo.textContent;
+  const files = useEditorStore((s) => s.files);
+
+  // Names this component's introspected Props schema covers — used to hide
+  // them from the raw AttributesPanel below, so each prop appears in exactly
+  // one editor (the typed schema control). External components or tags
+  // without a schema fall through with an empty set, preserving the existing
+  // "show every attribute" behavior.
+  const componentTag = astNode?.tagName ?? elementInfo.tagName;
+  const componentFile = isComponent
+    ? files.find((f) => f.type === "component" && f.path.endsWith(`/${componentTag}.astro`))
+    : undefined;
+  const schemaCached = useComponentPropsStore((s) =>
+    componentFile ? s.cache[componentFile.path] : undefined
+  );
+  const schemaOwned = schemaCached
+    ? new Set(schemaCached.fields.map((f) => f.name))
+    : undefined;
 
   function handleClassesChange(newClasses: string) {
     applyMutation({ type: "update-classes", nodeId, classes: newClasses });
@@ -170,9 +188,15 @@ export function PropertiesPanel({ nodeId, elementInfo }: PropertiesPanelProps) {
               />
             )}
 
-          {/* 3. Attributes — only the user-facing ones. Astro debug attrs
+          {/* 3. Attributes — only the user-facing ones. Schema-owned props
+              are filtered out so each prop appears exactly once (the typed
+              control in Advanced is the canonical editor). Astro debug attrs
               (data-astro-source-*) are pushed into Advanced below. */}
-          <AttributesPanel nodeId={nodeId} attributes={userAttrs} />
+          <AttributesPanel
+            nodeId={nodeId}
+            attributes={userAttrs}
+            schemaOwned={schemaOwned}
+          />
 
           {/* 4. Tabs */}
           <div className="tve-prop-tabs">

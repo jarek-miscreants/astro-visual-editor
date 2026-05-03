@@ -19,6 +19,7 @@ import { useHistoryStore, computeInverse } from "./history-store";
 import { toast } from "./toast-store";
 import { useGitStore } from "./git-store";
 import { useComponentSlotsStore } from "./component-slots-store";
+import { useComponentPropsStore } from "./component-props-store";
 
 function describeMutation(mutation: Mutation): string {
   switch (mutation.type) {
@@ -200,10 +201,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         if (msg.type === "file:changed") {
           // Any source-file change can affect the working-tree status
           useGitStore.getState().refreshDebounced();
-          // If a component's source changed, drop its slot cache so the
-          // tree picks up renamed/added/removed slots on the next render.
+          // If a component's source changed, drop its slot AND props caches
+          // so the tree picks up renamed/added/removed slots and the
+          // Properties panel reflects new props on the next render. The two
+          // caches are independent stores but share the same trigger — both
+          // are derived from the component file's frontmatter + body.
           if (msg.path.startsWith("src/components/")) {
             useComponentSlotsStore.getState().invalidate(msg.path);
+            useComponentPropsStore.getState().invalidate(msg.path);
           }
           const state = get();
           if (state.currentFile === msg.path) {

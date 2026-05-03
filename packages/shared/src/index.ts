@@ -12,6 +12,8 @@ export type {
   ContentFile,
   ComponentPropField,
   ComponentPropSchema,
+  ComponentSlotDef,
+  ComponentSlotSchema,
   RecentProject,
   GitMode,
   GitStatus,

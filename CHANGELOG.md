@@ -7,6 +7,16 @@ Categories: `Added`, `Changed`, `Fixed`, `Removed`, `Deprecated`, `Security`.
 
 ## [Unreleased]
 
+### Added
+- Schema-aware Properties panel for components — every prop from a `.astro` `interface Props { ... }` now renders with a typed control: numeric literal unions (e.g. `Cols = 1|2|...|12` referenced as `mobile?: Cols`) become a 1-to-N select via single-hop alias resolution; string unions stay as enum selects; primitives render as text/number inputs. Defaults extracted from `const { foo = "bar" } = Astro.props` are shown as placeholders or labelled options.
+- JSDoc surfaced from `Props` member comments. Each prop label gets an info badge whose tooltip + ARIA label is the cleaned doc text — closes the gap between component documentation and the editor UI without a separate Storybook/MDX path.
+- `ComponentSlotDef.hasFallback` returned by the slots service; paired `<slot name="x">fallback</slot>` declarations are now distinguishable from empty placeholders.
+- `useComponentPropsStore` (mirror of the slots store): cache + `ensure / get / invalidate`. The existing `file:changed` watcher handler invalidates both stores on any `src/components/` change so renamed/added/removed props show up without a server restart.
+
+### Changed
+- `ComponentPropField` carries an optional `jsdoc?: string` on every variant; new `kind: "number-enum"` for numeric literal unions with `options: number[]`. `ComponentSlotDef` and `ComponentSlotSchema` moved into `@tve/shared` for cross-package use.
+- `AttributesPanel` accepts a `schemaOwned: Set<string>` so component attrs the schema already covers no longer appear twice (typed control wins; raw editor stays as the escape hatch for unknown attrs).
+
 ## 2026-05-03
 
 ### Added

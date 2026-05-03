@@ -174,7 +174,12 @@ export interface RecentProject {
   name: string;
 }
 
-/** Typed prop extracted from a component's TypeScript Props interface */
+/**
+ * Typed prop extracted from a component's TypeScript Props interface.
+ * Every variant carries an optional jsdoc string so the editor can show the
+ * author's prop documentation (the leading doc comment above each property
+ * in the Props interface) as a tooltip / help text.
+ */
 export type ComponentPropField =
   | {
       kind: "enum";
@@ -182,30 +187,50 @@ export type ComponentPropField =
       required: boolean;
       options: string[];
       default?: string;
+      jsdoc?: string;
+    }
+  | {
+      /**
+       * Numeric union like 1 | 2 | 3 ... | 12. Renders as a select with
+       * numeric options; rejects out-of-range entries. The values are stored
+       * as strings in attributes (Astro stringifies numeric props in the
+       * template), so the editor still writes them as strings; options drives
+       * validation and the dropdown labels.
+       */
+      kind: "number-enum";
+      name: string;
+      required: boolean;
+      options: number[];
+      default?: number;
+      jsdoc?: string;
     }
   | {
       kind: "boolean";
       name: string;
       required: boolean;
       default?: boolean;
+      jsdoc?: string;
     }
   | {
       kind: "string";
       name: string;
       required: boolean;
       default?: string;
+      jsdoc?: string;
     }
   | {
       kind: "number";
       name: string;
       required: boolean;
       default?: number;
+      jsdoc?: string;
     }
   | {
       kind: "unknown";
       name: string;
       required: boolean;
       typeText: string;
+      jsdoc?: string;
     };
 
 export interface ComponentPropSchema {
@@ -213,6 +238,23 @@ export interface ComponentPropSchema {
   componentPath: string;
   /** Ordered list of props */
   fields: ComponentPropField[];
+}
+
+/**
+ * A slot declaration parsed from a component source. name === null is the
+ * default (unnamed) slot. hasFallback is true when the slot tag wraps fallback
+ * content (a paired tag with non-whitespace content between open and close).
+ * The editor uses hasFallback to render a "shows fallback when empty" hint
+ * instead of a bare empty target.
+ */
+export interface ComponentSlotDef {
+  name: string | null;
+  hasFallback: boolean;
+}
+
+export interface ComponentSlotSchema {
+  componentPath: string;
+  slots: ComponentSlotDef[];
 }
 
 /**

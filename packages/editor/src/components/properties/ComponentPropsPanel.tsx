@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { Sparkles, Code2, ChevronDown, ChevronRight, Link as LinkIcon } from "lucide-react";
+import { Sparkles, Code2, ChevronDown, ChevronRight, Link as LinkIcon, Info } from "lucide-react";
 import type { ComponentPropSchema, ComponentPropField, ASTNode } from "@tve/shared";
 import { useEditorStore } from "../../store/editor-store";
-import { api } from "../../lib/api-client";
+import { useComponentPropsStore } from "../../store/component-props-store";
 import { LinkSection } from "./LinkSection";
 
 interface Props {
@@ -36,6 +36,9 @@ function looksLikeProse(value: string | undefined): boolean {
 }
 
 function isContentField(field: ComponentPropField, currentValue: string | undefined): boolean {
+  // Numeric/boolean/enum props are never "content" — they belong in the
+  // typed Advanced section so users get a stepper/select instead of a
+  // freeform textarea.
   if (field.kind !== "string" && field.kind !== "unknown") return false;
   if (LINK_NAME_RE.test(field.name)) return false; // Link fields go to their own section
   if (CONTENT_NAME_RE.test(field.name)) return true;
@@ -106,14 +109,27 @@ export function ComponentPropsPanel({ nodeId, tagName, attributes, mode }: Props
   const files = useEditorStore((s) => s.files);
   const ast = useEditorStore((s) => s.ast);
   const applyMutation = useEditorStore((s) => s.applyMutation);
-  const [schema, setSchema] = useState<ComponentPropSchema | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   // Locate the component's source file by matching the tagName to a .astro filename
   const componentFile = files.find(
     (f) => f.type === "component" && f.path.endsWith(`/${tagName}.astro`)
   );
+
+  // Subscribe to the cache for this component so file-watcher invalidations
+  // re-render automatically. `cached` is undefined before the first ensure(),
+  // null while the request is in flight, and the ComponentPropSchema once
+  // resolved.
+  const cached = useComponentPropsStore((s) =>
+    componentFile ? s.cache[componentFile.path] : undefined
+  );
+  const ensureProps = useComponentPropsStore((s) => s.ensure);
+
+  useEffect(() => {
+    if (!componentFile) return;
+    // Fire-and-forget; the store handles in-flight dedupe and the subscription
+    // above will re-render when the cache lands.
+    void ensureProps(componentFile.path);
+  }, [componentFile?.path, ensureProps]);
 
   // For external components (no .astro file in the project), derive a schema
   // from observed attribute usages elsewhere on the same page. Memoised on
@@ -123,36 +139,10 @@ export function ComponentPropsPanel({ nodeId, tagName, attributes, mode }: Props
     [ast, tagName, attributes]
   );
 
-  useEffect(() => {
-    if (!componentFile) {
-      setSchema(null);
-      return;
-    }
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-    api
-      .getComponentProps(componentFile.path)
-      .then((s) => {
-        if (!cancelled) setSchema(s);
-      })
-      .catch((e) => {
-        if (!cancelled) setError(e.message);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [componentFile?.path]);
-
-  if (loading) {
+  if (componentFile && cached === null) {
     return <div className="tve-prop-status">Loading props…</div>;
   }
-  if (error) {
-    return <div className="tve-prop-status tve-prop-status--error">{error}</div>;
-  }
+  const schema: ComponentPropSchema | null = cached ?? null;
 
   // Schema priority:
   //   1. The component's introspected Props interface (project components).
@@ -345,6 +335,7 @@ function PropField({
         <label className="tve-prop-field__label--prominent">
           {field.name}
           {field.required && <span className="tve-prop-field__required">*</span>}
+          {field.jsdoc && <JsDocBadge text={field.jsdoc} />}
         </label>
         {isExpression ? (
           <div className="tve-prop-expr" title="Astro expression — edit in source">
@@ -363,6 +354,7 @@ function PropField({
       <label className="tve-prop-field-row__label">
         {field.name}
         {field.required && <span className="tve-prop-field__required">*</span>}
+        {field.jsdoc && <JsDocBadge text={field.jsdoc} />}
       </label>
       <div className="tve-prop-field-row__control">
         {isExpression ? (
@@ -375,6 +367,22 @@ function PropField({
         )}
       </div>
     </div>
+  );
+}
+
+/** Tiny info icon with the prop's JSDoc as a native tooltip. Native tooltip
+ *  is the right call here — it's keyboard-accessible by default and avoids
+ *  pulling in a popover library for a low-traffic affordance. */
+function JsDocBadge({ text }: { text: string }) {
+  return (
+    <span
+      className="tve-prop-field__jsdoc"
+      tabIndex={0}
+      title={text}
+      aria-label={text}
+    >
+      <Info size={10} />
+    </span>
   );
 }
 
@@ -438,6 +446,30 @@ function PropControl({
           )}
         </span>
       </label>
+    );
+  }
+
+  if (field.kind === "number-enum") {
+    // Astro stringifies numeric props in the template, so attribute values
+    // come back as strings ("3"). Compare on the string form to keep the
+    // <select> controlled across the round-trip.
+    const current = value ?? (field.default !== undefined ? String(field.default) : "");
+    return (
+      <select
+        value={current}
+        onChange={(e) => onChange(e.target.value === "" ? null : e.target.value)}
+        className="tve-prop-select tve-prop-select--mono"
+      >
+        {!field.required && field.default === undefined && (
+          <option value="">— unset —</option>
+        )}
+        {field.options.map((n) => (
+          <option key={n} value={String(n)}>
+            {n}
+            {field.default === n ? " (default)" : ""}
+          </option>
+        ))}
+      </select>
     );
   }
 
