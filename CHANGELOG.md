@@ -8,6 +8,7 @@ Categories: `Added`, `Changed`, `Fixed`, `Removed`, `Deprecated`, `Security`.
 ## [Unreleased]
 
 ### Added
+- Exit shortcut (`Ctrl+Shift+Q`) — confirms, then calls a new `POST /api/project/exit` endpoint that stops the Astro dev server and exits the backend. The CLI launcher now propagates child-process exits, so killing the backend tears down the editor Vite server too. Browser tab shows an "Editor stopped" overlay and best-effort `window.close()`.
 - Schema-aware Properties panel for components — every prop from a `.astro` `interface Props { ... }` now renders with a typed control: numeric literal unions (e.g. `Cols = 1|2|...|12` referenced as `mobile?: Cols`) become a 1-to-N select via single-hop alias resolution; string unions stay as enum selects; primitives render as text/number inputs. Defaults extracted from `const { foo = "bar" } = Astro.props` are shown as placeholders or labelled options.
 - JSDoc surfaced from `Props` member comments. Each prop label gets an info badge whose tooltip + ARIA label is the cleaned doc text — closes the gap between component documentation and the editor UI without a separate Storybook/MDX path.
 - `ComponentSlotDef.hasFallback` returned by the slots service; paired `<slot name="x">fallback</slot>` declarations are now distinguishable from empty placeholders.

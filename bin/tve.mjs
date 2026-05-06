@@ -95,17 +95,35 @@ async function main() {
   console.log(`  Press \x1b[1mCtrl+C\x1b[0m to stop\n`);
 
   // Handle shutdown
-  process.on("SIGINT", () => {
-    console.log("\n  Shutting down...");
+  let shuttingDown = false;
+  function shutdown(code = 0) {
+    if (shuttingDown) return;
+    shuttingDown = true;
     server.kill();
     editor.kill();
-    process.exit(0);
+    process.exit(code);
+  }
+
+  process.on("SIGINT", () => {
+    console.log("\n  Shutting down...");
+    shutdown(0);
   });
 
   process.on("SIGTERM", () => {
-    server.kill();
-    editor.kill();
-    process.exit(0);
+    shutdown(0);
+  });
+
+  // If either child exits (e.g. the editor's in-app Exit shortcut makes
+  // the backend call process.exit), tear down the sibling so we never
+  // leave half a stack running.
+  server.on("exit", () => {
+    console.log("\n  Server exited — stopping editor");
+    shutdown(0);
+  });
+
+  editor.on("exit", () => {
+    console.log("\n  Editor exited — stopping server");
+    shutdown(0);
   });
 }
 

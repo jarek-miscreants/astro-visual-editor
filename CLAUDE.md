@@ -63,6 +63,7 @@ pnpm --filter @tve/editor build     # Build the editor frontend
 | `Ctrl+Alt+G` | Wrap selected element in div |
 | `Ctrl+Z` | Undo |
 | `Ctrl+Shift+Z` | Redo |
+| `Ctrl+Shift+Q` | Exit editor (kills dev server + backend) |
 
 ## Implementation Status
 
@@ -196,6 +197,7 @@ Controls follow Tailwind's mobile-first responsive system. Base classes = mobile
 | POST | `/api/components/create` | Create new .astro component |
 | POST | `/api/components/extract` | Extract element to component |
 | POST | `/api/components/preview` | Generate component preview page |
+| POST | `/api/project/exit` | Stop dev server, exit backend (Exit shortcut) |
 
 ## Test Project
 

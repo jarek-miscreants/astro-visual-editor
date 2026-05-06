@@ -8,6 +8,7 @@ import { useEditorStore } from "../../store/editor-store";
 import { useContentStore } from "../../store/content-store";
 import { Toaster } from "../ui/Toaster";
 import { ShortcutsDialog, useShortcutsHotkey } from "../ui/ShortcutsDialog";
+import { ExitOverlay, useExitHotkey } from "../ui/ExitOverlay";
 import { Breadcrumb } from "../properties/Breadcrumb";
 
 export function EditorLayout() {
@@ -18,6 +19,7 @@ export function EditorLayout() {
   const selectedNodeId = useEditorStore((s) => s.selectedNodeId);
 
   useShortcutsHotkey();
+  useExitHotkey();
   return (
     <div className="tve-shell">
       <Toolbar />
@@ -50,6 +52,7 @@ export function EditorLayout() {
       )}
       <Toaster />
       <ShortcutsDialog />
+      <ExitOverlay />
     </div>
   );
 }

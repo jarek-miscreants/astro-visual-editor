@@ -64,6 +64,12 @@ const GROUPS: Group[] = [
       [["?"], "Open this cheat sheet"],
     ],
   },
+  {
+    title: "Session",
+    items: [
+      [["Ctrl", "Shift", "Q"], "Exit editor (kills dev server + backend)"],
+    ],
+  },
 ];
 
 export function ShortcutsDialog() {

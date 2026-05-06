@@ -2,6 +2,7 @@ import { Router } from "express";
 import fs from "fs/promises";
 import path from "path";
 import { getRecentProjects, addRecentProject } from "../services/recent-projects.js";
+import { stopDevServer } from "../services/astro-dev-server.js";
 
 export const projectRouter = Router();
 
@@ -92,4 +93,15 @@ projectRouter.post("/switch", async (req, res) => {
   } catch (err: any) {
     res.status(500).json({ error: err?.message || "Failed to switch project" });
   }
+});
+
+// Triggered by the editor's "Exit" shortcut. Stops the Astro dev server,
+// flushes the response, then exits the backend process. The CLI launcher
+// (bin/tve.mjs) watches for backend exit and tears down the editor Vite
+// server, so killing the backend kills the whole stack.
+projectRouter.post("/exit", (_req, res) => {
+  console.log("[TVE Server] Exit requested by editor — shutting down");
+  stopDevServer();
+  res.json({ success: true });
+  setTimeout(() => process.exit(0), 200);
 });
