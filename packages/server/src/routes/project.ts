@@ -3,28 +3,9 @@ import fs from "fs/promises";
 import path from "path";
 import { getRecentProjects, addRecentProject } from "../services/recent-projects.js";
 import { stopDevServer } from "../services/astro-dev-server.js";
+import { validateLocalProject } from "../services/project-validator.js";
 
 export const projectRouter = Router();
-
-const ASTRO_CONFIG_CANDIDATES = [
-  "astro.config.mjs",
-  "astro.config.ts",
-  "astro.config.js",
-  "astro.config.mts",
-  "astro.config.cjs",
-];
-
-async function hasAstroConfig(dir: string): Promise<boolean> {
-  for (const name of ASTRO_CONFIG_CANDIDATES) {
-    try {
-      await fs.access(path.join(dir, name));
-      return true;
-    } catch {
-      // continue
-    }
-  }
-  return false;
-}
 
 async function hasNodeModules(dir: string): Promise<boolean> {
   try {
@@ -65,9 +46,11 @@ projectRouter.post("/switch", async (req, res) => {
       return;
     }
 
-    if (!(await hasAstroConfig(abs))) {
+    const validation = await validateLocalProject(abs);
+    if (!validation.ok) {
       res.status(400).json({
-        error: "Not an Astro project — no astro.config.{mjs,ts,js} found in this folder",
+        error: validation.detail,
+        code: validation.reason,
       });
       return;
     }
