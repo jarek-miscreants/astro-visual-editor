@@ -533,7 +533,7 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
     matchComponent(astNode, domElements, startIndex) {
       if (startIndex >= domElements.length) return 0;
       const children = astNode.children;
-      const nextDom = domElements[startIndex];
+      domElements[startIndex];
       const firstRealChild = this.firstNonComponentDescendant(children);
       let bestScore = 0;
       if (firstRealChild) {
@@ -555,12 +555,23 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
         }
         return consumed;
       }
-      this.elementToNodeId.set(nextDom, astNode.nodeId);
-      this.nodeIdToElement.set(astNode.nodeId, nextDom);
-      if (children.length > 0) {
-        this.findAndMatchInSubtree(children, nextDom);
+      let wrapperIndex = startIndex;
+      for (let i = startIndex; i < domElements.length; i++) {
+        const cand = domElements[i];
+        if (cand.getAttribute("aria-hidden") === "true") continue;
+        const hasContent = this.getContentElements(cand).length > 0 || (cand.textContent ?? "").trim().length > 0;
+        if (hasContent) {
+          wrapperIndex = i;
+          break;
+        }
       }
-      return 1;
+      const wrapper = domElements[wrapperIndex];
+      this.elementToNodeId.set(wrapper, astNode.nodeId);
+      this.nodeIdToElement.set(astNode.nodeId, wrapper);
+      if (children.length > 0) {
+        this.findAndMatchInSubtree(children, wrapper);
+      }
+      return wrapperIndex - startIndex + 1;
     }
     /** BFS the wrapper's subtree for the best set of siblings to host
      *  astChildren. Then run a second pass to catch any AST children still

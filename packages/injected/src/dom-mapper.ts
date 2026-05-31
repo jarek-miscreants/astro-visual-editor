@@ -185,13 +185,36 @@ export class DomMapper {
     }
 
     // Wrapping component: map to the wrapper element, then descend into it
-    // to find slot content.
-    this.elementToNodeId.set(nextDom, astNode.nodeId);
-    this.nodeIdToElement.set(astNode.nodeId, nextDom);
-    if (children.length > 0) {
-      this.findAndMatchInSubtree(children, nextDom);
+    // to find slot content. The naive wrapper is the next sibling, but a
+    // component often renders its content among DECORATIVE siblings — e.g.
+    // SectionMain emits `<div aria-hidden="true" class="section-pattern">`
+    // flanking the slot's content div. Binding the component to an empty
+    // aria-hidden decorator means the visible content isn't a DOM descendant
+    // of the mapped element, so clicking it can't resolve back to the
+    // component (it's selectable in the tree but not the iframe). Prefer the
+    // first candidate from startIndex that is content-bearing and not
+    // aria-hidden; fall back to the next sibling when none qualifies.
+    let wrapperIndex = startIndex;
+    for (let i = startIndex; i < domElements.length; i++) {
+      const cand = domElements[i];
+      if (cand.getAttribute("aria-hidden") === "true") continue;
+      const hasContent =
+        this.getContentElements(cand).length > 0 ||
+        (cand.textContent ?? "").trim().length > 0;
+      if (hasContent) {
+        wrapperIndex = i;
+        break;
+      }
     }
-    return 1;
+    const wrapper = domElements[wrapperIndex];
+    this.elementToNodeId.set(wrapper, astNode.nodeId);
+    this.nodeIdToElement.set(astNode.nodeId, wrapper);
+    if (children.length > 0) {
+      this.findAndMatchInSubtree(children, wrapper);
+    }
+    // Consume through the chosen wrapper so any decorative siblings we skipped
+    // don't get re-matched to a later AST node.
+    return wrapperIndex - startIndex + 1;
   }
 
   /** BFS the wrapper's subtree for the best set of siblings to host
