@@ -1,0 +1,20 @@
+---
+const accent = "#f00";
+---
+<div class="wrap">
+  <style is:global>
+    .a { color: red; }
+    .b { color: blue; }
+  </style>
+  <p>Body</p>
+  <style define:vars={{ accent }}>
+    .c { color: var(--accent); }
+  </style>
+  <script>
+    console.log("first");
+  </script>
+  <script is:inline lang="ts">
+    const n: number = 2;
+    console.log(n);
+  </script>
+</div>

@@ -13,6 +13,7 @@ import { LayoutTab } from "./LayoutTab";
 import { TextTab } from "./TextTab";
 import { CollapsibleSection } from "../ui/Collapsible";
 import { LinkSection } from "./LinkSection";
+import { RawContentEditor, RawContentMarketerNote } from "./RawContentEditor";
 
 interface PropertiesPanelProps {
   nodeId: string;
@@ -69,6 +70,32 @@ export function PropertiesPanel({ nodeId, elementInfo }: PropertiesPanelProps) {
   // Dev mode shows raw attrs split into user-facing vs Astro-injected debug
   // attrs. Marketer mode never shows raw attributes at all.
   const { user: userAttrs, debug: debugAttrs } = splitAttributes(attributes);
+
+  // <style>/<script> blocks get a raw code editor instead of the visual
+  // controls. rawTextContent is populated only for those nodes by the parser;
+  // a null value means it's not an editable block (e.g. a self-closing
+  // <script src=…> with no body — fall through to the normal panel).
+  const lowerTag = (astNode?.tagName ?? elementInfo.tagName).toLowerCase();
+  const isRawBlock =
+    (lowerTag === "style" || lowerTag === "script") &&
+    astNode != null &&
+    astNode.rawTextContent != null;
+
+  if (isRawBlock) {
+    return (
+      <div className="flex h-full flex-col">
+        {userMode === "dev" ? (
+          <RawContentEditor
+            nodeId={nodeId}
+            tagName={astNode!.tagName}
+            rawContent={astNode!.rawTextContent ?? ""}
+          />
+        ) : (
+          <RawContentMarketerNote tagName={astNode!.tagName} />
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-full flex-col">

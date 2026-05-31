@@ -30,6 +30,8 @@ function describeMutation(mutation: Mutation): string {
       return `${mutation.attr} updated`;
     case "update-text":
       return "Text updated";
+    case "update-raw-content":
+      return "Content updated";
     case "add-element":
       return "Element added";
     case "remove-element":
@@ -315,6 +317,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (!skipHistory) {
       let prevClasses: string | undefined;
       let prevText: string | undefined;
+      let prevContent: string | undefined;
       if (mutation.type === "update-classes") {
         const node = state.nodeMap.get(mutation.nodeId);
         prevClasses = node?.classes || state.selectedElementInfo?.classes || "";
@@ -323,9 +326,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         const node = state.nodeMap.get(mutation.nodeId);
         prevText = node?.textContent || state.selectedElementInfo?.textContent || "";
       }
+      if (mutation.type === "update-raw-content") {
+        // Use the UNTRIMMED raw body so undo restores it byte-for-byte.
+        const node = state.nodeMap.get(mutation.nodeId);
+        prevContent = node?.rawTextContent ?? "";
+      }
       const inverse = computeInverse(mutation, {
         previousClasses: prevClasses,
         previousText: prevText,
+        previousContent: prevContent,
         ast: state.ast || undefined,
         nodeMap: state.nodeMap,
       });

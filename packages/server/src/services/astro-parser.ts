@@ -82,6 +82,21 @@ async function parseAstroSourceAsync(
         textContent = node.children[0].value?.trim() || null;
       }
 
+      // For <style>/<script> blocks, also surface the UNTRIMMED inner text so
+      // the raw-content editor loads the exact body and undo can restore it
+      // byte-for-byte. The compiler emits the whole body as a single text
+      // child for these elements.
+      let rawTextContent: string | null = null;
+      const loweredTag = tagName.toLowerCase();
+      if (loweredTag === "style" || loweredTag === "script") {
+        if (node.children?.length === 1 && node.children[0].type === "text") {
+          rawTextContent = node.children[0].value ?? "";
+        } else if (!node.children || node.children.length === 0) {
+          // Empty block (`<style></style>`) — distinguish from "not a block".
+          rawTextContent = "";
+        }
+      }
+
       const position: SourcePosition = {
         start: {
           offset: node.position?.start?.offset ?? 0,
@@ -102,6 +117,7 @@ async function parseAstroSourceAsync(
         classes,
         classExpression,
         textContent,
+        rawTextContent,
         attributes,
         children: [],
         position,

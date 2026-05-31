@@ -13,6 +13,10 @@ export interface ASTNode {
   classExpression?: string | null;
   /** Text content (for text-only nodes) */
   textContent: string | null;
+  /** Untrimmed raw inner text of a `<style>`/`<script>` block. Populated only
+   *  for those elements so the raw-content editor can load the exact body and
+   *  the undo inverse can restore it byte-for-byte. null for everything else. */
+  rawTextContent?: string | null;
   /** HTML attributes */
   attributes: Record<string, string>;
   /** Child nodes */
@@ -61,6 +65,7 @@ export interface ElementInfo {
 export type Mutation =
   | { type: "update-classes"; nodeId: string; classes: string }
   | { type: "update-text"; nodeId: string; text: string }
+  | { type: "update-raw-content"; nodeId: string; content: string }
   | {
       type: "update-attribute";
       nodeId: string;

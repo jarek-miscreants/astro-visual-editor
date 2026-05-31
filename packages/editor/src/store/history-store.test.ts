@@ -46,6 +46,29 @@ describe("computeInverse", () => {
     });
   });
 
+  describe("update-raw-content", () => {
+    it("inverse swaps in previousContent", () => {
+      const inv = computeInverse(
+        { type: "update-raw-content", nodeId: "n1", content: ".a { color: green; }" },
+        { previousContent: ".a { color: red; }" }
+      );
+      expect(inv).toEqual({
+        type: "update-raw-content",
+        nodeId: "n1",
+        content: ".a { color: red; }",
+      });
+    });
+
+    it("falls back to empty string when no previousContent given", () => {
+      const inv = computeInverse({
+        type: "update-raw-content",
+        nodeId: "n1",
+        content: "body {}",
+      });
+      expect(inv).toEqual({ type: "update-raw-content", nodeId: "n1", content: "" });
+    });
+  });
+
   describe("update-attribute", () => {
     it("returns null — no honest inverse without prior value", () => {
       const m: Mutation = {

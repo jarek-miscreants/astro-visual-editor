@@ -84,20 +84,22 @@ function findParentInAst(
  * context — the caller should skip recording the entry rather than push a
  * placeholder that would silently no-op (or worse, replay) on undo.
  *
- * Currently inverted: update-classes, update-text, move-element (with AST).
- * Structural mutations (add/remove/duplicate/wrap) and update-attribute would
- * need pre-mutation snapshots, which we don't capture yet.
+ * Currently inverted: update-classes, update-text, update-raw-content,
+ * move-element (with AST). Structural mutations (add/remove/duplicate/wrap)
+ * and update-attribute would need pre-mutation snapshots, which we don't
+ * capture yet.
  */
 export function computeInverse(
   mutation: Mutation,
   opts?: {
     previousClasses?: string;
     previousText?: string;
+    previousContent?: string;
     ast?: ASTNode[];
     nodeMap?: Map<string, ASTNode>;
   }
 ): Mutation | null {
-  const { previousClasses, previousText, ast } = opts || {};
+  const { previousClasses, previousText, previousContent, ast } = opts || {};
 
   switch (mutation.type) {
     case "update-classes":
@@ -111,6 +113,12 @@ export function computeInverse(
         type: "update-text",
         nodeId: mutation.nodeId,
         text: previousText ?? "",
+      };
+    case "update-raw-content":
+      return {
+        type: "update-raw-content",
+        nodeId: mutation.nodeId,
+        content: previousContent ?? "",
       };
     case "move-element": {
       if (ast) {

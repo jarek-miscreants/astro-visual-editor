@@ -86,6 +86,26 @@ export async function applyMutation(
         break;
       }
 
+      case "update-raw-content": {
+        const node = nodeMap.get(mutation.nodeId);
+        if (!node) return { success: false, error: `Node ${mutation.nodeId} not found` };
+
+        // Resolve the inner range — the text strictly between the opening
+        // tag's `>` and the matching `</tag>`. The opening tag (and its
+        // directives like is:global / define:vars / lang) and the close tag
+        // are left untouched; we only overwrite the body.
+        const inner = sourceRange.innerContentRange(source, node);
+        if (!inner) {
+          return {
+            success: false,
+            error: `Could not resolve inner content range for <${node.tagName}> — it may be self-closing or void.`,
+          };
+        }
+
+        s.overwrite(inner.start, inner.end, mutation.content);
+        break;
+      }
+
       case "update-attribute": {
         const node = nodeMap.get(mutation.nodeId);
         if (!node) return { success: false, error: `Node ${mutation.nodeId} not found` };

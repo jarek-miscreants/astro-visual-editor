@@ -150,3 +150,44 @@ export function findCloseTagStart(
   return idx !== -1 ? idx : endOffset;
 }
 
+/**
+ * Resolve the INNER content range of a paired element — the offsets strictly
+ * *between* the opening tag's `>` and its matching `</tag>`. Used by the
+ * `update-raw-content` mutation to overwrite a `<style>`/`<script>` body while
+ * leaving the tag, its attributes, and directives (`is:global`, `define:vars`,
+ * `lang`, …) byte-for-byte intact.
+ *
+ * Returns `null` when the element is self-closing/void or the inner range
+ * can't be resolved (the caller turns this into a clear error rather than
+ * silently corrupting the source).
+ */
+export function innerContentRange(
+  source: string,
+  node: RangeNode
+): ValidatedElementRange | null {
+  // Reuse validateElementRange to relocate the real element bounds from source
+  // — the Astro compiler can report off-by-N start offsets, and this also
+  // gives us the authoritative end (offset just past `</tag>`).
+  const validated = validateElementRange(source, node);
+  if (!validated) return null;
+
+  const openTagEnd = findOpenTagEnd(source, validated.start);
+  if (openTagEnd === -1) return null;
+
+  // Self-closing (`<tag />`) or void elements have no inner range. For
+  // self-closing, validateElementRange returns end === openTagEnd; the `/`
+  // sits right before `>`. Refuse — there's nothing between open and close.
+  if (source[openTagEnd - 2] === "/") return null;
+  if (VOID_ELEMENTS.has(node.tagName.toLowerCase())) return null;
+
+  // The close tag start is the matching `</tag>` located from the validated
+  // end (offset just past `</tag>`). validateElementRange already balanced
+  // nesting, so this lands on the correct close tag.
+  const closeTagStart = findCloseTagStart(source, validated.end, node.tagName);
+
+  // Sanity: inner range must be well-ordered and lie inside the element.
+  if (closeTagStart < openTagEnd || closeTagStart > validated.end) return null;
+
+  return { start: openTagEnd, end: closeTagStart };
+}
+
