@@ -22,7 +22,7 @@ interface Props {
 
 /** Prop names that almost always hold user-facing copy. */
 const CONTENT_NAME_RE =
-  /^(title|heading|headline|subtitle|subheading|description|body|text|content|label|cta|caption|excerpt|quote|author|eyebrow|message)$/i;
+  /^(title|heading|headline|header|subheader|subtitle|subheading|tagline|kicker|description|body|text|content|label|cta|caption|excerpt|quote|author|eyebrow|message)$/i;
 
 /** Prop names that almost always hold a URL or link target. */
 const LINK_NAME_RE = /^(href|url|link|to|cta_?url|cta_?href)$/i;
@@ -39,14 +39,19 @@ function looksLikeProse(value: string | undefined): boolean {
   return false;
 }
 
-function isContentField(field: ComponentPropField, currentValue: string | undefined): boolean {
+function isContentField(field: ComponentPropField): boolean {
   // Numeric/boolean/enum props are never "content" — they belong in the
   // typed Advanced section so users get a stepper/select instead of a
   // freeform textarea.
   if (field.kind !== "string" && field.kind !== "unknown") return false;
   if (LINK_NAME_RE.test(field.name)) return false; // Link fields go to their own section
   if (CONTENT_NAME_RE.test(field.name)) return true;
-  if (looksLikeProse(currentValue)) return true;
+  // Classify purely on the schema (name + declared default), never on the
+  // current per-instance value. Keying on the live value made the SAME prop
+  // land in Content on one instance and Advanced on another — e.g. a `header`
+  // of "98.3% uptime" (period → looks like prose) vs "Enterprise security"
+  // (no punctuation). Schema-only keeps every instance of a component
+  // consistent.
   if (looksLikeProse(field.kind === "string" ? field.default : undefined)) return true;
   return false;
 }
@@ -168,7 +173,7 @@ export function ComponentPropsPanel({ nodeId, tagName, attributes, mode, section
   const advancedFields: ComponentPropField[] = [];
   for (const f of fields) {
     if (isLinkField(f)) linkFields.push(f);
-    else if (isContentField(f, attributes[f.name])) contentFields.push(f);
+    else if (isContentField(f)) contentFields.push(f);
     else advancedFields.push(f);
   }
 
