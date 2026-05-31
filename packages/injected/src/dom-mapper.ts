@@ -76,14 +76,37 @@ export class DomMapper {
         continue;
       }
 
-      // Static element: skip unmatched DOM elements until we find a match
-      while (domIndex < domElements.length) {
-        const matched = this.tryMatchAt(astNode, domElements, domIndex);
-        if (matched.success) {
-          domIndex = matched.nextIndex;
+      // Static element: find the best same-tag DOM element from here on.
+      // When the AST node has element children, prefer a candidate whose
+      // subtree can actually host them (has content children) over an empty,
+      // decorative element of the same tag. This matters for classless wrapper
+      // divs: e.g. a page `<div>` whose component renders it as the slot of a
+      // grid section sitting between two empty `section-pattern` divs — binding
+      // to the first (empty) one strands the whole subtree unmapped. Fall back
+      // to the first tag match if none has children, preserving prior behavior.
+      const needsChildren = astNode.children.length > 0;
+      let fallbackIndex = -1;
+      let chosenIndex = -1;
+      for (let i = domIndex; i < domElements.length; i++) {
+        if (
+          domElements[i].tagName.toLowerCase() !== astNode.tagName.toLowerCase()
+        ) {
+          continue;
+        }
+        if (fallbackIndex === -1) fallbackIndex = i;
+        if (!needsChildren || this.getContentElements(domElements[i]).length > 0) {
+          chosenIndex = i;
           break;
         }
-        domIndex++;
+      }
+      const matchIndex = chosenIndex !== -1 ? chosenIndex : fallbackIndex;
+      if (matchIndex !== -1) {
+        const matched = this.tryMatchAt(astNode, domElements, matchIndex);
+        domIndex = matched.success ? matched.nextIndex : matchIndex + 1;
+      } else {
+        // No same-tag candidate remains — give up on this node (and, as before,
+        // the rest, since later siblings can't appear before an unmatched one).
+        domIndex = domElements.length;
       }
     }
 
@@ -121,7 +144,26 @@ export class DomMapper {
       }
     }
 
-    if (bestScore >= 2) {
+    // A class match scores +2, so the usual `>= 2` gate effectively requires
+    // the first child to share a class with a sibling. That fails when the
+    // child is a classless landmark (e.g. `<main>` with no class), which
+    // scores only +1 (tag-only) — the component then gets misread as a
+    // wrapper and consumes the wrong DOM element, leaving the whole subtree
+    // unmapped. So also accept a tag-only match when the child carries no
+    // classes (a class match is impossible) AND that tag is unique among the
+    // candidate siblings, making it a reliable anchor.
+    const childHasNoClasses =
+      !!firstRealChild && !(firstRealChild.classes || "").trim();
+    const tagOnlyAnchor =
+      childHasNoClasses &&
+      bestScore >= 1 &&
+      domElements.filter(
+        (el, i) =>
+          i >= startIndex &&
+          el.tagName.toLowerCase() === firstRealChild!.tagName.toLowerCase()
+      ).length === 1;
+
+    if (bestScore >= 2 || tagOnlyAnchor) {
       const beforeCount = this.elementToNodeId.size;
       const consumed = this.matchChildren(children, domElements.slice(startIndex));
       if (this.elementToNodeId.size > beforeCount && !this.nodeIdToElement.has(astNode.nodeId)) {
