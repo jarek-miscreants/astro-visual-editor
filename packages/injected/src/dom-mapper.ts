@@ -5,7 +5,18 @@ interface ASTNodeLike {
   isDynamic?: boolean;
   classes: string;
   attributes?: Record<string, string>;
+  /** Trimmed text of a text-only node (set by the parser when the element has
+   *  a single text child). Used as a tiebreaker in scoreMatch so two siblings
+   *  with identical tag+classes can still be told apart by their copy. */
+  textContent?: string | null;
   children: ASTNodeLike[];
+}
+
+/** Normalize text for comparison: trim and collapse internal whitespace runs
+ *  to single spaces, so AST copy (parser-trimmed) and DOM textContent (which
+ *  may carry indentation/newlines from the template) compare equal. */
+function normalizeText(text: string | null | undefined): string {
+  return (text ?? "").trim().replace(/\s+/g, " ");
 }
 
 /**
@@ -298,7 +309,7 @@ export class DomMapper {
     return null;
   }
 
-  /** Score a tag+class+attribute overlap. 0 means tag mismatch (reject). */
+  /** Score a tag+class+attribute+text overlap. 0 means tag mismatch (reject). */
   private scoreMatch(astNode: ASTNodeLike, domEl: Element): number {
     if (astNode.tagName.toLowerCase() !== domEl.tagName.toLowerCase()) return 0;
     let score = 1;
@@ -313,6 +324,16 @@ export class DomMapper {
         if (key === "class") continue;
         if (domEl.getAttribute(key) === val) score += 2;
       }
+    }
+    // Text tiebreaker: when the AST node is a text leaf, an exact (normalized)
+    // copy match is the most reliable discriminator between siblings that share
+    // tag + classes (e.g. several <p class="text-muted"> with different copy).
+    // Only awarded on exact equality, so it can only break ties, never reject
+    // an otherwise-good structural match. Weighted at +3 — stronger than one
+    // shared class — because for editable content, copy identity beats position.
+    const astText = normalizeText(astNode.textContent);
+    if (astText && normalizeText(domEl.textContent) === astText) {
+      score += 3;
     }
     return score;
   }

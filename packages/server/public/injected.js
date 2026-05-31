@@ -447,6 +447,9 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
       }
     };
   }
+  function normalizeText(text) {
+    return (text ?? "").trim().replace(/\s+/g, " ");
+  }
   class DomMapper {
     constructor() {
       __publicField(this, "ast", []);
@@ -494,13 +497,25 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
           domIndex += consumed;
           continue;
         }
-        while (domIndex < domElements.length) {
-          const matched = this.tryMatchAt(astNode, domElements, domIndex);
-          if (matched.success) {
-            domIndex = matched.nextIndex;
+        const needsChildren = astNode.children.length > 0;
+        let fallbackIndex = -1;
+        let chosenIndex = -1;
+        for (let i = domIndex; i < domElements.length; i++) {
+          if (domElements[i].tagName.toLowerCase() !== astNode.tagName.toLowerCase()) {
+            continue;
+          }
+          if (fallbackIndex === -1) fallbackIndex = i;
+          if (!needsChildren || this.getContentElements(domElements[i]).length > 0) {
+            chosenIndex = i;
             break;
           }
-          domIndex++;
+        }
+        const matchIndex = chosenIndex !== -1 ? chosenIndex : fallbackIndex;
+        if (matchIndex !== -1) {
+          const matched = this.tryMatchAt(astNode, domElements, matchIndex);
+          domIndex = matched.success ? matched.nextIndex : matchIndex + 1;
+        } else {
+          domIndex = domElements.length;
         }
       }
       return domIndex;
@@ -527,7 +542,11 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
           if (s > bestScore) bestScore = s;
         }
       }
-      if (bestScore >= 2) {
+      const childHasNoClasses = !!firstRealChild && !(firstRealChild.classes || "").trim();
+      const tagOnlyAnchor = childHasNoClasses && bestScore >= 1 && domElements.filter(
+        (el, i) => i >= startIndex && el.tagName.toLowerCase() === firstRealChild.tagName.toLowerCase()
+      ).length === 1;
+      if (bestScore >= 2 || tagOnlyAnchor) {
         const beforeCount = this.elementToNodeId.size;
         const consumed = this.matchChildren(children, domElements.slice(startIndex));
         if (this.elementToNodeId.size > beforeCount && !this.nodeIdToElement.has(astNode.nodeId)) {
@@ -632,7 +651,7 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
       }
       return null;
     }
-    /** Score a tag+class+attribute overlap. 0 means tag mismatch (reject). */
+    /** Score a tag+class+attribute+text overlap. 0 means tag mismatch (reject). */
     scoreMatch(astNode, domEl) {
       if (astNode.tagName.toLowerCase() !== domEl.tagName.toLowerCase()) return 0;
       let score = 1;
@@ -647,6 +666,10 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
           if (key === "class") continue;
           if (domEl.getAttribute(key) === val) score += 2;
         }
+      }
+      const astText = normalizeText(astNode.textContent);
+      if (astText && normalizeText(domEl.textContent) === astText) {
+        score += 3;
       }
       return score;
     }
