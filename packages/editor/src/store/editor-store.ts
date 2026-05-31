@@ -12,6 +12,7 @@ import {
   provideAstToIframe,
   updateClassesInIframe,
   updateTextInIframe,
+  updateAttributeInIframe,
   selectNodeInIframe,
 } from "../lib/iframe-bridge";
 import { connectWebSocket, onWsMessage } from "../lib/ws-client";
@@ -331,10 +332,17 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         const node = state.nodeMap.get(mutation.nodeId);
         prevContent = node?.rawTextContent ?? "";
       }
+      let prevValue: string | null | undefined;
+      if (mutation.type === "update-attribute") {
+        const node = state.nodeMap.get(mutation.nodeId);
+        // null when the attribute was absent — undo then removes it.
+        prevValue = node?.attributes?.[mutation.attr] ?? null;
+      }
       const inverse = computeInverse(mutation, {
         previousClasses: prevClasses,
         previousText: prevText,
         previousContent: prevContent,
+        previousValue: prevValue,
         ast: state.ast || undefined,
         nodeMap: state.nodeMap,
       });
@@ -349,6 +357,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }
     if (mutation.type === "update-text") {
       updateTextInIframe(mutation.nodeId, mutation.text);
+    }
+    if (mutation.type === "update-attribute") {
+      updateAttributeInIframe(mutation.nodeId, mutation.attr, mutation.value);
     }
 
     // Apply to source file

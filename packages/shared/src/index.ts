@@ -15,6 +15,8 @@ export type {
   ComponentSlotDef,
   ComponentSlotSchema,
   RecentProject,
+  AssetInfo,
+  AssetLocation,
   ProjectSwitchPayload,
   ProjectSwitchResponse,
   GitMode,

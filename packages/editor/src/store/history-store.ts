@@ -85,9 +85,9 @@ function findParentInAst(
  * placeholder that would silently no-op (or worse, replay) on undo.
  *
  * Currently inverted: update-classes, update-text, update-raw-content,
- * move-element (with AST). Structural mutations (add/remove/duplicate/wrap)
- * and update-attribute would need pre-mutation snapshots, which we don't
- * capture yet.
+ * update-attribute, move-element (with AST). Structural mutations
+ * (add/remove/duplicate/wrap) would need pre-mutation snapshots, which we
+ * don't capture yet.
  */
 export function computeInverse(
   mutation: Mutation,
@@ -95,11 +95,15 @@ export function computeInverse(
     previousClasses?: string;
     previousText?: string;
     previousContent?: string;
+    /** Prior attribute value for update-attribute undo. null means the
+     *  attribute was absent before, so the inverse removes it. */
+    previousValue?: string | null;
     ast?: ASTNode[];
     nodeMap?: Map<string, ASTNode>;
   }
 ): Mutation | null {
-  const { previousClasses, previousText, previousContent, ast } = opts || {};
+  const { previousClasses, previousText, previousContent, previousValue, ast } =
+    opts || {};
 
   switch (mutation.type) {
     case "update-classes":
@@ -134,8 +138,15 @@ export function computeInverse(
       }
       return null;
     }
-    // No honest inverse yet — skip recording so undo doesn't lie.
     case "update-attribute":
+      return {
+        type: "update-attribute",
+        nodeId: mutation.nodeId,
+        attr: mutation.attr,
+        // null restores "attribute was absent" by removing it on undo.
+        value: previousValue ?? null,
+      };
+    // No honest inverse yet — skip recording so undo doesn't lie.
     case "add-element":
     case "remove-element":
     case "duplicate-element":

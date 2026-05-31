@@ -45,6 +45,12 @@ export type EditorToIframeMessage =
   | { type: "tve:select-node"; nodeId: string | null }
   | { type: "tve:update-classes"; nodeId: string; classes: string }
   | { type: "tve:update-text"; nodeId: string; text: string }
+  | {
+      type: "tve:update-attribute";
+      nodeId: string;
+      attr: string;
+      value: string | null;
+    }
   | { type: "tve:refresh" }
   | { type: "tve:provide-ast"; ast: any[] };
 
@@ -92,6 +98,20 @@ export function setupBridge(domMapper: DomMapper): Bridge {
       const element = domMapper.getElementByNodeId(data.nodeId);
       if (element) {
         element.textContent = data.text;
+      }
+      return;
+    }
+
+    // Set/remove an arbitrary attribute (e.g. swapping an <img src>) for
+    // instant feedback before the HMR reload lands.
+    if (data.type === "tve:update-attribute") {
+      const element = domMapper.getElementByNodeId(data.nodeId);
+      if (element) {
+        if (data.value === null || data.value === "") {
+          element.removeAttribute(data.attr);
+        } else {
+          element.setAttribute(data.attr, data.value);
+        }
       }
       return;
     }

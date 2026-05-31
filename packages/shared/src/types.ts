@@ -119,6 +119,30 @@ export interface ContentFile {
   format: "md" | "mdx";
 }
 
+/** Which project tree an image asset was found in. `public/` assets are
+ *  URL-addressable as plain strings; `src/` assets require a frontmatter
+ *  import and so can only be previewed, not applied to a plain `src=""`. */
+export type AssetLocation = "public" | "src";
+
+/** An image asset discovered by the server's asset scanner, used by the
+ *  image picker. */
+export interface AssetInfo {
+  /** Path relative to the project root, POSIX-separated (e.g. `public/images/foo.webp`). */
+  relPath: string;
+  /** Bare filename (e.g. `foo.webp`). */
+  name: string;
+  /** Lowercase extension including the dot (e.g. `.webp`). */
+  ext: string;
+  /** Which scan root this asset came from. */
+  location: AssetLocation;
+  /** The string to write into a plain `src=""` — the production URL for
+   *  `public/` assets (e.g. `/images/foo.webp`); null for `src/` assets,
+   *  which need an import and can't be referenced by a plain string. */
+  publicUrl: string | null;
+  /** File size in bytes. */
+  size: number;
+}
+
 /** Dev server status */
 export type DevServerStatus = "stopped" | "starting" | "running" | "error";
 

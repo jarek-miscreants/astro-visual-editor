@@ -499,6 +499,26 @@
   color: var(--prop-tab-text-active);
 }
 
+/* Full-width secondary action button (e.g. "Choose from library…"). */
+.tve-prop-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 8px;
+  background: var(--prop-input-bg, #18181b);
+  border: 1px solid var(--prop-input-border, #3f3f46);
+  color: var(--prop-text, #e4e4e7);
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 100ms, background-color 100ms;
+}
+.tve-prop-action-btn:hover {
+  border-color: var(--prop-accent, #3b82f6);
+  background: var(--prop-input-bg-hover, #1f1f23);
+}
+
 /* ──────────────────────────────────────────────
    Class chips
    ────────────────────────────────────────────── */

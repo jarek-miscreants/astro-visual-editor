@@ -14,9 +14,16 @@ import type {
   GitCommitInfo,
   TveBranchConfig,
   DevServerStartError,
+  AssetInfo,
 } from "@tve/shared";
 
 const API_BASE = "/api";
+
+/** URL for the raw bytes of a project asset (thumbnails in the image picker).
+ *  Served by GET /api/assets/raw/*. relPath is project-relative, POSIX. */
+export function assetRawUrl(relPath: string): string {
+  return `${API_BASE}/assets/raw/${relPath.split("/").map(encodeURIComponent).join("/")}`;
+}
 
 /** Error thrown when an API call returns a non-2xx response. Carries the
  *  optional error code so callers (e.g. promotion conflict prompt) can branch
@@ -409,5 +416,10 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ kind: "github", ...input }),
     });
+  },
+
+  /** List image assets in the project's public/ and src/ trees (image picker). */
+  listAssets(): Promise<{ assets: AssetInfo[] }> {
+    return fetchJson("/assets");
   },
 };

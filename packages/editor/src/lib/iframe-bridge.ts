@@ -80,6 +80,16 @@ export function updateTextInIframe(nodeId: string, text: string) {
   sendToIframe({ type: "tve:update-text", nodeId, text });
 }
 
+/** Set/remove an attribute on an element in the iframe (instant feedback,
+ *  e.g. swapping an <img src>). value=null removes the attribute. */
+export function updateAttributeInIframe(
+  nodeId: string,
+  attr: string,
+  value: string | null
+) {
+  sendToIframe({ type: "tve:update-attribute", nodeId, attr, value });
+}
+
 /** Highlight a node in the iframe (hover-style outline) */
 export function highlightNodeInIframe(nodeId: string | null) {
   sendToIframe({ type: "tve:highlight-node", nodeId });

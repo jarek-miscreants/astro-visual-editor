@@ -26,6 +26,12 @@ export type EditorToIframeMessage =
   | { type: "tve:highlight-node"; nodeId: string | null }
   | { type: "tve:select-node"; nodeId: string | null }
   | { type: "tve:update-classes"; nodeId: string; classes: string }
+  | {
+      type: "tve:update-attribute";
+      nodeId: string;
+      attr: string;
+      value: string | null;
+    }
   | { type: "tve:update-text"; nodeId: string; text: string }
   | { type: "tve:refresh" }
   | { type: "tve:provide-ast"; ast: ASTNode[] };

@@ -427,6 +427,17 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
         }
         return;
       }
+      if (data.type === "tve:update-attribute") {
+        const element = domMapper.getElementByNodeId(data.nodeId);
+        if (element) {
+          if (data.value === null || data.value === "") {
+            element.removeAttribute(data.attr);
+          } else {
+            element.setAttribute(data.attr, data.value);
+          }
+        }
+        return;
+      }
       if (data.type === "tve:highlight-node") {
         for (const handler of handlers) {
           handler(data);

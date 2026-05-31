@@ -13,6 +13,7 @@ import { LayoutTab } from "./LayoutTab";
 import { TextTab } from "./TextTab";
 import { CollapsibleSection } from "../ui/Collapsible";
 import { LinkSection } from "./LinkSection";
+import { ImageSection } from "./ImageSection";
 import { RawContentEditor, RawContentMarketerNote } from "./RawContentEditor";
 
 interface PropertiesPanelProps {
@@ -214,6 +215,18 @@ export function PropertiesPanel({ nodeId, elementInfo }: PropertiesPanelProps) {
                 }
               />
             )}
+
+          {/* 2b. Image — for <img> elements, a previewing src editor + asset
+              browser. Sits above Attributes so it's the primary control for
+              images. The raw `src` still appears in Attributes as a fallback. */}
+          {!isComponent && elementInfo.tagName.toLowerCase() === "img" && (
+            <ImageSection
+              src={attributes.src}
+              onChange={(value) =>
+                applyMutation({ type: "update-attribute", nodeId, attr: "src", value })
+              }
+            />
+          )}
 
           {/* 3. Attributes — only the user-facing ones. Schema-owned props
               are filtered out so each prop appears exactly once (in the
