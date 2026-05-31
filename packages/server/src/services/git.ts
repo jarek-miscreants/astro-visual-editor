@@ -1,6 +1,7 @@
 import path from "path";
 import fs from "fs/promises";
 import { simpleGit, type SimpleGit } from "simple-git";
+import { getGitTransport } from "./git-transport.js";
 import type {
   GitStatus,
   GitMode,
@@ -241,11 +242,10 @@ export interface PushOptions {
 }
 
 export async function push(projectPath: string, opts: PushOptions = {}): Promise<void> {
-  const git = makeGit(projectPath);
   const args: string[] = [];
   if (opts.setUpstream) args.push("--set-upstream");
   if (opts.branch) args.push("origin", opts.branch);
-  await git.push(args.length > 0 ? args : undefined);
+  await getGitTransport().push(projectPath, args);
 }
 
 export interface PullOptions {
@@ -254,12 +254,11 @@ export interface PullOptions {
 }
 
 export async function pull(projectPath: string, opts: PullOptions): Promise<void> {
-  const git = makeGit(projectPath);
   const args: string[] = [];
   if (opts.mode === "ff-only") args.push("--ff-only");
   else if (opts.mode === "rebase") args.push("--rebase");
   if (opts.branch) args.push("origin", opts.branch);
-  await git.pull(args.length > 0 ? args : undefined);
+  await getGitTransport().pull(projectPath, args);
 }
 
 /**
@@ -388,7 +387,7 @@ export async function ensureStaging(
   try {
     await git.checkout(productionBranch);
     if (await remoteBranchExists(git, productionBranch)) {
-      await git.pull(["--ff-only", "origin", productionBranch]);
+      await getGitTransport().pull(projectPath, ["--ff-only", "origin", productionBranch]);
     }
   } catch (err: any) {
     throw new Error(
@@ -402,7 +401,7 @@ export async function ensureStaging(
   const remotes = await git.getRemotes(true);
   if (remotes.length > 0) {
     try {
-      await git.push(["--set-upstream", "origin", stagingName]);
+      await getGitTransport().push(projectPath, ["--set-upstream", "origin", stagingName]);
       pushed = true;
     } catch (err: any) {
       throw new Error(
@@ -486,7 +485,7 @@ export async function promote(
     // Best-effort sync so the merge is against latest origin/<to>
     if (hasRemote && (await remoteBranchExists(git, opts.to))) {
       try {
-        await git.pull(["--ff-only", "origin", opts.to]);
+        await getGitTransport().pull(projectPath, ["--ff-only", "origin", opts.to]);
       } catch {
         // Diverged from remote — let the merge surface that as a conflict
       }
@@ -540,7 +539,7 @@ export async function promote(
     let pushed = false;
     if (shouldPush) {
       try {
-        await git.push(["origin", opts.to]);
+        await getGitTransport().push(projectPath, ["origin", opts.to]);
         pushed = true;
       } catch (err: any) {
         throw new Error(

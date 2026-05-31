@@ -106,18 +106,17 @@ escape attempt. SQLite store opens cleanly on Win/macOS/Linux.
     `GET /api/github/repos`, `POST /api/github/clone`. Streams
     `clone → install → ready` via WS.
 
-    **Configurable cache directory.** `POST /api/github/clone` accepts
+    **Configurable cache directory.** Implements the locked decision
+    in `phase-0-decisions.md` §4. `POST /api/github/clone` accepts
     an optional `destBase` override; otherwise it uses the active
-    `repos_base_dir` pref (defaults to `~/.tve/repos/`). The clone dialog
-    shows the resolved path inline (`Save to: {base}/{owner}/{repo}/
-    [Change…]`) so users can redirect once without leaving the flow.
-    First-time override is persisted to `prefs.repos_base_dir`. Each
-    cloned repo's actual filesystem path is recorded in the
-    `repos.fs_path` column so changing the default later does not
-    orphan existing clones — they keep working at their original
-    location, new clones go to the new base. A Settings panel exposes
-    the same pref for later changes plus a list of active cache
-    locations with a "Move clone…" action per repo.
+    `repos_base_dir` pref (defaults to `~/.tve/repos/`). The clone
+    dialog shows the resolved path inline with a `[Change…]` button.
+    First-time override sticks via `prefs.repos_base_dir`; per-clone
+    location tracked in `repos.fs_path`. Settings panel surfaces both
+    the default pref and per-repo **Move clone…** actions for later
+    relocations. See §4 for the full UX spec, edge cases, and
+    rationale against onboarding-screen and per-clone-always
+    alternatives.
 
     **Three-layer validation pipeline.** A non-Astro-Tailwind repo must
     not be cloneable, installable, or runnable. Fail fast at every
@@ -315,13 +314,12 @@ differ:
    localhost origin for preview vs editor? CSP for the editor shell?
 3. **Code signing certificate ownership** — personal vs company entity
    on Apple/Microsoft developer accounts.
-4. **Cache directory location** — *Resolved.* Default
-   `~/.tve/repos/` with per-clone override surfaced inline in the
-   clone dialog (`Save to: … [Change…]`). The chosen base persists
-   to `prefs.repos_base_dir`; each repo's actual location is recorded
-   in `repos.fs_path` so changing the default later does not break
-   existing clones. Settings panel exposes the same pref + a per-repo
-   "Move clone…" action. See Phase 2 step 12.
+4. **Cache directory location** — *Resolved.* See
+   `phase-0-decisions.md` §4 for the locked spec (default
+   `~/.tve/repos/`, inline `[Change…]` in clone dialog, sticky pref
+   via `prefs.repos_base_dir`, per-clone tracking via
+   `repos.fs_path`, settings panel for later moves). Implemented in
+   Phase 1 step 6 (data model) + Phase 2 step 12 (UX).
 
 ## Test gates per phase
 

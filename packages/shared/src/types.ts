@@ -167,11 +167,47 @@ export interface ProjectInfo {
   name: string | null;
   hasAstro?: boolean;
   hasTailwind?: boolean;
+  /** Server runtime mode. `cli` is the original CLI dev tool flow;
+   * `desktop` is the Electron-shell flow added during the local-SaaS
+   * migration. Routes/screens gated on this flag are no-ops in `cli`. */
+  mode?: "cli" | "desktop";
 }
 
 export interface RecentProject {
   path: string;
   name: string;
+}
+
+/**
+ * Discriminated payload for `POST /api/project/switch`. Phase 1 wires
+ * the type so the editor and server agree on the shape; the `github`
+ * branch is intentionally inert until Phase 2 lands the GitHub clone
+ * flow (and returns `501 Not Implemented` until then).
+ *
+ * For backwards compatibility, the route also still accepts the legacy
+ * `{ path }` shape and treats it as `{ kind: "local", path }`.
+ */
+export type ProjectSwitchPayload =
+  | { kind: "local"; path: string }
+  | {
+      kind: "github";
+      owner: string;
+      repo: string;
+      ref?: string;
+      /** Numeric GitHub App installation_id with access to this repo.
+       *  The picker UI knows which installation it pulled the repo
+       *  from, so it can pass it directly. The server uses this to
+       *  request an installation token from the broker. */
+      installationId: number;
+    };
+
+export interface ProjectSwitchResponse {
+  path: string;
+  name: string;
+  hasNodeModules: boolean;
+  /** `local` mirrors the original CLI flow; `github` is the Phase 2
+   *  branch — clone progress will stream over the WebSocket. */
+  source: "local" | "github";
 }
 
 /**

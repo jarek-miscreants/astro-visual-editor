@@ -1,0 +1,30 @@
+name: cli-smoke
+
+on:
+  push:
+    branches: [main, feat/local-saas]
+  pull_request:
+    branches: [main]
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Boot server in cli mode and parse one page
+        run: node scripts/cli-smoke.mjs
+        env:
+          PORT: 3099

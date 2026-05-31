@@ -73,6 +73,34 @@ componentsRouter.get("/props", async (req, res) => {
 
 const PREVIEW_PAGE = "tve-preview.astro";
 
+/** Side-effect imports (`import "x";` with no binding) from an .astro
+ *  file's frontmatter — these are global styles, fonts, polyfills. */
+function extractSideEffectImports(astroSource: string): string[] {
+  const fm = astroSource.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+  const frontmatter = fm ? fm[1] : "";
+  const specs: string[] = [];
+  const re = /^\s*import\s+["']([^"']+)["']\s*;?\s*$/gm;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(frontmatter)) !== null) specs.push(m[1]);
+  return specs;
+}
+
+/** Keep CSS / font-package side-effect imports; drop script ones so the
+ *  isolated preview doesn't re-run a layout's analytics/JS side effects. */
+function isStyleOrFontImport(spec: string): boolean {
+  return !/\.(c|m)?[jt]s$/.test(spec);
+}
+
+/** Rewrite a relative import specifier from `fromDir` to be relative to
+ *  `toDir`. Bare package specifiers are returned unchanged. */
+function rewriteImport(spec: string, fromDir: string, toDir: string): string {
+  if (!spec.startsWith(".")) return spec;
+  const abs = path.resolve(fromDir, spec);
+  let rel = path.relative(toDir, abs).replace(/\\/g, "/");
+  if (!rel.startsWith(".")) rel = "./" + rel;
+  return rel;
+}
+
 /** POST /api/components/preview — Generate a preview page for a component */
 componentsRouter.post("/preview", async (req, res) => {
   try {
@@ -93,7 +121,12 @@ componentsRouter.post("/preview", async (req, res) => {
     let importPath = path.relative(pagesDir, componentFullPath).replace(/\\/g, "/");
     if (!importPath.startsWith(".")) importPath = "./" + importPath;
 
-    // Try to find a Layout component to wrap the preview in (so global styles load)
+    // Pull the project layout's GLOBAL STYLES + FONTS into the preview,
+    // but render the component in ISOLATION. Wrapping the component in the
+    // layout itself would also render the layout's page chrome (Nav,
+    // header, skip links, analytics) — not what you want when editing a
+    // single component. So we replicate only the layout's side-effect
+    // imports (CSS / font packages), not its body.
     const layoutCandidates = [
       "src/layouts/Layout.astro",
       "src/layouts/BaseLayout.astro",
@@ -101,32 +134,35 @@ componentsRouter.post("/preview", async (req, res) => {
       "src/layouts/Default.astro",
       "src/layouts/index.astro",
     ];
-    let layoutImport: string | null = null;
-    let layoutName: string | null = null;
-    let layoutHasTitle = false;
+
+    const styleImports: string[] = [];
+    const seenStyles = new Set<string>();
+    const addStyle = (spec: string) => {
+      if (!seenStyles.has(spec)) {
+        seenStyles.add(spec);
+        styleImports.push(spec);
+      }
+    };
 
     for (const candidate of layoutCandidates) {
       const candidatePath = path.join(projectPath, candidate);
+      let content: string;
       try {
-        const content = await fs.readFile(candidatePath, "utf-8");
-        const candidateName = path.basename(candidate, ".astro");
-        const relativeImport = path
-          .relative(pagesDir, candidatePath)
-          .replace(/\\/g, "/");
-        layoutImport = relativeImport.startsWith(".")
-          ? relativeImport
-          : "./" + relativeImport;
-        layoutName = candidateName;
-        // Check if layout accepts a title prop
-        layoutHasTitle = /\btitle\??\s*:/i.test(content) || /\btitle\b/i.test(content);
-        break;
+        content = await fs.readFile(candidatePath, "utf-8");
       } catch {
         continue;
       }
+      const layoutDir = path.dirname(candidatePath);
+      for (const spec of extractSideEffectImports(content)) {
+        if (isStyleOrFontImport(spec)) {
+          addStyle(rewriteImport(spec, layoutDir, pagesDir));
+        }
+      }
+      break; // first matching layout wins
     }
 
-    // Try to find a global stylesheet to import (for projects without a Layout)
-    let globalCssImport: string | null = null;
+    // Fallback / supplement: a detected global stylesheet, for projects
+    // whose layout doesn't import its CSS directly (or that have no layout).
     const cssCandidates = [
       "src/styles/global.css",
       "src/styles/main.css",
@@ -138,37 +174,22 @@ componentsRouter.post("/preview", async (req, res) => {
       const candidatePath = path.join(projectPath, candidate);
       try {
         await fs.access(candidatePath);
-        const relativeImport = path
-          .relative(pagesDir, candidatePath)
-          .replace(/\\/g, "/");
-        globalCssImport = relativeImport.startsWith(".")
-          ? relativeImport
-          : "./" + relativeImport;
+        let rel = path.relative(pagesDir, candidatePath).replace(/\\/g, "/");
+        if (!rel.startsWith(".")) rel = "./" + rel;
+        addStyle(rel);
         break;
       } catch {
         continue;
       }
     }
 
-    // Generate preview page
-    let previewContent: string;
-    if (layoutImport && layoutName) {
-      // Wrap in project layout (so global styles, fonts, head tags all work)
-      const titleProp = layoutHasTitle ? ` title="Preview: ${componentName}"` : "";
-      previewContent = `---
-import ${layoutName} from '${layoutImport}';
-import ${componentName} from '${importPath}';
----
-
-<${layoutName}${titleProp}>
-  <${componentName} />
-</${layoutName}>
-`;
-    } else {
-      // Standalone with optional global CSS import
-      const cssImport = globalCssImport ? `import '${globalCssImport}';\n` : "";
-      previewContent = `---
-${cssImport}import ${componentName} from '${importPath}';
+    // Render the component standalone in a minimal shell, with the
+    // project's global styles + fonts but none of the layout chrome.
+    const styleImportLines = styleImports
+      .map((s) => `import '${s}';`)
+      .join("\n");
+    const previewContent = `---
+${styleImportLines}${styleImportLines ? "\n" : ""}import ${componentName} from '${importPath}';
 ---
 
 <!doctype html>
@@ -183,7 +204,6 @@ ${cssImport}import ${componentName} from '${importPath}';
   </body>
 </html>
 `;
-    }
 
     await fs.mkdir(pagesDir, { recursive: true });
     await fs.writeFile(previewPagePath, previewContent, "utf-8");

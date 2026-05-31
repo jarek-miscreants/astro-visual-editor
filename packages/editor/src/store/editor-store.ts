@@ -20,6 +20,7 @@ import { toast } from "./toast-store";
 import { useGitStore } from "./git-store";
 import { useComponentSlotsStore } from "./component-slots-store";
 import { useComponentPropsStore } from "./component-props-store";
+import { useContentStore } from "./content-store";
 
 function describeMutation(mutation: Mutation): string {
   switch (mutation.type) {
@@ -80,6 +81,7 @@ interface EditorState {
   setIframeReady: (ready: boolean) => void;
   applyMutation: (mutation: Mutation, skipHistory?: boolean) => Promise<void>;
   startDevServer: () => Promise<void>;
+  autoOpenIndexPage: () => void;
   updateAst: (ast: ASTNode[]) => void;
 }
 
@@ -191,6 +193,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       wsUnsubscribe = onWsMessage((msg) => {
         if (msg.type === "dev-server:ready") {
           set({ devServerStatus: "running", devServerUrl: msg.url, devServerError: null });
+          get().autoOpenIndexPage();
         }
         if (msg.type === "dev-server:error") {
           set({
@@ -252,6 +255,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const status = await api.getDevServerStatus();
       if (status.url) {
         set({ devServerStatus: "running" as DevServerStatus, devServerUrl: status.url });
+        get().autoOpenIndexPage();
       }
     } catch (err) {
       console.error("Failed to init project:", err);
@@ -450,6 +454,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const result = await api.startDevServer();
       if (result.success && result.url) {
         set({ devServerStatus: "running", devServerUrl: result.url, devServerError: null });
+        get().autoOpenIndexPage();
         return;
       }
       // success: false — server returned a structured error
@@ -466,6 +471,26 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         devServerError: { kind: "unknown", message: err?.message ?? "Failed to start dev server", raw: err?.stack ?? String(err) },
       });
     }
+  },
+
+  autoOpenIndexPage() {
+    const state = get();
+    // Only when nothing is open yet — never override the page the user
+    // already picked or an open content file when the dev server
+    // (re)connects.
+    if (state.currentFile) return;
+    if (useContentStore.getState().currentPath) return;
+    const pages = state.files.filter((f) => f.type === "page");
+    if (pages.length === 0) return;
+    // Prefer the site index; never auto-open the internal tve-preview page.
+    const candidates = pages.filter(
+      (f) => f.path !== "src/pages/tve-preview.astro"
+    );
+    const pick =
+      candidates.find((f) => f.path === "src/pages/index.astro") ??
+      candidates.find((f) => /(^|\/)index\.astro$/.test(f.path)) ??
+      candidates[0];
+    if (pick) void get().setCurrentFile(pick.path);
   },
 
   updateAst(ast) {

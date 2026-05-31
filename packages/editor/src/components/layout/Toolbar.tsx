@@ -28,6 +28,7 @@ import { DesignSystemPanel } from "../design-system/DesignSystemPanel";
 import { Tooltip } from "../ui/Tooltip";
 import { openShortcutsDialog } from "../ui/ShortcutsDialog";
 import { GitToolbarWidget } from "../git/GitToolbarWidget";
+import { AuthButton } from "../auth/AuthButton";
 
 export function Toolbar() {
   const [showNewComponent, setShowNewComponent] = useState(false);
@@ -188,6 +189,11 @@ export function Toolbar() {
       )}
 
       <div className="tve-toolbar__spacer" />
+
+      {/* GitHub auth */}
+      <AuthButton />
+
+      <Divider />
 
       {/* Keyboard shortcuts */}
       <Tooltip content="Keyboard shortcuts" shortcut="?">

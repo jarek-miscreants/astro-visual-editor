@@ -345,4 +345,69 @@ export const api = {
       body: JSON.stringify(opts),
     });
   },
+
+  /** GitHub auth: current sign-in state. Always returns 200 (with
+   *  signedIn=false when no token is stored). */
+  getAuthStatus(): Promise<{
+    signedIn: boolean;
+    user?: { login: string; id: number; avatarUrl: string | null } | null;
+    installationId?: number | null;
+    storedAt?: number;
+    expiresAt?: number | null;
+  }> {
+    return fetchJson("/auth/whoami");
+  },
+
+  /** GitHub auth: clear the in-memory token. */
+  authLogout(): Promise<{ signedIn: false }> {
+    return fetchJson("/auth/logout", { method: "POST" });
+  },
+
+  /** GitHub: list the signed-in user's App installations. */
+  listGithubInstallations(): Promise<{
+    installations: Array<{
+      id: number;
+      account: { login: string; type: string; avatarUrl: string | null };
+      repositorySelection: "all" | "selected";
+      permissions: Record<string, string>;
+    }>;
+  }> {
+    return fetchJson("/github/installations");
+  },
+
+  /** GitHub: list repos accessible via a given installation. */
+  listGithubRepositories(installationId: number): Promise<{
+    repositories: Array<{
+      id: number;
+      name: string;
+      fullName: string;
+      defaultBranch: string;
+      private: boolean;
+      description: string | null;
+      htmlUrl: string;
+      pushedAt: string | null;
+    }>;
+  }> {
+    return fetchJson(`/github/installations/${installationId}/repositories`);
+  },
+
+  /** Project switch — kind="github" branch. Server clones the repo
+   *  via the broker's installation token, validates, and switches the
+   *  active project to the cached checkout. */
+  switchProjectToGithub(input: {
+    owner: string;
+    repo: string;
+    installationId: number;
+    ref?: string;
+  }): Promise<{
+    path: string;
+    name: string;
+    hasNodeModules: boolean;
+    source: "local" | "github";
+  }> {
+    return fetchJson("/project/switch", {
+      method: "POST",
+      body: JSON.stringify({ kind: "github", ...input }),
+    });
+  },
 };

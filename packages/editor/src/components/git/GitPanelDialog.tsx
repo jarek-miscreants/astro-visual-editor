@@ -19,6 +19,7 @@ import {
   Check,
 } from "lucide-react";
 import { useGitStore } from "../../store/git-store";
+import { useModeStore } from "../../store/mode-store";
 import type { GitDirtyFile, GitDiffEntry } from "@tve/shared";
 import { Tooltip } from "../ui/Tooltip";
 
@@ -49,6 +50,7 @@ export function GitPanelDialog({ onClose }: Props) {
   const checkout = useGitStore((s) => s.checkout);
   const ensureStaging = useGitStore((s) => s.ensureStaging);
   const promote = useGitStore((s) => s.promote);
+  const userMode = useModeStore((s) => s.userMode);
 
   const [message, setMessage] = useState("");
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -93,6 +95,26 @@ export function GitPanelDialog({ onClose }: Props) {
     const ok = await commit(trimmed);
     if (ok) setMessage("");
   }
+
+  /**
+   * One-click "save and ship" — the only verb a marketer needs. If
+   * there are uncommitted changes, commit them with an auto-message;
+   * then push if there's anything ahead of remote.
+   *
+   * Disabled when there's nothing to do (clean tree + 0 ahead).
+   */
+  async function handlePublish() {
+    if (dirty.length > 0) {
+      const auto = `Edits from TVE — ${new Date().toLocaleString()}`;
+      const ok = await commit(auto);
+      if (!ok) return;
+    }
+    // After commit, status updates; push handles 0-ahead as a no-op
+    // gracefully. Cheaper to just call push than to re-read status.
+    await push();
+  }
+
+  const canPublish = !busy && !isLocalOnly && (dirty.length > 0 || ahead > 0);
 
   async function handleSendToStaging() {
     if (!currentBranch) return;
@@ -265,21 +287,28 @@ export function GitPanelDialog({ onClose }: Props) {
           <span className="text-zinc-600">·</span>
           <span>{dirty.length} change{dirty.length === 1 ? "" : "s"}</span>
           <div className="flex-1" />
+          {/* Pull (dev only) — only meaningful when behind > 0,
+              which today only happens after an external git fetch.
+              Hidden in marketer mode entirely. */}
+          {userMode === "dev" && behind > 0 && (
+            <button
+              onClick={() => pull()}
+              disabled={busy || isLocalOnly}
+              className="inline-flex h-6 items-center gap-1 rounded border border-zinc-800 bg-zinc-900 px-2 text-[11px] text-zinc-300 hover:bg-zinc-800 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <ArrowDownToLine size={11} />
+              Pull
+            </button>
+          )}
+          {/* Publish — single primary action: commit pending changes
+              (auto-message) and push. Visible in both modes. */}
           <button
-            onClick={() => pull()}
-            disabled={busy || isLocalOnly || behind === 0}
-            className="inline-flex h-6 items-center gap-1 rounded border border-zinc-800 bg-zinc-900 px-2 text-[11px] text-zinc-300 hover:bg-zinc-800 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            <ArrowDownToLine size={11} />
-            Pull
-          </button>
-          <button
-            onClick={() => push()}
-            disabled={busy || isLocalOnly || ahead === 0}
-            className="inline-flex h-6 items-center gap-1 rounded border border-zinc-800 bg-zinc-900 px-2 text-[11px] text-zinc-300 hover:bg-zinc-800 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+            onClick={handlePublish}
+            disabled={!canPublish}
+            className="inline-flex h-6 items-center gap-1 rounded bg-blue-600 px-2.5 text-[11px] font-medium text-white hover:bg-blue-500 disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
           >
             <ArrowUpFromLine size={11} />
-            Push
+            Publish
           </button>
         </div>
 

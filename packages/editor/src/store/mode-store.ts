@@ -19,7 +19,14 @@ export const useModeStore = create<ModeState>((set) => ({
     try {
       const { defaultMode } = await api.getTveConfig();
       set({ userMode: defaultMode, defaultMode, loaded: true });
-    } catch {
+    } catch (err) {
+      // Surface the failure: previously we silently fell back to the
+      // hardcoded "dev" default, which made misconfigured tve.config
+      // files invisible in production.
+      console.warn(
+        "[tve] failed to load TVE config; using built-in defaults",
+        err
+      );
       set({ loaded: true });
     }
   },

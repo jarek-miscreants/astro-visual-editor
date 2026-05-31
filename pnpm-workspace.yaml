@@ -1,4 +1,15 @@
 packages:
   - "packages/*"
+  # Broker is a standalone Cloudflare Worker that will eventually
+  # extract to its own repo (per phase-0-decisions.md §1). It lives in
+  # the workspace for now so `pnpm install` covers it; extraction is a
+  # `git mv` + new repo, no code changes.
+  - "broker"
 onlyBuiltDependencies:
   - esbuild
+  - "@cloudflare/workerd-darwin-64"
+  - "@cloudflare/workerd-darwin-arm64"
+  - "@cloudflare/workerd-linux-64"
+  - "@cloudflare/workerd-linux-arm64"
+  - "@cloudflare/workerd-windows-64"
+  - workerd

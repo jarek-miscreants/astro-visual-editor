@@ -133,7 +133,12 @@ tests and dev. On Windows this is `%USERPROFILE%\.tve\` (e.g.
 `C:\Users\jarss\.tve\`).
 
 **Repos base directory** is decoupled from the state directory and
-user-configurable. Resolution order at clone time:
+user-configurable. Full UX spec lives in `phase-0-decisions.md` §4
+(default, inline clone-dialog override, sticky pref, per-clone
+tracking, settings panel). Phase 1 implements the data model only —
+the picker dialog is Phase 2.
+
+Resolution order at clone time:
 
 1. Explicit `destBase` argument passed to the clone API (Phase 2,
    step 12).

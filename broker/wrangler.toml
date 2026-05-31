@@ -1,0 +1,25 @@
+name = "tve-broker"
+main = "src/index.ts"
+compatibility_date = "2025-04-01"
+
+# Public env vars. Safe to commit — these are baked into the deployed
+# Worker as plain text. Secrets (client secret, private key) are set
+# separately via `wrangler secret put` and never appear in this file.
+[vars]
+GITHUB_APP_CLIENT_ID = "Iv23liYBl4uHyTNnpQzO"
+
+# Comma-separated list of origins allowed to call the broker. The
+# server-to-broker request flows are NOT bound by browser CORS, but
+# we still want a basic allowlist so a stray browser-side fetch from
+# a malicious tab can't probe the broker. Add prod TVE origins here
+# when desktop ships.
+ALLOWED_ORIGINS = "http://localhost:3011,http://localhost:3005"
+
+# Secrets — set via:
+#   wrangler secret put GITHUB_APP_CLIENT_SECRET
+#   wrangler secret put GITHUB_APP_PRIVATE_KEY
+# Private key is the entire .pem file contents (BEGIN/END markers
+# included). For the .pem you can pipe it: `Get-Content app.pem |
+# wrangler secret put GITHUB_APP_PRIVATE_KEY` on PowerShell, or
+# `cat app.pem | wrangler secret put GITHUB_APP_PRIVATE_KEY` on
+# POSIX shells.

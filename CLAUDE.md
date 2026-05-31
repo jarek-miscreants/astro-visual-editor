@@ -201,7 +201,7 @@ Controls follow Tailwind's mobile-first responsive system. Base classes = mobile
 
 ## Test Project
 
-`test-project/` contains a sample Astro 5 + Tailwind v3 project for development testing. Requires `tailwind.config.mjs` with content paths.
+`test-project/` contains a sample Astro 6 + Tailwind v4 project for development testing. Tailwind v4 is wired via PostCSS (`postcss.config.mjs` + `@tailwindcss/postcss`) with `src/styles/global.css` doing `@import "tailwindcss";` — the `@tailwindcss/vite` plugin is currently incompatible with Astro 6's rolldown-vite. Content collections use the Astro 6 content layer (`src/content.config.ts` with a `glob()` loader). TVE targets Astro 6+ / Tailwind v4+ only.
 
 ## Port Assignments
 - 3005: Editor (Vite dev server)

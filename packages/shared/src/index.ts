@@ -15,6 +15,8 @@ export type {
   ComponentSlotDef,
   ComponentSlotSchema,
   RecentProject,
+  ProjectSwitchPayload,
+  ProjectSwitchResponse,
   GitMode,
   GitStatus,
   GitDirtyFile,

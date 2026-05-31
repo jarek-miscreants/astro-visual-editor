@@ -5,6 +5,7 @@ import { useHistoryStore } from "./store/history-store";
 import { useThemeStore } from "./store/theme-store";
 import { useModeStore } from "./store/mode-store";
 import { useContentStore } from "./store/content-store";
+import { useAuthStore, consumeSignedInQuery } from "./store/auth-store";
 
 export default function App() {
   const initProject = useEditorStore((s) => s.initProject);
@@ -13,6 +14,7 @@ export default function App() {
   const loadTokens = useThemeStore((s) => s.loadTokens);
   const loadMode = useModeStore((s) => s.loadMode);
   const loadContentFiles = useContentStore((s) => s.loadFiles);
+  const loadAuth = useAuthStore((s) => s.loadAuth);
 
   useEffect(() => {
     initProject();
@@ -20,7 +22,11 @@ export default function App() {
     loadTokens();
     loadMode();
     loadContentFiles();
-  }, [initProject, loadTheme, loadTokens, loadMode, loadContentFiles]);
+    // If we're returning from the OAuth callback, strip the query
+    // params before loadAuth so reloads don't loop.
+    consumeSignedInQuery();
+    loadAuth();
+  }, [initProject, loadTheme, loadTokens, loadMode, loadContentFiles, loadAuth]);
 
   // Global keyboard shortcuts
   useEffect(() => {

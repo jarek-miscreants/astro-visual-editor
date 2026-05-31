@@ -317,3 +317,73 @@ A non-technical user can:
 7. Never see the words "rebase," "merge conflict," or "remote tracking branch" unless something is genuinely wrong.
 
 If all seven hold, the local-app phase is done and the next conversation is "what does this look like as a hosted product."
+
+
+TVE Hosted GitHub SaaS Migration Plan
+Summary
+Move TVE from a single localhost project editor into a multi-tenant webapp with GitHub login, repo installation, isolated ephemeral editing sessions, and GitHub-backed persistence.
+
+Locked choices:
+
+Auth/repo access: GitHub App with user login and repository installation.
+Runtime: managed container workers.
+Database: Neon Postgres.
+Workspace model: ephemeral per-session containers.
+Collaboration v1: multi-tenant, not real-time co-editing.
+Publishing: support both draft branch + PR and direct branch push, with PR flow as the default.
+Key Changes
+Split the app into a control plane and workspace workers.
+
+Control plane owns auth, GitHub App callbacks, repo/session records, worker orchestration, billing-ready tenant boundaries, and API routing.
+Each worker owns one isolated repo checkout, file watcher, Astro dev server, preview proxy target, mutation engine, and Git operations.
+Replace global app.locals.projectPath, global file watcher, and global Astro process with session-scoped workspace context.
+Add GitHub SaaS flow.
+
+User logs in with GitHub.
+User installs/configures the GitHub App for selected repos.
+Backend stores user, installation, repo, and session metadata in Neon.
+Backend generates short-lived installation tokens on demand; do not persist installation tokens.
+Clone via HTTPS using installation token, create or checkout the requested editing branch, run dependency install/preflight, then start Astro preview.
+Add hosted workspace lifecycle.
+
+POST /api/workspaces creates an ephemeral session for {repo, branch, mode}.
+Worker clones into an isolated temp volume and exposes scoped API/WS/preview endpoints.
+Idle sessions shut down after a fixed timeout, with dirty-state warning and recovery metadata in DB.
+Source of truth remains GitHub; local worker state is disposable.
+Adapt editor UI.
+
+Replace local path picker with GitHub repo picker.
+Add session startup states: cloning, installing, preflight, dev server starting, ready, failed.
+Keep existing visual editor, properties panel, design system, content editor, tree editing, preview, and Git panel behavior.
+Git panel gains publish mode selector: “Open/update PR” or “Push directly”.
+Store core SaaS data in Neon.
+
+Tables: users, github_accounts, installations, repositories, workspace_sessions, workspace_events, branch_configs, commits/publish_events.
+Encrypt refresh/user tokens if stored; prefer short-lived token generation where possible.
+Use Neon pooled connections for app traffic and direct connection for migrations.
+Security baseline for public SaaS.
+
+Treat repo code as untrusted.
+Run workers in isolated containers with no shared filesystem, no ambient secrets, restricted network where practical, CPU/RAM/disk/time quotas, and automatic teardown.
+Never expose raw worker ports publicly; route through authenticated gateway with workspace ownership checks.
+Scope WebSocket broadcasts by workspace session, not globally.
+Prerequisite Stabilization
+Before migration, fix the review findings that would become harder in SaaS:
+
+Injected overlay typecheck and protocol mismatch.
+Centralized path guard coverage for all write/read routes.
+Structural undo/redo placeholders or disable unsupported undo actions.
+Tailwind v3 token color sync.
+WebSocket handler accumulation.
+Port/docs mismatch.
+Test Plan
+Unit tests for GitHub App auth helpers, token refresh/generation, repo access checks, and workspace session state transitions.
+Integration tests for clone, install, parse AST, mutate source, commit, push, and PR creation against a disposable test repo.
+Security tests for cross-tenant access denial, invalid workspace IDs, path traversal, revoked installation, deleted repo, expired token, and worker teardown.
+E2E tests for login, install repo, open editor, start preview, edit class/text/content, commit, push direct, open PR, and reopen a new session.
+Load tests for concurrent workspace startup, idle cleanup, WebSocket routing, and Neon connection usage.
+Assumptions
+v1 does not include live multi-user co-editing in the same page.
+GitHub is the only source provider for v1.
+GitHub remains the durable source of edited project files; workers are cache/session state only.
+Recommended references: GitHub Apps vs OAuth Apps, GitHub App user tokens, installation access tokens, and Neon connection pooling.
