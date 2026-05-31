@@ -15,3 +15,6 @@ tve-preview.astro
 .vscode/
 .idea/
 .claude/
+
+# Session/agent temp artifacts
+.tmp-*
