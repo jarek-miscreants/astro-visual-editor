@@ -282,6 +282,22 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
         bridge.sendToEditor({ type: "tve:deselect" });
       }
     });
+    document.addEventListener("keydown", (e) => {
+      const t = e.target;
+      if (t && (t.isContentEditable || t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT")) {
+        return;
+      }
+      if (!isEditorShortcut(e)) return;
+      e.preventDefault();
+      bridge.sendToEditor({
+        type: "tve:keydown",
+        key: e.key,
+        ctrlKey: e.ctrlKey,
+        shiftKey: e.shiftKey,
+        altKey: e.altKey,
+        metaKey: e.metaKey
+      });
+    });
     document.addEventListener(
       "submit",
       (e) => {
@@ -372,6 +388,11 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
         el.scrollIntoView({ behavior: "smooth", block: "nearest" });
       }
     });
+  }
+  function isEditorShortcut(e) {
+    if (e.key === "Delete") return true;
+    if (!e.ctrlKey && !e.metaKey) return false;
+    return ["z", "y", "d", "e", "g", "q"].includes(e.key.toLowerCase());
   }
   function formatElementLabel(el) {
     const isComponent = /^[A-Z]/.test(el.tagName);

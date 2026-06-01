@@ -6,6 +6,7 @@ import { useThemeStore } from "./store/theme-store";
 import { useModeStore } from "./store/mode-store";
 import { useContentStore } from "./store/content-store";
 import { useAuthStore, consumeSignedInQuery } from "./store/auth-store";
+import { onIframeMessage } from "./lib/iframe-bridge";
 
 export default function App() {
   const initProject = useEditorStore((s) => s.initProject);
@@ -52,6 +53,26 @@ export default function App() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [applyMutation]);
+
+  // Re-dispatch shortcuts forwarded from the preview iframe. Keydowns inside
+  // the iframe never reach our window-level handlers, so we replay them here
+  // as a synthetic event on window — every global shortcut listener then fires.
+  useEffect(() => {
+    return onIframeMessage((message) => {
+      if (message.type !== "tve:keydown") return;
+      window.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: message.key,
+          ctrlKey: message.ctrlKey,
+          shiftKey: message.shiftKey,
+          altKey: message.altKey,
+          metaKey: message.metaKey,
+          bubbles: true,
+          cancelable: true,
+        })
+      );
+    });
+  }, []);
 
   return <EditorLayout />;
 }

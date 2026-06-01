@@ -37,7 +37,15 @@ export type IframeToEditorMessage =
       newParentId: string;
       newIndex: number;
     }
-  | { type: "tve:dom-ready"; nodeCount: number };
+  | { type: "tve:dom-ready"; nodeCount: number }
+  | {
+      type: "tve:keydown";
+      key: string;
+      ctrlKey: boolean;
+      shiftKey: boolean;
+      altKey: boolean;
+      metaKey: boolean;
+    };
 
 export type EditorToIframeMessage =
   | { type: "tve:set-mode"; mode: "edit" | "preview" }

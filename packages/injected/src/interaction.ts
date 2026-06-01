@@ -125,6 +125,39 @@ export function setupInteraction(
     }
   });
 
+  // Forward editor shortcuts to the parent. Keydowns that land inside the
+  // preview iframe never reach the editor's window-level shortcut handlers,
+  // so undo/redo, delete, duplicate, exit, etc. silently break once the
+  // preview has focus. We relay the keystroke and the editor re-dispatches it.
+  document.addEventListener("keydown", (e) => {
+    // Never hijack keys while the user is editing text inside the preview
+    // (inline contentEditable region or a real form field).
+    const t = e.target as HTMLElement | null;
+    if (
+      t &&
+      (t.isContentEditable ||
+        t.tagName === "INPUT" ||
+        t.tagName === "TEXTAREA" ||
+        t.tagName === "SELECT")
+    ) {
+      return;
+    }
+
+    if (!isEditorShortcut(e)) return;
+
+    // Suppress the browser default for combos the editor owns
+    // (Ctrl+D bookmark, Ctrl+E address bar, etc.).
+    e.preventDefault();
+    bridge.sendToEditor({
+      type: "tve:keydown",
+      key: e.key,
+      ctrlKey: e.ctrlKey,
+      shiftKey: e.shiftKey,
+      altKey: e.altKey,
+      metaKey: e.metaKey,
+    });
+  });
+
   // Prevent default link/form behavior in edit mode
   document.addEventListener(
     "submit",
@@ -231,6 +264,16 @@ export function setupInteraction(
       el.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
   });
+}
+
+/** Whether a keystroke maps to one of the editor's global shortcuts and
+ *  should be relayed to the parent window. Keep this in sync with the
+ *  window-level handlers in the editor (App.tsx, LeftSidebar.tsx, ExitOverlay.tsx). */
+function isEditorShortcut(e: KeyboardEvent): boolean {
+  if (e.key === "Delete") return true; // delete selected element
+  if (!e.ctrlKey && !e.metaKey) return false;
+  // z/y: undo/redo · d: duplicate · e: add element · g: wrap · q: exit
+  return ["z", "y", "d", "e", "g", "q"].includes(e.key.toLowerCase());
 }
 
 /** Build a user-facing label for an overlay pill:

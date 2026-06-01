@@ -18,7 +18,18 @@ export type IframeToEditorMessage =
       newParentId: string;
       newIndex: number;
     }
-  | { type: "tve:dom-ready"; nodeCount: number };
+  | { type: "tve:dom-ready"; nodeCount: number }
+  | {
+      // Editor shortcut keystroke forwarded from the preview iframe so
+      // global shortcuts (undo, delete, exit, …) work even when focus
+      // is inside the preview. The editor re-dispatches it on its own window.
+      type: "tve:keydown";
+      key: string;
+      ctrlKey: boolean;
+      shiftKey: boolean;
+      altKey: boolean;
+      metaKey: boolean;
+    };
 
 /** Messages sent from the editor to the injected iframe script */
 export type EditorToIframeMessage =
