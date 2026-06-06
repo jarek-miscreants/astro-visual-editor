@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { FileText, ChevronDown, FileType, Box, Plus } from "lucide-react";
+import { FileText, ChevronDown, FileType, Box, Plus, Trash2 } from "lucide-react";
 import { useEditorStore } from "../../store/editor-store";
 import { useContentStore } from "../../store/content-store";
 import { ContentFileDialog } from "../dialogs/ContentFileDialog";
@@ -13,8 +13,11 @@ export function PageSelector() {
   const clearComponentReturn = useEditorStore((s) => s.clearComponentReturn);
   const contentFiles = useContentStore((s) => s.files);
   const currentContentPath = useContentStore((s) => s.currentPath);
+  const contentDirty = useContentStore((s) => s.dirty);
+  const deletingContent = useContentStore((s) => s.deleting);
   const openContentFile = useContentStore((s) => s.openFile);
   const closeContentFile = useContentStore((s) => s.closeFile);
+  const deleteContentFile = useContentStore((s) => s.deleteFile);
 
   // Group files by type
   const pages = files.filter((f) => f.type === "page");
@@ -44,6 +47,24 @@ export function PageSelector() {
   function openContent(path: string) {
     clearComponentReturn();
     openContentFile(path);
+  }
+
+  async function deleteContent(path: string) {
+    if (deletingContent) return;
+    const dirtyWarning =
+      path === currentContentPath && contentDirty
+        ? "\n\nUnsaved changes in this entry will be lost."
+        : "";
+    const confirmed = window.confirm(
+      `Delete ${path}?\n\nThis removes the content file from disk.${dirtyWarning}`
+    );
+    if (!confirmed) return;
+
+    try {
+      await deleteContentFile(path);
+    } catch {
+      // The content store records the error for the active markdown editor.
+    }
   }
 
   const astroShortName = (path: string) =>
@@ -139,6 +160,7 @@ export function PageSelector() {
                   setShowCreateDialog(true);
                   close();
                 }}
+                onDelete={deleteContent}
               />
             ))}
             <button
@@ -229,6 +251,7 @@ function FileGroup({
   onSelect,
   accent = "blue",
   onAddNew,
+  onDelete,
 }: {
   label: string;
   files: { path: string; type: string }[];
@@ -236,6 +259,7 @@ function FileGroup({
   onSelect: (path: string) => void;
   accent?: "blue" | "emerald";
   onAddNew?: () => void;
+  onDelete?: (path: string) => void;
 }) {
   const activeClass =
     accent === "emerald"
@@ -257,19 +281,46 @@ function FileGroup({
           </button>
         )}
       </div>
-      {files.map((file) => (
-        <button
-          key={file.path}
-          onClick={() => onSelect(file.path)}
-          className={`w-full px-3 py-1.5 text-left text-xs transition-colors ${
-            currentFile === file.path
-              ? activeClass
-              : "text-zinc-300 hover:bg-zinc-700"
-          }`}
-        >
-          {file.path}
-        </button>
-      ))}
+      {files.map((file) => {
+        const active = currentFile === file.path;
+        const rowClass = active ? activeClass : "text-zinc-300 hover:bg-zinc-700";
+
+        if (!onDelete) {
+          return (
+            <button
+              key={file.path}
+              onClick={() => onSelect(file.path)}
+              className={`w-full px-3 py-1.5 text-left text-xs transition-colors ${rowClass}`}
+            >
+              {file.path}
+            </button>
+          );
+        }
+
+        return (
+          <div
+            key={file.path}
+            className={`group flex items-center text-xs transition-colors ${rowClass}`}
+          >
+            <button
+              onClick={() => onSelect(file.path)}
+              className="min-w-0 flex-1 px-3 py-1.5 text-left"
+            >
+              <span className="block truncate">{file.path}</span>
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(file.path);
+              }}
+              className="mr-1 inline-flex h-6 w-6 shrink-0 items-center justify-center text-zinc-500 opacity-0 transition-colors hover:bg-red-950/50 hover:text-red-300 group-hover:opacity-100 focus:opacity-100"
+              title={`Delete ${file.path}`}
+            >
+              <Trash2 size={12} />
+            </button>
+          </div>
+        );
+      })}
     </div>
   );
 }

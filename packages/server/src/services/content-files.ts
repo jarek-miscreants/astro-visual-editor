@@ -1,6 +1,7 @@
 import fs from "fs/promises";
 import path from "path";
 import matter from "gray-matter";
+import { resolveProjectPath } from "../lib/path-guard.js";
 
 export interface ContentFileInfo {
   path: string;
@@ -111,6 +112,15 @@ export async function writeContentFile(
   // preserving quoting style for the fields it controls.
   const out = matter.stringify(body, frontmatter);
   await fs.writeFile(full, out, "utf-8");
+}
+
+export async function deleteContentFile(
+  projectPath: string,
+  relPath: string
+): Promise<void> {
+  assertMarkdownPath(relPath);
+  const full = resolveProjectPath(projectPath, relPath);
+  await fs.unlink(full);
 }
 
 export interface CreateContentFileInput {

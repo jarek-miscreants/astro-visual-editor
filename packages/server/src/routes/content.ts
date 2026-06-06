@@ -3,6 +3,7 @@ import {
   scanContentFiles,
   readContentFile,
   writeContentFile,
+  deleteContentFile,
   createContentFile,
 } from "../services/content-files.js";
 import {
@@ -68,6 +69,29 @@ contentRouter.post("/write/*filePath", async (req, res) => {
       return;
     }
     res.status(500).json({ error: err.message });
+  }
+});
+
+/** DELETE /api/content/delete/* — remove a markdown content entry from disk */
+contentRouter.delete("/delete/*filePath", async (req, res) => {
+  try {
+    const projectPath = req.app.locals.projectPath as string;
+    const raw = (req.params as any).filePath;
+    const relPath = Array.isArray(raw) ? raw.join("/") : String(raw);
+    resolveProjectPath(projectPath, relPath);
+
+    await deleteContentFile(projectPath, relPath);
+    res.json({ success: true });
+  } catch (err: any) {
+    if (err instanceof PathTraversalError) {
+      res.status(403).json({ error: err.message });
+      return;
+    }
+    if (err.code === "ENOENT") {
+      res.status(404).json({ error: err.message });
+      return;
+    }
+    res.status(400).json({ error: err.message });
   }
 });
 

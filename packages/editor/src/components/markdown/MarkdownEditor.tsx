@@ -1,7 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Save, Loader2, AlertTriangle, Code2, Wand2, Columns2, Image as ImageIcon } from "lucide-react";
+import {
+  Save,
+  Loader2,
+  AlertTriangle,
+  Code2,
+  Wand2,
+  Columns2,
+  Image as ImageIcon,
+  Trash2,
+} from "lucide-react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { useContentStore } from "../../store/content-store";
 import { FrontmatterForm } from "./FrontmatterForm";
@@ -28,10 +37,12 @@ export function MarkdownEditor() {
   const currentPath = useContentStore((s) => s.currentPath);
   const dirty = useContentStore((s) => s.dirty);
   const saving = useContentStore((s) => s.saving);
+  const deleting = useContentStore((s) => s.deleting);
   const lastError = useContentStore((s) => s.lastError);
   const revision = useContentStore((s) => s.revision);
   const updateBody = useContentStore((s) => s.updateBody);
   const save = useContentStore((s) => s.save);
+  const deleteFile = useContentStore((s) => s.deleteFile);
 
   const [mode, setModeState] = useState<Mode>(loadMode);
   const [autosave, setAutosaveState] = useState(loadAutosave);
@@ -62,6 +73,21 @@ export function MarkdownEditor() {
     updateBody(`${before}${prefix}${imageMarkdown}${suffix}${after}`);
     const cursor = selection.start + prefix.length + imageMarkdown.length;
     setBodySelection({ start: cursor, end: cursor });
+  }
+
+  async function handleDelete() {
+    if (!currentPath || deleting) return;
+    const dirtyWarning = dirty ? "\n\nUnsaved changes in this entry will be lost." : "";
+    const confirmed = window.confirm(
+      `Delete ${currentPath}?\n\nThis removes the content file from disk.${dirtyWarning}`
+    );
+    if (!confirmed) return;
+
+    try {
+      await deleteFile(currentPath);
+    } catch {
+      // The store surfaces the error in the header.
+    }
   }
 
   // Ctrl+S to save
@@ -133,6 +159,19 @@ export function MarkdownEditor() {
               {lastError}
             </span>
           )}
+          <button
+            onClick={handleDelete}
+            disabled={deleting || saving}
+            className={`inline-flex h-7 items-center gap-1.5 border px-2 text-xs font-medium transition-colors ${
+              deleting || saving
+                ? "cursor-not-allowed border-zinc-800 bg-zinc-900 text-zinc-600"
+                : "border-red-900/70 bg-zinc-950 text-red-300 hover:border-red-700 hover:bg-red-950/40 hover:text-red-200"
+            }`}
+            title="Delete content entry"
+          >
+            {deleting ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />}
+            {deleting ? "Deleting..." : "Delete"}
+          </button>
           <button
             onClick={() => save()}
             disabled={!dirty || saving}

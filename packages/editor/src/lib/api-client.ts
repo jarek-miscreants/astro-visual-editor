@@ -357,6 +357,13 @@ export const api = {
     });
   },
 
+  /** Delete a .md/.mdx content entry from disk */
+  deleteContentFile(path: string): Promise<{ success: boolean }> {
+    return fetchJson(`/content/delete/${encodePath(path)}`, {
+      method: "DELETE",
+    });
+  },
+
   /** Extract an element into a new Astro component */
   extractComponent(
     sourceFile: string,

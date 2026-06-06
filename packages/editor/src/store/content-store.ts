@@ -8,6 +8,7 @@ interface ContentState {
   current: ContentFile | null;
   dirty: boolean;
   saving: boolean;
+  deleting: boolean;
   lastError: string | null;
   revision: number;
 
@@ -22,6 +23,7 @@ interface ContentState {
     frontmatter?: Record<string, any>;
     body?: string;
   }) => Promise<string>;
+  deleteFile: (path: string) => Promise<void>;
   updateBody: (body: string) => void;
   updateFrontmatterField: (key: string, value: any) => void;
   renameFrontmatterField: (oldKey: string, newKey: string) => void;
@@ -35,6 +37,7 @@ export const useContentStore = create<ContentState>((set, get) => ({
   current: null,
   dirty: false,
   saving: false,
+  deleting: false,
   lastError: null,
   revision: 0,
 
@@ -66,6 +69,27 @@ export const useContentStore = create<ContentState>((set, get) => ({
     await get().loadFiles();
     await get().openFile(path);
     return path;
+  },
+
+  async deleteFile(path) {
+    if (!path) return;
+    set({ deleting: true, lastError: null });
+    try {
+      await api.deleteContentFile(path);
+      const { files } = await api.getContentFiles();
+      const isCurrent = get().currentPath === path;
+      set({
+        files,
+        deleting: false,
+        currentPath: isCurrent ? null : get().currentPath,
+        current: isCurrent ? null : get().current,
+        dirty: isCurrent ? false : get().dirty,
+        revision: isCurrent ? 0 : get().revision,
+      });
+    } catch (err: any) {
+      set({ deleting: false, lastError: err.message });
+      throw err;
+    }
   },
 
   updateBody(body) {

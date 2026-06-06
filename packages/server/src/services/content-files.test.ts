@@ -3,6 +3,7 @@ import path from "path";
 import fs from "fs/promises";
 import os from "os";
 import {
+  deleteContentFile,
   readContentFile,
   scanContentFiles,
   writeContentFile,
@@ -68,6 +69,35 @@ describe("content file read/write", () => {
 
     await expect(readContentFile(tmpDir, "src/pages/index.astro")).rejects.toThrow(
       "Content editor only supports .md and .mdx files"
+    );
+  });
+});
+
+describe("deleteContentFile", () => {
+  it("deletes markdown and mdx entries inside the project", async () => {
+    await writeFixture("src/content/blog/post.mdx", "---\ntitle: Post\n---\n<Post />\n");
+
+    await deleteContentFile(tmpDir, "src/content/blog/post.mdx");
+
+    await expect(
+      fs.access(path.join(tmpDir, "src/content/blog/post.mdx"))
+    ).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  it("rejects non-markdown paths", async () => {
+    await writeFixture("src/pages/index.astro", "<h1>Keep me</h1>\n");
+
+    await expect(deleteContentFile(tmpDir, "src/pages/index.astro")).rejects.toThrow(
+      "Content editor only supports .md and .mdx files"
+    );
+    await expect(fs.readFile(path.join(tmpDir, "src/pages/index.astro"), "utf-8")).resolves.toBe(
+      "<h1>Keep me</h1>\n"
+    );
+  });
+
+  it("blocks path traversal", async () => {
+    await expect(deleteContentFile(tmpDir, "../outside.md")).rejects.toThrow(
+      "Path traversal blocked"
     );
   });
 });
