@@ -1,10 +1,12 @@
 import { spawn, type ChildProcess } from "child_process";
 import type { DevServerStatus, DevServerStartError } from "@tve/shared";
 import { runDevServerPreflight, parseAstroError } from "./dev-server-preflight.js";
+import { getAstroCliCommand } from "./astro-cli.js";
 
 let devServerProcess: ChildProcess | null = null;
 let devServerUrl: string | null = null;
 let devServerStatus: DevServerStatus = "stopped";
+let startPromise: Promise<string> | null = null;
 
 export function getDevServerStatus() {
   return { status: devServerStatus, url: devServerUrl };
@@ -23,6 +25,19 @@ export class DevServerStartFailure extends Error {
 }
 
 export async function startDevServer(
+  projectPath: string,
+  broadcast: (message: object) => void
+): Promise<string> {
+  if (devServerUrl) return devServerUrl;
+  if (startPromise) return startPromise;
+
+  startPromise = startDevServerFresh(projectPath, broadcast).finally(() => {
+    startPromise = null;
+  });
+  return startPromise;
+}
+
+async function startDevServerFresh(
   projectPath: string,
   broadcast: (message: object) => void
 ): Promise<string> {
@@ -48,12 +63,11 @@ export async function startDevServer(
   return new Promise((resolve, reject) => {
     console.log("[DevServer] Starting Astro dev server...");
 
-    const isWindows = process.platform === "win32";
-    const cmd = isWindows ? "npx.cmd" : "npx";
-    devServerProcess = spawn(cmd, ["astro", "dev", "--port", "4321"], {
+    const astro = getAstroCliCommand(projectPath, ["dev", "--port", "4321"]);
+    devServerProcess = spawn(astro.cmd, astro.args, {
       cwd: projectPath,
       stdio: ["pipe", "pipe", "pipe"],
-      shell: isWindows,
+      shell: astro.shell,
     });
 
     // Buffer stderr so we can parse it into a structured error on early exit
@@ -129,10 +143,11 @@ export async function startDevServer(
 }
 
 export function stopDevServer() {
+  startPromise = null;
   if (devServerProcess) {
     devServerProcess.kill();
     devServerProcess = null;
-    devServerUrl = null;
-    devServerStatus = "stopped";
   }
+  devServerUrl = null;
+  devServerStatus = "stopped";
 }

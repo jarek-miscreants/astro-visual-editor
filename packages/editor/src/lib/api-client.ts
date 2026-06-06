@@ -15,6 +15,8 @@ import type {
   TveBranchConfig,
   DevServerStartError,
   AssetInfo,
+  SeoPageData,
+  SeoPageResponse,
 } from "@tve/shared";
 
 const API_BASE = "/api";
@@ -545,5 +547,26 @@ export const api = {
       throw new ApiError(err.error || res.statusText, res.status, err.code);
     }
     return res.json();
+  },
+
+  /** Read editable SEO/social metadata for an Astro page. */
+  getSeoPage(path: string): Promise<SeoPageResponse> {
+    return fetchJson(`/seo/page?path=${encodeURIComponent(path)}`);
+  },
+
+  /** Update an existing SEO source on an Astro page. */
+  updateSeoPage(path: string, data: Partial<SeoPageData>): Promise<SeoPageResponse> {
+    return fetchJson(`/seo/page?path=${encodeURIComponent(path)}`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  },
+
+  /** Insert the configured SEO component on an Astro page, then return it. */
+  addSeoPage(path: string, data: Partial<SeoPageData>): Promise<SeoPageResponse> {
+    return fetchJson(`/seo/page/add?path=${encodeURIComponent(path)}`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
   },
 };

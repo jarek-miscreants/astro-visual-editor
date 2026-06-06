@@ -1,11 +1,24 @@
 import fs from "fs/promises";
 import path from "path";
 import ts from "typescript";
-import type { ComponentPropField, ComponentPropSchema } from "@tve/shared";
+import type {
+  ComponentControlKind,
+  ComponentEditorMeta,
+  ComponentPropField,
+  ComponentPropMeta,
+  ComponentPropSchema,
+} from "@tve/shared";
 
 interface CacheEntry {
   mtime: number;
+  schemaMtime: number;
   schema: ComponentPropSchema;
+}
+
+interface ParsedTveSchema {
+  meta: ComponentEditorMeta;
+  fields: Record<string, ComponentPropMeta>;
+  warnings: string[];
 }
 
 const cache = new Map<string, CacheEntry>();
@@ -21,16 +34,34 @@ export async function getComponentPropSchema(
 ): Promise<ComponentPropSchema> {
   const full = path.join(projectPath, relPath);
   const stat = await fs.stat(full);
+  const companion = companionSchemaPath(full);
+  const schemaMtime = await fs
+    .stat(companion)
+    .then((s) => s.mtimeMs)
+    .catch(() => 0);
   const cached = cache.get(full);
-  if (cached && cached.mtime === stat.mtimeMs) return cached.schema;
+  if (cached && cached.mtime === stat.mtimeMs && cached.schemaMtime === schemaMtime) {
+    return cached.schema;
+  }
 
   const source = await fs.readFile(full, "utf-8");
   const frontmatter = extractFrontmatter(source);
-  const fields = frontmatter ? parseProps(frontmatter, frontmatter) : [];
-  const schema: ComponentPropSchema = { componentPath: relPath, fields };
+  const propsFields = frontmatter ? parseProps(frontmatter, frontmatter) : [];
+  const tveSchema = await readTveComponentSchema(companion);
+  const fields = mergeSchemaFields(propsFields, tveSchema);
+  const schema: ComponentPropSchema = {
+    componentPath: relPath,
+    fields,
+    meta: tveSchema?.meta,
+    warnings: tveSchema?.warnings ?? [],
+  };
 
-  cache.set(full, { mtime: stat.mtimeMs, schema });
+  cache.set(full, { mtime: stat.mtimeMs, schemaMtime, schema });
   return schema;
+}
+
+function companionSchemaPath(componentFullPath: string): string {
+  return componentFullPath.replace(/\.astro$/i, ".tve.ts");
 }
 
 /** Extract the content between the first pair of `---` fences in an .astro file.
@@ -92,6 +123,224 @@ function parseProps(frontmatter: string, source: string): ComponentPropField[] {
   }
 
   return fields;
+}
+
+function mergeSchemaFields(
+  propsFields: ComponentPropField[],
+  schema: ParsedTveSchema | null
+): ComponentPropField[] {
+  if (!schema) return propsFields;
+
+  const remaining = new Map(Object.entries(schema.fields));
+  const merged = propsFields.map((field) => {
+    const meta = remaining.get(field.name);
+    if (!meta) return field;
+    remaining.delete(field.name);
+    return withMeta(field, meta);
+  });
+
+  for (const [name, meta] of remaining) {
+    const synthetic = fieldFromMeta(name, meta);
+    if (synthetic) merged.push(synthetic);
+  }
+
+  return merged.filter((field) => !field.meta?.hidden);
+}
+
+function withMeta(field: ComponentPropField, meta: ComponentPropMeta): ComponentPropField {
+  const required = meta.required ?? field.required;
+  return { ...field, required, meta } as ComponentPropField;
+}
+
+function fieldFromMeta(name: string, meta: ComponentPropMeta): ComponentPropField | null {
+  const required = meta.required ?? false;
+  const control = meta.control;
+  if (control === "choice" && meta.choices && meta.choices.length > 0) {
+    return {
+      kind: "enum",
+      name,
+      required,
+      options: meta.choices.map((choice) => choice.value),
+      meta,
+    };
+  }
+  if (control === "boolean") return { kind: "boolean", name, required, meta };
+  if (control === "number") return { kind: "number", name, required, meta };
+  if (control === "text" || control === "textarea" || control === "richText" || control === "image" || control === "link") {
+    return { kind: "string", name, required, meta };
+  }
+  return { kind: "unknown", name, required, typeText: "schema", meta };
+}
+
+async function readTveComponentSchema(schemaPath: string): Promise<ParsedTveSchema | null> {
+  let source: string;
+  try {
+    source = await fs.readFile(schemaPath, "utf-8");
+  } catch (err: any) {
+    if (err?.code === "ENOENT") return null;
+    throw err;
+  }
+
+  const warnings: string[] = [];
+  const sf = ts.createSourceFile(
+    path.basename(schemaPath),
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TS
+  );
+
+  const root = findDefaultSchemaObject(sf);
+  if (!root) {
+    return {
+      meta: {},
+      fields: {},
+      warnings: ["No export default defineTveComponent({ ... }) object found."],
+    };
+  }
+
+  const parsed = objectLiteralToValue(root, warnings);
+  if (!isRecord(parsed)) {
+    return { meta: {}, fields: {}, warnings: ["Component schema must be an object literal."] };
+  }
+
+  const meta: ComponentEditorMeta = {
+    label: readString(parsed.label),
+    category: readString(parsed.category),
+    description: readString(parsed.description),
+  };
+
+  const fields: Record<string, ComponentPropMeta> = {};
+  if (isRecord(parsed.fields)) {
+    for (const [name, raw] of Object.entries(parsed.fields)) {
+      if (!isRecord(raw)) continue;
+      const meta = fieldMetaFromRecord(raw);
+      if (meta) fields[name] = meta;
+    }
+  }
+
+  return { meta, fields, warnings };
+}
+
+function findDefaultSchemaObject(sf: ts.SourceFile): ts.ObjectLiteralExpression | null {
+  for (const stmt of sf.statements) {
+    if (!ts.isExportAssignment(stmt)) continue;
+    const expr = stmt.expression;
+    if (ts.isCallExpression(expr)) {
+      const first = expr.arguments[0];
+      return first && ts.isObjectLiteralExpression(first) ? first : null;
+    }
+    if (ts.isObjectLiteralExpression(expr)) return expr;
+  }
+  return null;
+}
+
+function objectLiteralToValue(
+  node: ts.ObjectLiteralExpression,
+  warnings: string[]
+): unknown {
+  const out: Record<string, unknown> = {};
+  for (const prop of node.properties) {
+    if (!ts.isPropertyAssignment(prop)) continue;
+    const name = propName(prop.name);
+    if (!name) continue;
+    out[name] = expressionToValue(prop.initializer, warnings, name);
+  }
+  return out;
+}
+
+function expressionToValue(
+  expr: ts.Expression,
+  warnings: string[],
+  context: string
+): unknown {
+  if (ts.isStringLiteral(expr) || ts.isNoSubstitutionTemplateLiteral(expr)) return expr.text;
+  if (ts.isNumericLiteral(expr)) return Number(expr.text);
+  if (expr.kind === ts.SyntaxKind.TrueKeyword) return true;
+  if (expr.kind === ts.SyntaxKind.FalseKeyword) return false;
+  if (expr.kind === ts.SyntaxKind.NullKeyword) return null;
+  if (ts.isArrayLiteralExpression(expr)) {
+    return expr.elements.map((item, index) =>
+      expressionToValue(item as ts.Expression, warnings, `${context}[${index}]`)
+    );
+  }
+  if (ts.isObjectLiteralExpression(expr)) return objectLiteralToValue(expr, warnings);
+
+  warnings.push(`Ignored unsupported expression at ${context}. Use static literals in .tve.ts files.`);
+  return undefined;
+}
+
+function propName(name: ts.PropertyName): string | null {
+  if (ts.isIdentifier(name) || ts.isStringLiteral(name) || ts.isNumericLiteral(name)) {
+    return name.text;
+  }
+  return null;
+}
+
+function fieldMetaFromRecord(raw: Record<string, unknown>): ComponentPropMeta | null {
+  const control = readControl(raw.type);
+  const meta: ComponentPropMeta = {
+    label: readString(raw.label),
+    group: readString(raw.group),
+    description: readString(raw.description),
+    placeholder: readString(raw.placeholder),
+    control,
+    required: readBoolean(raw.required),
+    hidden: readBoolean(raw.hidden),
+    advanced: readBoolean(raw.advanced),
+    maxLength: readNumber(raw.maxLength),
+  };
+
+  const choices = readChoices(raw.options);
+  if (choices.length > 0) meta.choices = choices;
+  return meta;
+}
+
+function readChoices(value: unknown): { value: string; label: string }[] {
+  if (!Array.isArray(value)) return [];
+  const out: { value: string; label: string }[] = [];
+  for (const item of value) {
+    if (typeof item === "string") {
+      out.push({ value: item, label: item });
+    } else if (isRecord(item)) {
+      const optionValue = readString(item.value);
+      if (optionValue) out.push({ value: optionValue, label: readString(item.label) ?? optionValue });
+    }
+  }
+  return out;
+}
+
+function readControl(value: unknown): ComponentControlKind | undefined {
+  const text = readString(value);
+  if (
+    text === "text" ||
+    text === "textarea" ||
+    text === "richText" ||
+    text === "image" ||
+    text === "link" ||
+    text === "choice" ||
+    text === "boolean" ||
+    text === "number"
+  ) {
+    return text;
+  }
+  return undefined;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function readString(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
+}
+
+function readBoolean(value: unknown): boolean | undefined {
+  return typeof value === "boolean" ? value : undefined;
+}
+
+function readNumber(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
 /** Extract leading JSDoc text above a property signature. We strip the

@@ -253,6 +253,7 @@ export type ComponentPropField =
       options: string[];
       default?: string;
       jsdoc?: string;
+      meta?: ComponentPropMeta;
     }
   | {
       /**
@@ -268,6 +269,7 @@ export type ComponentPropField =
       options: number[];
       default?: number;
       jsdoc?: string;
+      meta?: ComponentPropMeta;
     }
   | {
       kind: "boolean";
@@ -275,6 +277,7 @@ export type ComponentPropField =
       required: boolean;
       default?: boolean;
       jsdoc?: string;
+      meta?: ComponentPropMeta;
     }
   | {
       kind: "string";
@@ -282,6 +285,7 @@ export type ComponentPropField =
       required: boolean;
       default?: string;
       jsdoc?: string;
+      meta?: ComponentPropMeta;
     }
   | {
       kind: "number";
@@ -289,6 +293,7 @@ export type ComponentPropField =
       required: boolean;
       default?: number;
       jsdoc?: string;
+      meta?: ComponentPropMeta;
     }
   | {
       kind: "unknown";
@@ -296,6 +301,7 @@ export type ComponentPropField =
       required: boolean;
       typeText: string;
       jsdoc?: string;
+      meta?: ComponentPropMeta;
     };
 
 export interface ComponentPropSchema {
@@ -303,6 +309,85 @@ export interface ComponentPropSchema {
   componentPath: string;
   /** Ordered list of props */
   fields: ComponentPropField[];
+  /** Component-level display metadata from optional Component.tve.ts files. */
+  meta?: ComponentEditorMeta;
+  /** Non-fatal schema parsing warnings. */
+  warnings?: string[];
+}
+
+export type ComponentControlKind =
+  | "text"
+  | "textarea"
+  | "richText"
+  | "image"
+  | "link"
+  | "choice"
+  | "boolean"
+  | "number";
+
+export interface ComponentChoiceOption {
+  value: string;
+  label: string;
+}
+
+export interface ComponentPropMeta {
+  label?: string;
+  group?: string;
+  description?: string;
+  placeholder?: string;
+  control?: ComponentControlKind;
+  required?: boolean;
+  hidden?: boolean;
+  advanced?: boolean;
+  maxLength?: number;
+  choices?: ComponentChoiceOption[];
+}
+
+export interface ComponentEditorMeta {
+  label?: string;
+  category?: string;
+  description?: string;
+}
+
+export interface SeoPageData {
+  title: string;
+  description: string;
+  canonical: string;
+  ogTitle: string;
+  ogDescription: string;
+  ogImage: string;
+  twitterImage: string;
+  noindex: boolean;
+}
+
+export type SeoAdapterKind = "component" | "layout-props" | "head-tags" | "none";
+
+export interface SeoFieldState {
+  value: string | boolean | null;
+  writable: boolean;
+  reason?: string;
+  source?: {
+    kind: "component-prop" | "layout-prop" | "head-tag";
+    nodeId?: string;
+    prop?: string;
+  };
+}
+
+export interface SeoWarning {
+  code: string;
+  message: string;
+  severity: "info" | "warning" | "error";
+}
+
+export interface SeoPageResponse {
+  path: string;
+  editable: boolean;
+  adapter: SeoAdapterKind;
+  found: boolean;
+  canInsert: boolean;
+  data: Partial<SeoPageData>;
+  fields: Record<keyof SeoPageData, SeoFieldState>;
+  warnings: SeoWarning[];
 }
 
 /**

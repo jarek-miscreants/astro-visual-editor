@@ -1,0 +1,35 @@
+---
+interface Props {
+  title?: string;
+  description?: string;
+  ogTitle?: string;
+  ogDescription?: string;
+  image?: string;
+  twitterImage?: string;
+  canonical?: string;
+  noindex?: boolean | string;
+}
+
+const {
+  title,
+  description,
+  ogTitle = title,
+  ogDescription = description,
+  image,
+  twitterImage = image,
+  canonical,
+  noindex = false,
+} = Astro.props;
+
+const isNoindex = noindex === true || noindex === "true";
+const robots = isNoindex ? "noindex,nofollow" : "index,follow";
+---
+
+{title && <title>{title}</title>}
+{description && <meta name="description" content={description} />}
+<meta name="robots" content={robots} />
+{canonical && <link rel="canonical" href={canonical} />}
+{ogTitle && <meta property="og:title" content={ogTitle} />}
+{ogDescription && <meta property="og:description" content={ogDescription} />}
+{image && <meta property="og:image" content={image} />}
+{twitterImage && <meta name="twitter:image" content={twitterImage} />}

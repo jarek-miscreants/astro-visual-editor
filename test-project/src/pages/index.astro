@@ -2,9 +2,23 @@
 import Layout from '../layouts/Layout.astro';
 import GridColumns from '../components/GridColumns.astro';
 import Button from '../components/Button.astro';
+import Test from "../components/Test.astro";
+import SEO from "../components/SEO.astro";
 ---
 
 <Layout title="Home">
+  <Fragment slot="head">
+    <SEO
+      title="Tailwind Visual Editor Demo"
+      description="A local visual editor demo for Astro pages, Tailwind styling, marketer content edits, and SEO previews."
+      canonical="/"
+      ogTitle="Tailwind Visual Editor Demo"
+      ogDescription="Edit Astro pages visually, manage marketing content, and preview SEO metadata in TVE."
+      image="/images/zafcon-hero.webp"
+      twitterImage="/images/zafcon-hero.webp"
+    />
+  </Fragment>
+
   <header class="text-white py-8 bg-blue-600">
     <div class="max-w-4xl mx-auto px-4">
       <h1 class="text-4xl font-bold leading-tight">Welcome to TVE</h1>
@@ -56,4 +70,6 @@ import Button from '../components/Button.astro';
   <footer class="flex">
     <p>Built with Astro + Tailwind CSS</p>
   </footer>
+
+  <Test />
 </Layout>

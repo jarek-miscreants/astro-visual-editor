@@ -40,6 +40,10 @@ function looksLikeProse(value: string | undefined): boolean {
 }
 
 function isContentField(field: ComponentPropField): boolean {
+  if (field.meta?.advanced) return false;
+  if (field.meta?.group && /^(content|copy|media)$/i.test(field.meta.group)) return true;
+  if (field.meta?.control === "textarea" || field.meta?.control === "richText") return true;
+  if (field.meta?.control === "text") return true;
   // Numeric/boolean/enum props are never "content" — they belong in the
   // typed Advanced section so users get a stepper/select instead of a
   // freeform textarea.
@@ -57,6 +61,7 @@ function isContentField(field: ComponentPropField): boolean {
 }
 
 function isLinkField(field: ComponentPropField): boolean {
+  if (field.meta?.control === "link") return true;
   if (field.kind !== "string" && field.kind !== "unknown") return false;
   return LINK_NAME_RE.test(field.name);
 }
@@ -172,6 +177,7 @@ export function ComponentPropsPanel({ nodeId, tagName, attributes, mode, section
   const linkFields: ComponentPropField[] = [];
   const advancedFields: ComponentPropField[] = [];
   for (const f of fields) {
+    if (f.meta?.hidden) continue;
     if (isLinkField(f)) linkFields.push(f);
     else if (isContentField(f)) contentFields.push(f);
     else advancedFields.push(f);
@@ -234,7 +240,7 @@ export function ComponentPropsPanel({ nodeId, tagName, attributes, mode, section
             if (attr === "href") commit(primaryLinkField.name, value);
             else commit(attr, value);
           }}
-          label={primaryLinkField.name === "href" ? "Link" : `Link (${primaryLinkField.name})`}
+          label={primaryLinkField.meta?.label ?? (primaryLinkField.name === "href" ? "Link" : `Link (${primaryLinkField.name})`)}
           hideNewTab={!usePairedLink}
         />
       )}
@@ -345,10 +351,15 @@ function PropField({
     return (
       <div className="tve-prop-field">
         <label className="tve-prop-field__label--prominent">
-          {field.name}
+          {fieldLabel(field)}
           {field.required && <span className="tve-prop-field__required">*</span>}
-          {field.jsdoc && <JsDocBadge text={field.jsdoc} />}
+          {(field.meta?.description || field.jsdoc) && (
+            <JsDocBadge text={field.meta?.description ?? field.jsdoc!} />
+          )}
         </label>
+        {field.meta?.description && (
+          <div className="tve-prop-section__hint">{field.meta.description}</div>
+        )}
         {isExpression ? (
           <div className="tve-prop-expr" title="Astro expression — edit in source">
             <Code2 size={10} />
@@ -364,9 +375,11 @@ function PropField({
   return (
     <div className="tve-prop-field-row">
       <label className="tve-prop-field-row__label">
-        {field.name}
+        {fieldLabel(field)}
         {field.required && <span className="tve-prop-field__required">*</span>}
-        {field.jsdoc && <JsDocBadge text={field.jsdoc} />}
+        {(field.meta?.description || field.jsdoc) && (
+          <JsDocBadge text={field.meta?.description ?? field.jsdoc!} />
+        )}
       </label>
       <div className="tve-prop-field-row__control">
         {isExpression ? (
@@ -380,6 +393,18 @@ function PropField({
       </div>
     </div>
   );
+}
+
+function fieldLabel(field: ComponentPropField): string {
+  return field.meta?.label ?? field.name;
+}
+
+function fieldPlaceholder(field: ComponentPropField, fallback: string): string {
+  return field.meta?.placeholder ?? fallback;
+}
+
+function optionLabel(field: ComponentPropField, value: string): string {
+  return field.meta?.choices?.find((choice) => choice.value === value)?.label ?? value;
 }
 
 /** Tiny info icon with the prop's JSDoc as a native tooltip. Native tooltip
@@ -431,7 +456,7 @@ function PropControl({
         )}
         {field.options.map((opt) => (
           <option key={opt} value={opt}>
-            {opt}
+            {optionLabel(field, opt)}
             {field.default === opt ? " (default)" : ""}
           </option>
         ))}
@@ -502,12 +527,16 @@ function PropControl({
   }
 
   if (field.kind === "string") {
-    if (prominent) {
+    const useTextarea =
+      prominent ||
+      field.meta?.control === "textarea" ||
+      field.meta?.control === "richText";
+    if (useTextarea) {
       return (
         <textarea
           key={inputKey}
           defaultValue={value ?? ""}
-          placeholder={field.default ?? ""}
+          placeholder={fieldPlaceholder(field, field.default ?? "")}
           rows={Math.min(6, Math.max(2, Math.ceil((value?.length ?? 0) / 48)))}
           onBlur={(e) => {
             const v = e.target.value;
@@ -522,7 +551,7 @@ function PropControl({
         key={inputKey}
         type="text"
         defaultValue={value ?? ""}
-        placeholder={field.default ?? "string"}
+        placeholder={fieldPlaceholder(field, field.default ?? "string")}
         onBlur={(e) => {
           const v = e.target.value;
           if (v !== (value ?? "")) onChange(v === "" ? null : v);

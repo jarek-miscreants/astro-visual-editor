@@ -1,0 +1,25 @@
+{
+  "defaultMode": "dev",
+  "seo": {
+    "preferredAdapter": "component",
+    "component": {
+      "tagName": "SEO",
+      "path": "src/components/SEO.astro",
+      "insertion": {
+        "mode": "layout-slot",
+        "layout": "Layout",
+        "slot": "head"
+      },
+      "fields": {
+        "title": "title",
+        "description": "description",
+        "canonical": "canonical",
+        "ogTitle": "ogTitle",
+        "ogDescription": "ogDescription",
+        "ogImage": "image",
+        "twitterImage": "twitterImage",
+        "noindex": "noindex"
+      }
+    }
+  }
+}

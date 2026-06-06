@@ -1,5 +1,6 @@
 import { spawn } from "child_process";
 import type { DevServerStartError } from "@tve/shared";
+import { getAstroCliCommand } from "./astro-cli.js";
 
 /** Strip ANSI escape codes so regexes match raw text. */
 function stripAnsi(s: string): string {
@@ -94,12 +95,11 @@ export function parseAstroError(rawInput: string): DevServerStartError {
  *  of a generic "Failed to start". Returns null on success. */
 export function runDevServerPreflight(projectPath: string): Promise<DevServerStartError | null> {
   return new Promise((resolve) => {
-    const isWindows = process.platform === "win32";
-    const cmd = isWindows ? "npx.cmd" : "npx";
-    const child = spawn(cmd, ["astro", "sync"], {
+    const astro = getAstroCliCommand(projectPath, ["sync"]);
+    const child = spawn(astro.cmd, astro.args, {
       cwd: projectPath,
       stdio: ["ignore", "pipe", "pipe"],
-      shell: isWindows,
+      shell: astro.shell,
     });
 
     let stdout = "";
