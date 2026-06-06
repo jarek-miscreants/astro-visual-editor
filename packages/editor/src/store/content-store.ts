@@ -9,6 +9,7 @@ interface ContentState {
   dirty: boolean;
   saving: boolean;
   lastError: string | null;
+  revision: number;
 
   loadFiles: () => Promise<void>;
   openFile: (path: string) => Promise<void>;
@@ -35,6 +36,7 @@ export const useContentStore = create<ContentState>((set, get) => ({
   dirty: false,
   saving: false,
   lastError: null,
+  revision: 0,
 
   async loadFiles() {
     try {
@@ -46,17 +48,17 @@ export const useContentStore = create<ContentState>((set, get) => ({
   },
 
   async openFile(path) {
-    set({ currentPath: path, current: null, dirty: false, lastError: null });
+    set({ currentPath: path, current: null, dirty: false, lastError: null, revision: 0 });
     try {
       const file = await api.readContentFile(path);
-      set({ current: file });
+      set({ current: file, revision: 0 });
     } catch (err: any) {
       set({ lastError: err.message });
     }
   },
 
   closeFile() {
-    set({ currentPath: null, current: null, dirty: false, lastError: null });
+    set({ currentPath: null, current: null, dirty: false, lastError: null, revision: 0 });
   },
 
   async createFile(input) {
@@ -67,22 +69,23 @@ export const useContentStore = create<ContentState>((set, get) => ({
   },
 
   updateBody(body) {
-    const current = get().current;
+    const { current, revision } = get();
     if (!current) return;
-    set({ current: { ...current, body }, dirty: true });
+    set({ current: { ...current, body }, dirty: true, revision: revision + 1 });
   },
 
   updateFrontmatterField(key, value) {
-    const current = get().current;
+    const { current, revision } = get();
     if (!current) return;
     set({
       current: { ...current, frontmatter: { ...current.frontmatter, [key]: value } },
       dirty: true,
+      revision: revision + 1,
     });
   },
 
   renameFrontmatterField(oldKey, newKey) {
-    const current = get().current;
+    const { current, revision } = get();
     if (!current || oldKey === newKey) return;
     if (!(oldKey in current.frontmatter)) return;
     if (newKey in current.frontmatter) return; // refuse to clobber
@@ -91,23 +94,27 @@ export const useContentStore = create<ContentState>((set, get) => ({
     for (const [k, v] of Object.entries(current.frontmatter)) {
       next[k === oldKey ? newKey : k] = v;
     }
-    set({ current: { ...current, frontmatter: next }, dirty: true });
+    set({ current: { ...current, frontmatter: next }, dirty: true, revision: revision + 1 });
   },
 
   removeFrontmatterField(key) {
-    const current = get().current;
+    const { current, revision } = get();
     if (!current) return;
     const { [key]: _removed, ...rest } = current.frontmatter;
-    set({ current: { ...current, frontmatter: rest }, dirty: true });
+    set({ current: { ...current, frontmatter: rest }, dirty: true, revision: revision + 1 });
   },
 
   async save() {
-    const { current, currentPath } = get();
+    const { current, currentPath, revision } = get();
     if (!current || !currentPath) return;
     set({ saving: true, lastError: null });
     try {
       await api.writeContentFile(currentPath, current.frontmatter, current.body);
-      set({ saving: false, dirty: false });
+      const latest = get();
+      set({
+        saving: false,
+        dirty: latest.currentPath === currentPath && latest.revision === revision ? false : latest.dirty,
+      });
     } catch (err: any) {
       set({ saving: false, lastError: err.message });
     }

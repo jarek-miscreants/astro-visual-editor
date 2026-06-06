@@ -1,4 +1,5 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
+import { Image as ImageIcon } from "lucide-react";
 import {
   MDXEditor,
   headingsPlugin,
@@ -16,8 +17,8 @@ import {
   UndoRedo,
   BoldItalicUnderlineToggles,
   BlockTypeSelect,
+  ButtonWithTooltip,
   CreateLink,
-  InsertImage,
   InsertTable,
   InsertThematicBreak,
   InsertCodeBlock,
@@ -25,6 +26,8 @@ import {
   type MDXEditorMethods,
 } from "@mdxeditor/editor";
 import "@mdxeditor/editor/style.css";
+import { ImagePickerDialog } from "../dialogs/ImagePickerDialog";
+import { normalizeMarkdownProjectAssetUrls, projectAssetPreviewUrl } from "../../lib/api-client";
 
 interface Props {
   body: string;
@@ -33,6 +36,20 @@ interface Props {
 
 export function RichBodyEditor({ body, onChange }: Props) {
   const ref = useRef<MDXEditorMethods>(null);
+  const [imagePickerOpen, setImagePickerOpen] = useState(false);
+
+  function insertLibraryImage(url: string) {
+    const markdown = `![Image](${url})`;
+    const editor = ref.current;
+
+    if (editor) {
+      editor.focus(() => editor.insertMarkdown(markdown), { defaultSelection: "rootEnd" });
+      return;
+    }
+
+    const prefix = body.length === 0 || body.endsWith("\n") ? "" : "\n\n";
+    onChange(`${body}${prefix}${markdown}`);
+  }
 
   return (
     <div className="flex h-full flex-col bg-zinc-950">
@@ -43,7 +60,7 @@ export function RichBodyEditor({ body, onChange }: Props) {
         <MDXEditor
           ref={ref}
           markdown={body}
-          onChange={onChange}
+          onChange={(next) => onChange(normalizeMarkdownProjectAssetUrls(next))}
           className="tve-mdx dark-theme dark-editor"
           contentEditableClassName="tve-mdx-content"
           plugins={[
@@ -53,7 +70,9 @@ export function RichBodyEditor({ body, onChange }: Props) {
             thematicBreakPlugin(),
             linkPlugin(),
             linkDialogPlugin(),
-            imagePlugin(),
+            imagePlugin({
+              imagePreviewHandler: async (src) => projectAssetPreviewUrl(src),
+            }),
             tablePlugin(),
             codeBlockPlugin({ defaultCodeBlockLanguage: "ts" }),
             codeMirrorPlugin({
@@ -80,7 +99,12 @@ export function RichBodyEditor({ body, onChange }: Props) {
                   <BlockTypeSelect />
                   <ListsToggle />
                   <CreateLink />
-                  <InsertImage />
+                  <ButtonWithTooltip
+                    title="Insert image from library"
+                    onClick={() => setImagePickerOpen(true)}
+                  >
+                    <ImageIcon size={16} />
+                  </ButtonWithTooltip>
                   <InsertTable />
                   <InsertThematicBreak />
                   <InsertCodeBlock />
@@ -90,6 +114,12 @@ export function RichBodyEditor({ body, onChange }: Props) {
           ]}
         />
       </div>
+      {imagePickerOpen && (
+        <ImagePickerDialog
+          onSelect={insertLibraryImage}
+          onClose={() => setImagePickerOpen(false)}
+        />
+      )}
     </div>
   );
 }

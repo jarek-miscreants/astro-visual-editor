@@ -16,20 +16,17 @@ export interface ContentFile {
   format: "md" | "mdx";
 }
 
-const CONTENT_ROOTS = ["src/content", "src/pages", "content"];
 const EXCLUDED_DIRS = new Set(["node_modules", ".astro", "dist", ".git", ".next"]);
 
-/** Scan the project for .md / .mdx files under conventional content roots */
+/** Scan the project for .md / .mdx files. Users may map Markdown content from
+ *  arbitrary project directories, not only Astro content collections. */
 export async function scanContentFiles(projectPath: string): Promise<ContentFileInfo[]> {
   const out: ContentFileInfo[] = [];
 
-  for (const root of CONTENT_ROOTS) {
-    const abs = path.join(projectPath, root);
-    try {
-      await walk(abs, projectPath, out);
-    } catch (err: any) {
-      if (err.code !== "ENOENT") throw err;
-    }
+  try {
+    await walk(projectPath, projectPath, out);
+  } catch (err: any) {
+    if (err.code !== "ENOENT") throw err;
   }
 
   return out.sort((a, b) => a.path.localeCompare(b.path));
@@ -72,13 +69,24 @@ function deriveCollection(relPath: string): string {
   if (parts[0] === "content" && parts.length >= 3) {
     return parts[1];
   }
+  if (parts.length >= 2) {
+    return parts[0];
+  }
   return "root";
+}
+
+function assertMarkdownPath(relPath: string) {
+  const ext = path.extname(relPath).toLowerCase();
+  if (ext !== ".md" && ext !== ".mdx") {
+    throw new Error("Content editor only supports .md and .mdx files");
+  }
 }
 
 export async function readContentFile(
   projectPath: string,
   relPath: string
 ): Promise<ContentFile> {
+  assertMarkdownPath(relPath);
   const full = path.join(projectPath, relPath);
   const raw = await fs.readFile(full, "utf-8");
   const parsed = matter(raw);
@@ -97,6 +105,7 @@ export async function writeContentFile(
   frontmatter: Record<string, any>,
   body: string
 ): Promise<void> {
+  assertMarkdownPath(relPath);
   const full = path.join(projectPath, relPath);
   // matter.stringify normalizes line endings and handles YAML serialization,
   // preserving quoting style for the fields it controls.

@@ -1,6 +1,8 @@
 import { useState } from "react";
-import { Trash2, Plus } from "lucide-react";
+import { Image as ImageIcon, Plus, Replace, Trash2 } from "lucide-react";
 import { useContentStore } from "../../store/content-store";
+import { isProjectPublicAssetUrl, nullableProjectAssetPreviewUrl } from "../../lib/api-client";
+import { ImagePickerDialog } from "../dialogs/ImagePickerDialog";
 
 type FieldKind = "string" | "number" | "boolean" | "date" | "array" | "object";
 
@@ -14,6 +16,30 @@ function inferKind(value: unknown): FieldKind {
   // Heuristic: ISO-like date string
   if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}/.test(value)) return "date";
   return "string";
+}
+
+function isImageLikeField(fieldKey: string, value: unknown): boolean {
+  const key = fieldKey.toLowerCase();
+  const imageNames = new Set([
+    "image",
+    "img",
+    "photo",
+    "picture",
+    "cover",
+    "thumbnail",
+    "thumb",
+    "avatar",
+    "logo",
+    "hero",
+    "heroimage",
+    "ogimage",
+    "featuredimage",
+  ]);
+  if (imageNames.has(key) || key.endsWith("image") || key.endsWith("img")) {
+    return true;
+  }
+  if (typeof value !== "string") return false;
+  return /\.(png|jpe?g|gif|svg|webp|avif|ico|bmp)(\?.*)?$/i.test(value);
 }
 
 export function FrontmatterForm() {
@@ -83,7 +109,7 @@ function FieldRow({
         className="w-32 shrink-0 border border-zinc-800 bg-zinc-900 px-2 py-1 text-[11px] font-mono text-zinc-300 focus:border-blue-500 focus:outline-none"
       />
       <div className="flex-1">
-        <FieldInput kind={kind} value={value} onChange={onChange} />
+        <FieldInput fieldKey={fieldKey} kind={kind} value={value} onChange={onChange} />
       </div>
       <button
         onClick={onRemove}
@@ -97,10 +123,12 @@ function FieldRow({
 }
 
 function FieldInput({
+  fieldKey,
   kind,
   value,
   onChange,
 }: {
+  fieldKey: string;
   kind: FieldKind;
   value: any;
   onChange: (v: any) => void;
@@ -182,6 +210,9 @@ function FieldInput({
 
   // string
   const str = value == null ? "" : String(value);
+  if (isImageLikeField(fieldKey, value)) {
+    return <ImageFieldInput value={str} onChange={onChange} />;
+  }
   const multiline = str.length > 60 || str.includes("\n");
   return multiline ? (
     <textarea
@@ -196,6 +227,56 @@ function FieldInput({
       onChange={(e) => onChange(e.target.value)}
       className="w-full border border-zinc-800 bg-zinc-900 px-2 py-1 text-[11px] text-zinc-200 focus:border-blue-500 focus:outline-none"
     />
+  );
+}
+
+function ImageFieldInput({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const localPreview = isProjectPublicAssetUrl(value);
+  const previewUrl = nullableProjectAssetPreviewUrl(value);
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex gap-2">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden border border-zinc-800 bg-[repeating-conic-gradient(#27272a_0%_25%,#1c1c1f_0%_50%)] bg-[length:12px_12px]">
+          {previewUrl ? (
+            <img src={previewUrl} alt="" className="max-h-full max-w-full object-contain" />
+          ) : (
+            <ImageIcon size={14} className="text-zinc-600" />
+          )}
+        </div>
+        <div className="min-w-0 flex-1 space-y-1">
+          <input
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder="/images/photo.webp"
+            className="w-full border border-zinc-800 bg-zinc-900 px-2 py-1 text-[11px] text-zinc-200 focus:border-blue-500 focus:outline-none"
+          />
+          <button
+            type="button"
+            onClick={() => setPickerOpen(true)}
+            className="inline-flex h-6 items-center gap-1 border border-zinc-700 bg-zinc-900 px-2 text-[10px] font-medium text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-200"
+          >
+            <Replace size={10} />
+            Choose image
+          </button>
+        </div>
+      </div>
+
+      {pickerOpen && (
+        <ImagePickerDialog
+          currentSrc={localPreview ? value : undefined}
+          onSelect={(url) => onChange(url)}
+          onClose={() => setPickerOpen(false)}
+        />
+      )}
+    </div>
   );
 }
 

@@ -23,6 +23,16 @@ const DEFAULT_CONFIG: TveBranchConfig = {
     ffOnly: true,
     deleteDraftAfterMerge: true,
   },
+  publishing: {
+    productionMode: "admins-only",
+    defaultTarget: "staging",
+    reviewBranchPrefix: "tve/review-",
+  },
+  roles: {
+    admins: [],
+    publishers: [],
+    reviewers: [],
+  },
 };
 
 /**
@@ -564,19 +574,94 @@ export async function promote(
 
 const CONFIG_REL_PATH = ".tve/config.json";
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function stringValue(value: unknown, fallback: string): string {
+  return typeof value === "string" && value.trim() ? value : fallback;
+}
+
+function booleanValue(value: unknown, fallback: boolean): boolean {
+  return typeof value === "boolean" ? value : fallback;
+}
+
+function stringArrayValue(value: unknown, fallback: string[]): string[] {
+  if (!Array.isArray(value)) return [...fallback];
+  return value.filter((item): item is string => typeof item === "string" && item.trim() !== "");
+}
+
+function productionModeValue(
+  value: unknown,
+  fallback: TveBranchConfig["publishing"]["productionMode"]
+): TveBranchConfig["publishing"]["productionMode"] {
+  return value === "admins-only" || value === "any-signed-in" || value === "anyone"
+    ? value
+    : fallback;
+}
+
+function defaultTargetValue(
+  value: unknown,
+  fallback: TveBranchConfig["publishing"]["defaultTarget"]
+): TveBranchConfig["publishing"]["defaultTarget"] {
+  return value === "staging" || value === "production" ? value : fallback;
+}
+
+function mergeConfig(value: unknown): TveBranchConfig {
+  const parsed = isRecord(value) ? value : {};
+  const branches = isRecord(parsed.branches) ? parsed.branches : {};
+  const git = isRecord(parsed.git) ? parsed.git : {};
+  const publishing = isRecord(parsed.publishing) ? parsed.publishing : {};
+  const roles = isRecord(parsed.roles) ? parsed.roles : {};
+
+  return {
+    branches: {
+      production: stringValue(branches.production, DEFAULT_CONFIG.branches.production),
+      staging: stringValue(branches.staging, DEFAULT_CONFIG.branches.staging),
+      draftPrefix: stringValue(branches.draftPrefix, DEFAULT_CONFIG.branches.draftPrefix),
+    },
+    git: {
+      autoCommitMode:
+        git.autoCommitMode === "per-mutation" || git.autoCommitMode === "staged"
+          ? git.autoCommitMode
+          : DEFAULT_CONFIG.git.autoCommitMode,
+      ffOnly: booleanValue(git.ffOnly, DEFAULT_CONFIG.git.ffOnly),
+      deleteDraftAfterMerge: booleanValue(
+        git.deleteDraftAfterMerge,
+        DEFAULT_CONFIG.git.deleteDraftAfterMerge
+      ),
+    },
+    publishing: {
+      productionMode: productionModeValue(
+        publishing.productionMode,
+        DEFAULT_CONFIG.publishing.productionMode
+      ),
+      defaultTarget: defaultTargetValue(
+        publishing.defaultTarget,
+        DEFAULT_CONFIG.publishing.defaultTarget
+      ),
+      reviewBranchPrefix: stringValue(
+        publishing.reviewBranchPrefix,
+        DEFAULT_CONFIG.publishing.reviewBranchPrefix
+      ),
+    },
+    roles: {
+      admins: stringArrayValue(roles.admins, DEFAULT_CONFIG.roles.admins),
+      publishers: stringArrayValue(roles.publishers, DEFAULT_CONFIG.roles.publishers),
+      reviewers: stringArrayValue(roles.reviewers, DEFAULT_CONFIG.roles.reviewers),
+    },
+  };
+}
+
 export async function readConfig(projectPath: string): Promise<TveBranchConfig> {
   const abs = path.join(projectPath, CONFIG_REL_PATH);
   try {
     const raw = await fs.readFile(abs, "utf-8");
     const parsed = JSON.parse(raw);
-    // Shallow-merge with defaults so older config files keep working when
-    // we add fields later.
-    return {
-      branches: { ...DEFAULT_CONFIG.branches, ...(parsed.branches || {}) },
-      git: { ...DEFAULT_CONFIG.git, ...(parsed.git || {}) },
-    };
+    // Merge with defaults so older config files keep working when we add fields later.
+    return mergeConfig(parsed);
   } catch (err: any) {
-    if (err.code === "ENOENT") return { ...DEFAULT_CONFIG };
+    if (err.code === "ENOENT") return mergeConfig({});
     throw err;
   }
 }

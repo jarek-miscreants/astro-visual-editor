@@ -22,7 +22,30 @@ export function allowedEditorOrigins(): string[] {
     ""
   );
   const port = Number(process.env.PORT) || 3011;
-  return [editor, `http://localhost:${port}`, `http://127.0.0.1:${port}`];
+  return [
+    ...loopbackOriginAliases(editor),
+    `http://localhost:${port}`,
+    `http://127.0.0.1:${port}`,
+  ];
+}
+
+function loopbackOriginAliases(origin: string): string[] {
+  const out = new Set([origin]);
+
+  try {
+    const url = new URL(origin);
+    if (url.hostname === "localhost" || url.hostname === "127.0.0.1") {
+      for (const host of ["localhost", "127.0.0.1"]) {
+        const alias = new URL(origin);
+        alias.hostname = host;
+        out.add(alias.origin);
+      }
+    }
+  } catch {
+    // Keep the exact configured value for malformed custom inputs.
+  }
+
+  return [...out];
 }
 
 export function requireEditorOrigin(

@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { Image as ImageIcon, Code2, Replace } from "lucide-react";
-import { assetRawUrl } from "../../lib/api-client";
+import { Image as ImageIcon, Replace } from "lucide-react";
+import { isProjectPublicAssetUrl, projectAssetPreviewUrl } from "../../lib/api-client";
 import { ImagePickerDialog } from "../dialogs/ImagePickerDialog";
 
 interface ImageSectionProps {
@@ -8,12 +8,6 @@ interface ImageSectionProps {
   src: string | undefined;
   /** Apply a new plain-string src. */
   onChange: (value: string) => void;
-}
-
-/** Is this src a project-local `public/` URL we can preview + replace? Absolute
- *  http(s) URLs and Astro expressions are shown but not previewed locally. */
-function isLocalPublicUrl(src: string): boolean {
-  return src.startsWith("/") && !src.startsWith("//");
 }
 
 /**
@@ -27,12 +21,10 @@ export function ImageSection({ src, onChange }: ImageSectionProps) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const value = src ?? "";
   const isExpression = value.startsWith("{") && value.endsWith("}");
-  const localPreview = isLocalPublicUrl(value);
-  const previewUrl = localPreview
-    ? assetRawUrl("public" + value)
-    : !isExpression && value
-      ? value
-      : null;
+  const localPreview = isProjectPublicAssetUrl(value);
+  const previewUrl = !isExpression && value
+    ? projectAssetPreviewUrl(value)
+    : null;
 
   return (
     <div className="tve-prop-section">

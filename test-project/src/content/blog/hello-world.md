@@ -1,22 +1,21 @@
 ---
-title: Hello, World
+title: 'Hello, World'
 description: A first blog post to test the TVE markdown editor.
-publishedAt: 2026-04-15
+publishedAt: '2026-04-15T00:00:00.000Z'
 draft: false
 tags:
   - intro
   - welcome
 ---
-
 # Welcome
 
 This is a **sample** markdown file for testing the TVE markdown editor.
 
 ## Features
 
-- Frontmatter form with inferred field types
-- Split-view body + live preview
-- Save via `Ctrl+S` or the toolbar button
+* Frontmatter form with inferred field types
+* Split-view body + live preview
+* Save via `Ctrl+S` or the toolbar button
 
 ## Code
 
@@ -31,6 +30,6 @@ const greet = (name) => `Hello, ${name}!`;
 
 ## Checklist
 
-- [x] Read file
-- [x] Edit body
-- [ ] Add MDX support later
+* [x] Read file
+* [x] Edit body
+* [ ] Add MDX support later

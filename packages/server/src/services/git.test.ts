@@ -311,6 +311,12 @@ describe("readConfig / writeConfig", () => {
     expect(cfg.branches.production).toBe("main");
     expect(cfg.branches.staging).toBe("staging");
     expect(cfg.git.ffOnly).toBe(true);
+    expect(cfg.publishing.productionMode).toBe("admins-only");
+    expect(cfg.publishing.defaultTarget).toBe("staging");
+    expect(cfg.publishing.reviewBranchPrefix).toBe("tve/review-");
+    expect(cfg.roles.admins).toEqual([]);
+    expect(cfg.roles.publishers).toEqual([]);
+    expect(cfg.roles.reviewers).toEqual([]);
   });
 
   it("round-trips through writeConfig", async () => {
@@ -318,12 +324,28 @@ describe("readConfig / writeConfig", () => {
     await writeConfig(workdir, {
       branches: { production: "trunk", staging: "stage", draftPrefix: "d/" },
       git: { autoCommitMode: "per-mutation", ffOnly: false, deleteDraftAfterMerge: false },
+      publishing: {
+        productionMode: "any-signed-in",
+        defaultTarget: "production",
+        reviewBranchPrefix: "review/",
+      },
+      roles: {
+        admins: ["owner", "lead"],
+        publishers: ["marketer"],
+        reviewers: ["editor-a", "editor-b"],
+      },
     });
 
     const cfg = await readConfig(workdir);
     expect(cfg.branches.production).toBe("trunk");
     expect(cfg.branches.staging).toBe("stage");
     expect(cfg.git.autoCommitMode).toBe("per-mutation");
+    expect(cfg.publishing.productionMode).toBe("any-signed-in");
+    expect(cfg.publishing.defaultTarget).toBe("production");
+    expect(cfg.publishing.reviewBranchPrefix).toBe("review/");
+    expect(cfg.roles.admins).toEqual(["owner", "lead"]);
+    expect(cfg.roles.publishers).toEqual(["marketer"]);
+    expect(cfg.roles.reviewers).toEqual(["editor-a", "editor-b"]);
   });
 
   it("merges partial config files with defaults (forward compatibility)", async () => {
@@ -343,5 +365,32 @@ describe("readConfig / writeConfig", () => {
     expect(cfg.branches.production).toBe("main");
     expect(cfg.git).toBeDefined();
     expect(cfg.git.ffOnly).toBe(true);
+    expect(cfg.publishing.productionMode).toBe("admins-only");
+    expect(cfg.publishing.defaultTarget).toBe("staging");
+    expect(cfg.roles.admins).toEqual([]);
+    expect(cfg.roles.publishers).toEqual([]);
+    expect(cfg.roles.reviewers).toEqual([]);
+  });
+
+  it("merges partial publishing and role config with defaults", async () => {
+    workdir = await makeLocalRepo();
+    const dir = path.join(workdir, ".tve");
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(
+      path.join(dir, "config.json"),
+      JSON.stringify({
+        publishing: { productionMode: "anyone" },
+        roles: { admins: ["owner"], reviewers: ["editor"] },
+      }),
+      "utf-8"
+    );
+
+    const cfg = await readConfig(workdir);
+    expect(cfg.publishing.productionMode).toBe("anyone");
+    expect(cfg.publishing.defaultTarget).toBe("staging");
+    expect(cfg.publishing.reviewBranchPrefix).toBe("tve/review-");
+    expect(cfg.roles.admins).toEqual(["owner"]);
+    expect(cfg.roles.publishers).toEqual([]);
+    expect(cfg.roles.reviewers).toEqual(["editor"]);
   });
 });

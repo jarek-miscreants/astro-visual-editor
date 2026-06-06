@@ -25,6 +25,111 @@ export function assetRawUrl(relPath: string): string {
   return `${API_BASE}/assets/raw/${relPath.split("/").map(encodeURIComponent).join("/")}`;
 }
 
+const RAW_PUBLIC_ASSET_PREFIX = "/api/assets/raw/public";
+
+function splitUrlSuffix(value: string): { pathPart: string; suffix: string } {
+  const queryIndex = value.indexOf("?");
+  const hashIndex = value.indexOf("#");
+  const cut = [queryIndex, hashIndex]
+    .filter((index) => index >= 0)
+    .sort((a, b) => a - b)[0];
+
+  if (cut === undefined) return { pathPart: value, suffix: "" };
+  return {
+    pathPart: value.slice(0, cut),
+    suffix: value.slice(cut),
+  };
+}
+
+function decodeUrlPath(pathPart: string): string {
+  return pathPart
+    .split("/")
+    .map((segment) => {
+      try {
+        return decodeURIComponent(segment);
+      } catch {
+        return segment;
+      }
+    })
+    .join("/");
+}
+
+export function isProjectPublicAssetUrl(value: string): boolean {
+  return value.startsWith("/") && !value.startsWith("//") && !value.startsWith("/api/");
+}
+
+function currentEditorOrigin(): string | null {
+  if (typeof window === "undefined") return null;
+  return window.location.origin;
+}
+
+function sameOriginPublicAssetPath(value: string): string | null {
+  const origin = currentEditorOrigin();
+  if (!origin) return null;
+
+  try {
+    const parsed = new URL(value, origin);
+    if (parsed.origin !== origin) return null;
+    if (parsed.pathname.startsWith(RAW_PUBLIC_ASSET_PREFIX + "/")) {
+      return parsed.pathname.slice(RAW_PUBLIC_ASSET_PREFIX.length) + parsed.search + parsed.hash;
+    }
+    if (parsed.pathname.startsWith("/api/")) return null;
+    return parsed.pathname + parsed.search + parsed.hash;
+  } catch {
+    return null;
+  }
+}
+
+export function projectPublicAssetPath(value: string): string | null {
+  const src = value.trim();
+  if (!src) return null;
+  if (isProjectPublicAssetUrl(src)) return src;
+  return sameOriginPublicAssetPath(src);
+}
+
+/** Resolve a saved public asset URL for display inside the editor app.
+ *  Markdown should keep `/images/foo.webp`, but the editor preview must load
+ *  those bytes through the backend because Vite does not serve project public/.
+ */
+export function projectAssetPreviewUrl(value: string): string {
+  const publicPath = projectPublicAssetPath(value);
+  if (!publicPath) return value;
+
+  const { pathPart, suffix } = splitUrlSuffix(publicPath);
+  return `${assetRawUrl(`public${decodeUrlPath(pathPart)}`)}${suffix}`;
+}
+
+export function normalizeProjectAssetUrlForSave(value: string): string {
+  return projectPublicAssetPath(value) ?? value;
+}
+
+export function normalizeMarkdownProjectAssetUrls(markdown: string): string {
+  return markdown
+    .replace(
+      /(<img\b[^>]*\bsrc\s*=\s*)(["'])([^"']+)(\2)/gi,
+      (_match, prefix: string, quote: string, src: string, suffix: string) =>
+        `${prefix}${quote}${normalizeProjectAssetUrlForSave(src)}${suffix}`
+    )
+    .replace(
+      /(!\[[^\]]*\]\(<)([^>]+)(>\))/g,
+      (_match, prefix: string, src: string, suffix: string) =>
+        `${prefix}${normalizeProjectAssetUrlForSave(src)}${suffix}`
+    )
+    .replace(
+      /(!\[[^\]]*\]\()([^\s)<>]+)((?:\s+(?:"[^"]*"|'[^']*'))?\))/g,
+      (_match, prefix: string, src: string, suffix: string) =>
+        `${prefix}${normalizeProjectAssetUrlForSave(src)}${suffix}`
+    );
+}
+
+export function nullableProjectAssetPreviewUrl(value: string): string | null {
+  const src = value.trim();
+  if (!src) return null;
+  if (projectPublicAssetPath(src)) return projectAssetPreviewUrl(src);
+  if (/^(https?:|data:|blob:)/i.test(src)) return src;
+  return null;
+}
+
 /** Error thrown when an API call returns a non-2xx response. Carries the
  *  optional error code so callers (e.g. promotion conflict prompt) can branch
  *  on it without parsing the message string. */
@@ -421,5 +526,24 @@ export const api = {
   /** List image assets in the project's public/ and src/ trees (image picker). */
   listAssets(): Promise<{ assets: AssetInfo[] }> {
     return fetchJson("/assets");
+  },
+
+  /** Upload an image into public/images/ and return the created asset. */
+  async uploadAsset(file: File): Promise<{ success: boolean; asset: AssetInfo }> {
+    const res = await fetch(
+      `${API_BASE}/assets/upload?filename=${encodeURIComponent(file.name)}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": file.type || "application/octet-stream",
+        },
+        body: file,
+      }
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      throw new ApiError(err.error || res.statusText, res.status, err.code);
+    }
+    return res.json();
   },
 };

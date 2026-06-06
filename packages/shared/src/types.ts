@@ -387,6 +387,12 @@ export interface GitCommitInfo {
  * Persisted in the repo at `.tve/config.json`. Defines branch roles for the
  * draft → staging → production promotion model. Missing file falls back to
  * sensible defaults; production branch resolves from origin/HEAD.
+ *
+ * Publishing roles are defined by the project owner, lead developer, or repo
+ * admin in `.tve/config.json`. Entries are GitHub usernames. Anyone with a
+ * local checkout can edit this file for their own app session, so these roles
+ * are UI/workflow hints only. GitHub permissions, branch protection, and
+ * CODEOWNERS remain the source of truth for what can be pushed or merged.
  */
 export interface TveBranchConfig {
   branches: {
@@ -398,5 +404,21 @@ export interface TveBranchConfig {
     autoCommitMode: "staged" | "per-mutation";
     ffOnly: boolean;
     deleteDraftAfterMerge: boolean;
+  };
+  publishing: {
+    /** Who TVE should offer production/main publishing controls to. */
+    productionMode: "admins-only" | "any-signed-in" | "anyone";
+    /** The default branch target for content users. */
+    defaultTarget: "staging" | "production";
+    /** Prefix for future review/draft branches created by TVE. */
+    reviewBranchPrefix: string;
+  };
+  roles: {
+    /** GitHub logins that can use production publishing controls in TVE. */
+    admins: string[];
+    /** GitHub logins that can publish to staging/review targets. */
+    publishers: string[];
+    /** GitHub logins that can review proposed content changes. */
+    reviewers: string[];
   };
 }

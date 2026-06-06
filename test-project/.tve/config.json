@@ -1,0 +1,22 @@
+{
+  "branches": {
+    "production": "main",
+    "staging": "staging",
+    "draftPrefix": "tve/draft-"
+  },
+  "git": {
+    "autoCommitMode": "staged",
+    "ffOnly": true,
+    "deleteDraftAfterMerge": true
+  },
+  "publishing": {
+    "productionMode": "admins-only",
+    "defaultTarget": "staging",
+    "reviewBranchPrefix": "tve/review-"
+  },
+  "roles": {
+    "admins": ["jarek-miscreants"],
+    "publishers": [],
+    "reviewers": []
+  }
+}

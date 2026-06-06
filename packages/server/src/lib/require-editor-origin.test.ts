@@ -42,6 +42,14 @@ describe("requireEditorOrigin", () => {
     expect(res.status).toBe(200);
   });
 
+  it("allows the configured editor origin's loopback alias", async () => {
+    const res = await fetch(`${baseUrl}/guarded`, {
+      method: "POST",
+      headers: { Origin: "http://127.0.0.1:3005" },
+    });
+    expect(res.status).toBe(200);
+  });
+
   it("rejects a drive-by cross-origin request with 403", async () => {
     const res = await fetch(`${baseUrl}/guarded`, {
       method: "POST",

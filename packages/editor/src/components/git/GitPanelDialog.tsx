@@ -17,9 +17,11 @@ import {
   Rocket,
   Sparkles,
   Check,
+  ShieldCheck,
 } from "lucide-react";
 import { useGitStore } from "../../store/git-store";
 import { useModeStore } from "../../store/mode-store";
+import { useAuthStore } from "../../store/auth-store";
 import type { GitDirtyFile, GitDiffEntry } from "@tve/shared";
 import { Tooltip } from "../ui/Tooltip";
 
@@ -51,6 +53,8 @@ export function GitPanelDialog({ onClose }: Props) {
   const ensureStaging = useGitStore((s) => s.ensureStaging);
   const promote = useGitStore((s) => s.promote);
   const userMode = useModeStore((s) => s.userMode);
+  const signedIn = useAuthStore((s) => s.signedIn);
+  const user = useAuthStore((s) => s.user);
 
   const [message, setMessage] = useState("");
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -80,6 +84,22 @@ export function GitPanelDialog({ onClose }: Props) {
   const currentBranch = status?.currentBranch || null;
   const productionBranch = config?.branches.production || status?.defaultBranch || "main";
   const stagingBranch = config?.branches.staging || "staging";
+  const productionMode = config?.publishing?.productionMode || "admins-only";
+  const defaultTarget = config?.publishing?.defaultTarget || "staging";
+  const githubLogin = user?.login || null;
+  const admins = config?.roles?.admins || [];
+  const publishers = config?.roles?.publishers || [];
+  const reviewers = config?.roles?.reviewers || [];
+  const roleConfigEmpty = admins.length === 0 && publishers.length === 0 && reviewers.length === 0;
+  const isAdmin = roleMatches(admins, githubLogin);
+  const isPublisher = isAdmin || roleMatches(publishers, githubLogin);
+  const isReviewer = isPublisher || roleMatches(reviewers, githubLogin);
+  const devModeFallback = roleConfigEmpty && userMode === "dev";
+  const canUseProduction =
+    productionMode === "anyone" ||
+    (productionMode === "any-signed-in" && signedIn) ||
+    (productionMode === "admins-only" && isAdmin) ||
+    devModeFallback;
 
   const localBranches = useMemo(() => branches.filter((b) => b.hasLocal), [branches]);
   const stagingExists = useMemo(
@@ -88,6 +108,7 @@ export function GitPanelDialog({ onClose }: Props) {
   );
   const onProduction = currentBranch === productionBranch;
   const onStaging = currentBranch === stagingBranch;
+  const publishCurrentBranchRestricted = onProduction && !canUseProduction;
 
   async function handleCommit() {
     const trimmed = message.trim();
@@ -114,7 +135,95 @@ export function GitPanelDialog({ onClose }: Props) {
     await push();
   }
 
-  const canPublish = !busy && !isLocalOnly && (dirty.length > 0 || ahead > 0);
+  const canPublish =
+    !busy &&
+    !isLocalOnly &&
+    !publishCurrentBranchRestricted &&
+    (dirty.length > 0 || ahead > 0);
+  const publishLabel = onProduction
+    ? "Publish Main"
+    : onStaging
+    ? "Publish Staging"
+    : "Push Branch";
+  const publishTooltip = isLocalOnly
+    ? "No remote configured"
+    : publishCurrentBranchRestricted
+    ? productionAccessMessage({
+        mode: productionMode,
+        signedIn,
+        githubLogin,
+        roleConfigEmpty,
+        productionBranch,
+      })
+    : dirty.length > 0
+    ? `Commit and push ${currentBranch || "current branch"}`
+    : ahead > 0
+    ? `Push ${currentBranch || "current branch"} to origin`
+    : "Nothing to publish";
+  const roleLabel = devModeFallback
+    ? "dev"
+    : isAdmin
+    ? "admin"
+    : isPublisher
+    ? "publisher"
+    : isReviewer
+    ? "reviewer"
+    : signedIn && githubLogin
+    ? githubLogin
+    : "signed out";
+  const roleTooltip = (
+    <div className="flex max-w-[360px] flex-col gap-1 text-left leading-relaxed">
+      <span>
+        <span className="font-semibold text-zinc-100">Who defines roles?</span>{" "}
+        The project owner, lead developer, or repo admin edits{" "}
+        <span className="font-mono text-zinc-100">.tve/config.json</span>.
+      </span>
+      <span>
+        Add GitHub usernames to{" "}
+        <span className="font-mono text-zinc-100">roles.admins</span>,{" "}
+        <span className="font-mono text-zinc-100">roles.publishers</span>, or{" "}
+        <span className="font-mono text-zinc-100">roles.reviewers</span>. TVE uses those
+        lists to shape the UI only.
+      </span>
+      <span>
+        Anyone with a local checkout can edit this file for themselves. That does not grant
+        repo permission; GitHub branch protection, CODEOWNERS, and push permissions still
+        decide what reaches staging or production.
+      </span>
+      <span className="text-zinc-400">
+        Current TVE role: {roleLabel}. Default content target: {defaultTarget}.
+        {roleConfigEmpty ? " No roles are configured yet; dev mode keeps production controls available." : ""}
+      </span>
+    </div>
+  );
+  const stagingTooltip = !currentBranch
+    ? "No current branch"
+    : isLocalOnly
+    ? "No remote configured"
+    : onStaging
+    ? `You're already on ${stagingBranch}`
+    : onProduction
+    ? "Switch to a feature branch first"
+    : dirty.length > 0
+    ? "Commit changes before sending to staging"
+    : `Merge ${currentBranch} -> ${stagingBranch}${stagingExists ? " and push" : " (creates staging first)"}`;
+  const productionTooltip = !currentBranch
+    ? "No current branch"
+    : isLocalOnly
+    ? "No remote configured"
+    : onProduction
+    ? `You're already on ${productionBranch}`
+    : dirty.length > 0
+    ? "Commit changes before publishing to production"
+    : !canUseProduction
+    ? productionAccessMessage({
+        mode: productionMode,
+        signedIn,
+        githubLogin,
+        roleConfigEmpty,
+        productionBranch,
+      })
+    : `Merge ${onStaging || !stagingExists ? currentBranch : stagingBranch} -> ${productionBranch} and push`;
 
   async function handleSendToStaging() {
     if (!currentBranch) return;
@@ -199,6 +308,18 @@ export function GitPanelDialog({ onClose }: Props) {
                 </span>
               </Tooltip>
             )}
+            <Tooltip content={roleTooltip}>
+              <span
+                className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] normal-case ${
+                  canUseProduction
+                    ? "bg-emerald-500/10 text-emerald-300"
+                    : "bg-zinc-900 text-zinc-500"
+                }`}
+              >
+                <ShieldCheck size={11} />
+                {roleLabel}
+              </span>
+            </Tooltip>
           </div>
           <button
             onClick={onClose}
@@ -219,10 +340,18 @@ export function GitPanelDialog({ onClose }: Props) {
 
           {/* Set up staging button — only when missing */}
           {!stagingExists && (
-            <Tooltip content={`Create ${stagingBranch} from ${productionBranch} and push to origin`}>
+            <Tooltip
+              content={
+                isLocalOnly
+                  ? "No remote configured"
+                  : dirty.length > 0
+                  ? "Commit changes before creating staging"
+                  : `Create ${stagingBranch} from ${productionBranch} and push to origin`
+              }
+            >
               <button
                 onClick={() => ensureStaging()}
-                disabled={busy || dirty.length > 0}
+                disabled={busy || isLocalOnly || dirty.length > 0}
                 className="inline-flex h-7 items-center gap-1.5 rounded border border-zinc-800 bg-zinc-900 px-2.5 text-[11px] font-medium text-zinc-300 hover:bg-zinc-800 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <Sparkles size={11} className="text-amber-300" />
@@ -245,7 +374,8 @@ export function GitPanelDialog({ onClose }: Props) {
           >
             <button
               onClick={handleSendToStaging}
-              disabled={busy || !currentBranch || onStaging || onProduction || dirty.length > 0}
+              title={stagingTooltip}
+              disabled={busy || isLocalOnly || !currentBranch || onStaging || onProduction || dirty.length > 0}
               className="inline-flex h-7 items-center gap-1.5 rounded border border-blue-500/40 bg-blue-500/10 px-2.5 text-[11px] font-medium text-blue-200 hover:bg-blue-500/20 hover:text-blue-100 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <Send size={11} />
@@ -265,7 +395,8 @@ export function GitPanelDialog({ onClose }: Props) {
           >
             <button
               onClick={handlePublishToProduction}
-              disabled={busy || !currentBranch || onProduction || dirty.length > 0}
+              title={productionTooltip}
+              disabled={busy || isLocalOnly || !currentBranch || onProduction || dirty.length > 0 || !canUseProduction}
               className="inline-flex h-7 items-center gap-1.5 rounded bg-emerald-500 px-2.5 text-[11px] font-medium text-white shadow-sm hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <Rocket size={11} />
@@ -302,14 +433,16 @@ export function GitPanelDialog({ onClose }: Props) {
           )}
           {/* Publish — single primary action: commit pending changes
               (auto-message) and push. Visible in both modes. */}
-          <button
-            onClick={handlePublish}
-            disabled={!canPublish}
-            className="inline-flex h-6 items-center gap-1 rounded bg-blue-600 px-2.5 text-[11px] font-medium text-white hover:bg-blue-500 disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
-          >
-            <ArrowUpFromLine size={11} />
-            Publish
-          </button>
+          <Tooltip content={publishTooltip}>
+            <button
+              onClick={handlePublish}
+              disabled={!canPublish}
+              className="inline-flex h-6 items-center gap-1 rounded bg-blue-600 px-2.5 text-[11px] font-medium text-white hover:bg-blue-500 disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
+            >
+              <ArrowUpFromLine size={11} />
+              {publishLabel}
+            </button>
+          </Tooltip>
         </div>
 
         {/* Body — two columns: changes / log */}
@@ -571,6 +704,44 @@ function ForceMergePrompt({
       </div>
     </div>
   );
+}
+
+function normalizeRoleEntry(entry: string): string {
+  return entry.trim().replace(/^github:/i, "").replace(/^@/, "").toLowerCase();
+}
+
+function roleMatches(entries: string[], githubLogin: string | null): boolean {
+  if (!githubLogin) return false;
+  const login = normalizeRoleEntry(githubLogin);
+  return entries.some((entry) => {
+    const normalized = normalizeRoleEntry(entry);
+    return normalized === "*" || normalized === login;
+  });
+}
+
+function productionAccessMessage({
+  mode,
+  signedIn,
+  githubLogin,
+  roleConfigEmpty,
+  productionBranch,
+}: {
+  mode: "admins-only" | "any-signed-in" | "anyone";
+  signedIn: boolean;
+  githubLogin: string | null;
+  roleConfigEmpty: boolean;
+  productionBranch: string;
+}): string {
+  if (mode === "anyone") {
+    return `Publishing to ${productionBranch} is enabled for anyone in TVE. GitHub still has final say.`;
+  }
+  if (mode === "any-signed-in" && !signedIn) {
+    return `Sign in with GitHub to publish to ${productionBranch}.`;
+  }
+  if (roleConfigEmpty) {
+    return `No TVE admins are configured in .tve/config.json. Add GitHub logins under roles.admins to enable production publishing for marketers.`;
+  }
+  return `Only TVE admins can publish to ${productionBranch}. ${githubLogin || "This user"} is not listed in roles.admins.`;
 }
 
 function firstLine(s: string): string {

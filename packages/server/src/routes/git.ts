@@ -15,6 +15,7 @@ import {
   ensureStaging,
   promote,
 } from "../services/git.js";
+import type { TveBranchConfig } from "@tve/shared";
 
 export const gitRouter = Router();
 
@@ -215,16 +216,26 @@ gitRouter.put("/config", async (req, res) => {
   const projectPath = requireProject(req, res);
   if (!projectPath) return;
   try {
-    const body = req.body as Partial<{ branches: any; git: any }>;
+    const body = req.body as Partial<TveBranchConfig>;
     if (!body || typeof body !== "object") {
       res.status(400).json({ error: "config body is required" });
       return;
     }
     // Read-modify-write so partial updates merge cleanly
     const current = await readConfig(projectPath);
-    const next = {
+    const next: TveBranchConfig = {
       branches: { ...current.branches, ...(body.branches || {}) },
       git: { ...current.git, ...(body.git || {}) },
+      publishing: { ...current.publishing, ...(body.publishing || {}) },
+      roles: {
+        admins: Array.isArray(body.roles?.admins) ? body.roles.admins : current.roles.admins,
+        publishers: Array.isArray(body.roles?.publishers)
+          ? body.roles.publishers
+          : current.roles.publishers,
+        reviewers: Array.isArray(body.roles?.reviewers)
+          ? body.roles.reviewers
+          : current.roles.reviewers,
+      },
     };
     await writeConfig(projectPath, next);
     res.json({ success: true, config: next });
