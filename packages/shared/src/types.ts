@@ -25,6 +25,8 @@ export interface ASTNode {
   position: SourcePosition;
   /** Whether this node is inside a dynamic expression */
   isDynamic: boolean;
+  /** Nodes rendered into document.head should not be matched against iframe body clicks. */
+  renderTarget?: "body" | "head";
 }
 
 export interface SourcePosition {

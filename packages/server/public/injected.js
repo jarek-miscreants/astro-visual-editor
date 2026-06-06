@@ -519,6 +519,7 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
     matchChildren(astNodes, domElements) {
       let domIndex = 0;
       for (const astNode of astNodes) {
+        if (!this.rendersInBody(astNode)) continue;
         if (domIndex >= domElements.length) break;
         if (astNode.isComponent || this.isPascalCase(astNode.tagName)) {
           const consumed = this.matchComponent(astNode, domElements, domIndex);
@@ -643,6 +644,7 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
         }
       }
       for (const astChild of astChildren) {
+        if (!this.rendersInBody(astChild)) continue;
         if (this.nodeIdToElement.has(astChild.nodeId)) continue;
         this.matchAstChildAnywhere(astChild, root);
       }
@@ -651,6 +653,7 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
      *  subtree. For components, anchor on their first non-component
      *  descendant since components don't have a DOM tag of their own. */
     matchAstChildAnywhere(astChild, root) {
+      if (!this.rendersInBody(astChild)) return;
       const target = astChild.isComponent || this.isPascalCase(astChild.tagName) ? this.firstNonComponentDescendant(astChild.children) : astChild;
       if (!target) return;
       let best = null;
@@ -679,6 +682,7 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
     /** First AST node in the subtree that isn't a component (i.e. renders as a DOM element). */
     firstNonComponentDescendant(nodes) {
       for (const node of nodes) {
+        if (!this.rendersInBody(node)) continue;
         if (node.isComponent || this.isPascalCase(node.tagName)) {
           const found = this.firstNonComponentDescendant(node.children);
           if (found) return found;
@@ -691,6 +695,7 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
     /** First DOM element reachable through already-mapped descendants. */
     findFirstMappedDescendantEl(nodes) {
       for (const node of nodes) {
+        if (!this.rendersInBody(node)) continue;
         const el = this.nodeIdToElement.get(node.nodeId);
         if (el) return el;
         const deeper = this.findFirstMappedDescendantEl(node.children);
@@ -771,6 +776,7 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
      */
     mapComponentsToDOM(nodes) {
       for (const node of nodes) {
+        if (!this.rendersInBody(node)) continue;
         if ((node.isComponent || this.isPascalCase(node.tagName)) && node.children.length > 0) {
           const firstChild = this.flattenComponents(node.children)[0];
           if (firstChild) {
@@ -788,6 +794,7 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
     flattenComponents(nodes) {
       const result = [];
       for (const node of nodes) {
+        if (!this.rendersInBody(node)) continue;
         if (node.isComponent || this.isPascalCase(node.tagName)) {
           result.push(...this.flattenComponents(node.children));
         } else {
@@ -798,6 +805,9 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
     }
     isPascalCase(name) {
       return /^[A-Z]/.test(name);
+    }
+    rendersInBody(node) {
+      return node.renderTarget !== "head";
     }
     /** Get meaningful child elements (skip script, style, tve overlay) */
     getContentElements(parent) {

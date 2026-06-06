@@ -5,6 +5,7 @@ interface ASTNodeLike {
   isDynamic?: boolean;
   classes: string;
   attributes?: Record<string, string>;
+  renderTarget?: "body" | "head";
   /** Trimmed text of a text-only node (set by the parser when the element has
    *  a single text child). Used as a tiebreaker in scoreMatch so two siblings
    *  with identical tag+classes can still be told apart by their copy. */
@@ -67,6 +68,7 @@ export class DomMapper {
     let domIndex = 0;
 
     for (const astNode of astNodes) {
+      if (!this.rendersInBody(astNode)) continue;
       if (domIndex >= domElements.length) break;
 
       if (astNode.isComponent || this.isPascalCase(astNode.tagName)) {
@@ -268,6 +270,7 @@ export class DomMapper {
     // content, so scoreMatch can usually anchor on tag + classes + slot
     // attribute and find the right element.
     for (const astChild of astChildren) {
+      if (!this.rendersInBody(astChild)) continue;
       if (this.nodeIdToElement.has(astChild.nodeId)) continue;
       this.matchAstChildAnywhere(astChild, root);
     }
@@ -277,6 +280,7 @@ export class DomMapper {
    *  subtree. For components, anchor on their first non-component
    *  descendant since components don't have a DOM tag of their own. */
   private matchAstChildAnywhere(astChild: ASTNodeLike, root: Element) {
+    if (!this.rendersInBody(astChild)) return;
     const target =
       astChild.isComponent || this.isPascalCase(astChild.tagName)
         ? this.firstNonComponentDescendant(astChild.children)
@@ -311,6 +315,7 @@ export class DomMapper {
   /** First AST node in the subtree that isn't a component (i.e. renders as a DOM element). */
   private firstNonComponentDescendant(nodes: ASTNodeLike[]): ASTNodeLike | null {
     for (const node of nodes) {
+      if (!this.rendersInBody(node)) continue;
       if (node.isComponent || this.isPascalCase(node.tagName)) {
         const found = this.firstNonComponentDescendant(node.children);
         if (found) return found;
@@ -324,6 +329,7 @@ export class DomMapper {
   /** First DOM element reachable through already-mapped descendants. */
   private findFirstMappedDescendantEl(nodes: ASTNodeLike[]): Element | null {
     for (const node of nodes) {
+      if (!this.rendersInBody(node)) continue;
       const el = this.nodeIdToElement.get(node.nodeId);
       if (el) return el;
       const deeper = this.findFirstMappedDescendantEl(node.children);
@@ -436,6 +442,7 @@ export class DomMapper {
    */
   private mapComponentsToDOM(nodes: ASTNodeLike[]) {
     for (const node of nodes) {
+      if (!this.rendersInBody(node)) continue;
       if ((node.isComponent || this.isPascalCase(node.tagName)) && node.children.length > 0) {
         const firstChild = this.flattenComponents(node.children)[0];
         if (firstChild) {
@@ -454,6 +461,7 @@ export class DomMapper {
   private flattenComponents(nodes: ASTNodeLike[]): ASTNodeLike[] {
     const result: ASTNodeLike[] = [];
     for (const node of nodes) {
+      if (!this.rendersInBody(node)) continue;
       if (node.isComponent || this.isPascalCase(node.tagName)) {
         result.push(...this.flattenComponents(node.children));
       } else {
@@ -465,6 +473,10 @@ export class DomMapper {
 
   private isPascalCase(name: string): boolean {
     return /^[A-Z]/.test(name);
+  }
+
+  private rendersInBody(node: ASTNodeLike): boolean {
+    return node.renderTarget !== "head";
   }
 
   /** Get meaningful child elements (skip script, style, tve overlay) */

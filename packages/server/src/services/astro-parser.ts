@@ -27,7 +27,11 @@ async function parseAstroSourceAsync(
   const rootNodes: ASTNode[] = [];
   let nodeIndex = 0;
 
-  function processNode(node: any, parent: ASTNode | null): ASTNode | null {
+  function processNode(
+    node: any,
+    parent: ASTNode | null,
+    renderTarget: "body" | "head" = "body"
+  ): ASTNode | null {
     // Skip frontmatter, comments, doctype
     if (
       node.type === "frontmatter" ||
@@ -75,6 +79,8 @@ async function parseAstroSourceAsync(
           }
         }
       }
+      const nodeRenderTarget =
+        renderTarget === "head" || attributes.slot === "head" ? "head" : "body";
 
       // Extract text content (only if single text child)
       let textContent: string | null = null;
@@ -122,12 +128,13 @@ async function parseAstroSourceAsync(
         children: [],
         position,
         isDynamic: false,
+        renderTarget: nodeRenderTarget,
       };
 
       // Process children
       if (node.children) {
         for (const child of node.children) {
-          const childNode = processNode(child, astNode);
+          const childNode = processNode(child, astNode, nodeRenderTarget);
           if (childNode) {
             astNode.children.push(childNode);
           }
@@ -140,7 +147,7 @@ async function parseAstroSourceAsync(
     // Handle expression nodes that contain elements
     if (node.type === "expression" && node.children) {
       for (const child of node.children) {
-        const childNode = processNode(child, parent);
+        const childNode = processNode(child, parent, renderTarget);
         if (childNode) {
           childNode.isDynamic = true;
           if (parent) {
@@ -154,8 +161,10 @@ async function parseAstroSourceAsync(
 
     // Handle fragment / root
     if ((node.type === "root" || node.type === "fragment") && node.children) {
+      const fragmentRenderTarget =
+        renderTarget === "head" || fragmentSlotValue(node) === "head" ? "head" : "body";
       for (const child of node.children) {
-        const childNode = processNode(child, parent);
+        const childNode = processNode(child, parent, fragmentRenderTarget);
         if (childNode) {
           if (parent) {
             parent.children.push(childNode);
@@ -171,6 +180,14 @@ async function parseAstroSourceAsync(
 
   processNode(result.ast, null);
   return rootNodes;
+}
+
+function fragmentSlotValue(node: any): string | null {
+  if (!Array.isArray(node.attributes)) return null;
+  const slot = node.attributes.find(
+    (attr: any) => attr?.name === "slot" && typeof attr.value === "string"
+  );
+  return slot?.value ?? null;
 }
 
 /** Build a flat map of nodeId -> ASTNode */
