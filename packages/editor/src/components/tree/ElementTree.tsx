@@ -387,8 +387,7 @@ function TreeNode({
   const selectedNodeId = useEditorStore((s) => s.selectedNodeId);
   const hoveredNodeId = useEditorStore((s) => s.hoveredNodeId);
   const selectNode = useEditorStore((s) => s.selectNode);
-  const setCurrentFile = useEditorStore((s) => s.setCurrentFile);
-  const files = useEditorStore((s) => s.files);
+  const enterComponent = useEditorStore((s) => s.enterComponent);
   const nodeRef = useRef<HTMLDivElement>(null);
 
   // Components have a virtual slot child even when empty
@@ -489,12 +488,7 @@ function TreeNode({
         }}
         onDoubleClick={() => {
           if (node.isComponent) {
-            const componentFile = files.find(
-              (f) => f.type === "component" && f.path.endsWith(`/${node.tagName}.astro`)
-            );
-            if (componentFile) {
-              setCurrentFile(componentFile.path);
-            }
+            enterComponent(node.nodeId);
           }
         }}
         onContextMenu={handleContextMenu}

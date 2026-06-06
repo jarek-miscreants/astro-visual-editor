@@ -318,6 +318,10 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
         if (!mappedEl) return;
         const nodeId = domMapper.getNodeId(mappedEl);
         if (!nodeId) return;
+        if (domMapper.isComponentNode(nodeId)) {
+          bridge.sendToEditor({ type: "tve:enter-component", nodeId });
+          return;
+        }
         const text = getDirectTextContent(mappedEl);
         if (text === null) return;
         mappedEl.contentEditable = "true";
@@ -825,6 +829,10 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
     getNodeCount() {
       return this.elementToNodeId.size;
     }
+    isComponentNode(nodeId) {
+      const node = this.findNode(this.ast, nodeId);
+      return !!node && (node.isComponent || this.isPascalCase(node.tagName));
+    }
     /** Find the closest mapped ancestor (or self) */
     getClosestMappedElement(element) {
       let current = element;
@@ -833,6 +841,14 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
           return current;
         }
         current = current.parentElement;
+      }
+      return null;
+    }
+    findNode(nodes, nodeId) {
+      for (const node of nodes) {
+        if (node.nodeId === nodeId) return node;
+        const found = this.findNode(node.children, nodeId);
+        if (found) return found;
       }
       return null;
     }

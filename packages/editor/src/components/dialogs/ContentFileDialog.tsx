@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { X } from "lucide-react";
 import { useContentStore } from "../../store/content-store";
+import { useEditorStore } from "../../store/editor-store";
 import { ApiError } from "../../lib/api-client";
 
 interface ContentFileDialogProps {
@@ -14,6 +15,7 @@ const NEW_COLLECTION_VALUE = "__new__";
 export function ContentFileDialog({ defaultCollection, onClose }: ContentFileDialogProps) {
   const files = useContentStore((s) => s.files);
   const createFile = useContentStore((s) => s.createFile);
+  const clearComponentReturn = useEditorStore((s) => s.clearComponentReturn);
 
   const existingCollections = useMemo(() => {
     const set = new Set<string>();
@@ -77,6 +79,7 @@ export function ContentFileDialog({ defaultCollection, onClose }: ContentFileDia
 
     setLoading(true);
     try {
+      clearComponentReturn();
       await createFile({
         collection,
         slug,

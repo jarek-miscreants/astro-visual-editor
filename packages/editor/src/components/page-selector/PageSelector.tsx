@@ -10,6 +10,7 @@ export function PageSelector() {
   const files = useEditorStore((s) => s.files);
   const currentFile = useEditorStore((s) => s.currentFile);
   const setCurrentFile = useEditorStore((s) => s.setCurrentFile);
+  const clearComponentReturn = useEditorStore((s) => s.clearComponentReturn);
   const contentFiles = useContentStore((s) => s.files);
   const currentContentPath = useContentStore((s) => s.currentPath);
   const openContentFile = useContentStore((s) => s.openFile);
@@ -41,6 +42,7 @@ export function PageSelector() {
   }
 
   function openContent(path: string) {
+    clearComponentReturn();
     openContentFile(path);
   }
 

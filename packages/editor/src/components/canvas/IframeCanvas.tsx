@@ -61,6 +61,10 @@ export function IframeCanvas() {
         useEditorStore.getState().selectNode(null);
       }
 
+      if (msg.type === "tve:enter-component") {
+        useEditorStore.getState().enterComponent(msg.nodeId);
+      }
+
       if (msg.type === "tve:hover") {
         useEditorStore.getState().hoverNode(msg.nodeId);
       }

@@ -22,6 +22,19 @@ import { useGitStore } from "./git-store";
 import { useComponentSlotsStore } from "./component-slots-store";
 import { useComponentPropsStore } from "./component-props-store";
 import { useContentStore } from "./content-store";
+import { findComponentFile } from "../lib/component-files";
+
+interface ComponentReturnTarget {
+  filePath: string;
+  nodeId: string;
+  label: string;
+  componentTagName: string;
+}
+
+interface SetCurrentFileOptions {
+  componentReturnTarget?: ComponentReturnTarget | null;
+  selectedNodeId?: string | null;
+}
 
 function describeMutation(mutation: Mutation): string {
   switch (mutation.type) {
@@ -54,6 +67,7 @@ interface EditorState {
   // Files
   files: FileInfo[];
   currentFile: string | null;
+  componentReturnTarget: ComponentReturnTarget | null;
 
   // AST
   ast: ASTNode[] | null;
@@ -76,7 +90,10 @@ interface EditorState {
   initProject: () => Promise<void>;
   resetProject: () => void;
   loadFiles: () => Promise<void>;
-  setCurrentFile: (path: string) => Promise<void>;
+  setCurrentFile: (path: string, options?: SetCurrentFileOptions) => Promise<void>;
+  enterComponent: (nodeId: string) => boolean;
+  returnToComponentOrigin: () => Promise<void>;
+  clearComponentReturn: () => void;
   selectNode: (nodeId: string | null, info?: ElementInfo | null) => void;
   hoverNode: (nodeId: string | null) => void;
   setMode: (mode: "edit" | "preview") => void;
@@ -96,6 +113,12 @@ function buildNodeMap(nodes: ASTNode[]): Map<string, ASTNode> {
   }
   for (const node of nodes) walk(node);
   return map;
+}
+
+function astroShortName(path: string): string {
+  return path
+    .replace(/^src\/(pages|layouts|components)\//, "")
+    .replace(/\.astro$/, "");
 }
 
 /** Synthesise a selection ElementInfo from an AST node. The DOM rect/computed
@@ -142,6 +165,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   projectName: null,
   files: [],
   currentFile: null,
+  componentReturnTarget: null,
   ast: null,
   nodeMap: new Map(),
   selectedNodeId: null,
@@ -166,6 +190,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       projectName: null,
       files: [],
       currentFile: null,
+      componentReturnTarget: null,
       ast: null,
       nodeMap: new Map(),
       selectedNodeId: null,
@@ -274,14 +299,84 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }
   },
 
-  async setCurrentFile(path: string) {
-    set({ currentFile: path, selectedNodeId: null, selectedElementInfo: null, iframeReady: false });
+  async setCurrentFile(path, options = {}) {
+    set({
+      currentFile: path,
+      componentReturnTarget: options.componentReturnTarget ?? null,
+      selectedNodeId: null,
+      selectedElementInfo: null,
+      iframeReady: false,
+    });
     try {
       const { ast } = await api.getAst(path);
-      set({ ast, nodeMap: buildNodeMap(ast) });
+      const nodeMap = buildNodeMap(ast);
+      const selectedNode = options.selectedNodeId
+        ? nodeMap.get(options.selectedNodeId)
+        : null;
+      set({
+        ast,
+        nodeMap,
+        selectedNodeId: selectedNode?.nodeId ?? null,
+        selectedElementInfo: selectedNode ? elementInfoFromNode(selectedNode, null) : null,
+      });
     } catch (err) {
       console.error("Failed to load AST:", err);
     }
+  },
+
+  enterComponent(nodeId) {
+    const state = get();
+    const node = state.nodeMap.get(nodeId);
+    if (!node || (!node.isComponent && !/^[A-Z]/.test(node.tagName))) return false;
+
+    const componentFile = findComponentFile(state.files, node.tagName);
+    if (!componentFile) {
+      toast.error(
+        "Component source not found",
+        `${node.tagName}.astro is not in this project.`
+      );
+      return false;
+    }
+
+    const existingReturn = state.componentReturnTarget;
+    const origin =
+      state.currentFile && !state.currentFile.startsWith("src/components/")
+        ? {
+            filePath: state.currentFile,
+            nodeId,
+            label: astroShortName(state.currentFile),
+            componentTagName: node.tagName,
+          }
+        : existingReturn;
+
+    void get().setCurrentFile(componentFile.path, {
+      componentReturnTarget: origin,
+    });
+    return true;
+  },
+
+  async returnToComponentOrigin() {
+    const target = get().componentReturnTarget;
+    if (!target) return;
+
+    await get().setCurrentFile(target.filePath, {
+      componentReturnTarget: null,
+      selectedNodeId: target.nodeId,
+    });
+
+    const restored = get().nodeMap.get(target.nodeId);
+    if (restored) {
+      selectNodeInIframe(target.nodeId);
+    } else {
+      toast.error(
+        "Component instance not found",
+        `${target.componentTagName} may have moved or been removed.`
+      );
+    }
+  },
+
+  clearComponentReturn() {
+    set({ componentReturnTarget: null });
   },
 
   selectNode(nodeId, info = null) {
@@ -307,6 +402,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     // Send AST to iframe when it becomes ready
     if (ready && state.ast) {
       provideAstToIframe(state.ast);
+      if (state.selectedNodeId) {
+        selectNodeInIframe(state.selectedNodeId);
+      }
     }
   },
 

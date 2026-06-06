@@ -1,9 +1,10 @@
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
-import { Copy, Trash2, ArrowUp, ArrowDown, PlusCircle } from "lucide-react";
+import { Copy, Trash2, ArrowUp, ArrowDown, PlusCircle, Component } from "lucide-react";
 import { createPortal } from "react-dom";
 import { useEditorStore } from "../../store/editor-store";
 import { Tooltip } from "../ui/Tooltip";
 import { AddElementPanel } from "../tree/AddElementPanel";
+import { findComponentFile } from "../../lib/component-files";
 
 interface Props {
   /** Ref to the iframe so we can compute its page offset. */
@@ -20,7 +21,9 @@ export function SelectionToolbar({ iframeRef }: Props) {
   const selectedNodeId = useEditorStore((s) => s.selectedNodeId);
   const selectedElementInfo = useEditorStore((s) => s.selectedElementInfo);
   const ast = useEditorStore((s) => s.ast);
+  const files = useEditorStore((s) => s.files);
   const applyMutation = useEditorStore((s) => s.applyMutation);
+  const enterComponent = useEditorStore((s) => s.enterComponent);
 
   const [coords, setCoords] = useState<{ top: number; left: number } | null>(null);
   const [showAddChild, setShowAddChild] = useState(false);
@@ -167,6 +170,10 @@ export function SelectionToolbar({ iframeRef }: Props) {
   // child insertion.
   const selectedNode = ast ? findNode(ast, selectedNodeId) : null;
   const childCount = selectedNode?.children.length ?? 0;
+  const componentFile =
+    selectedNode && (selectedNode.isComponent || /^[A-Z]/.test(selectedNode.tagName))
+      ? findComponentFile(files, selectedNode.tagName)
+      : undefined;
 
   function handleAddChild(html: string, options?: { componentPath?: string }) {
     if (!selectedNodeId) return;
@@ -188,6 +195,7 @@ export function SelectionToolbar({ iframeRef }: Props) {
     >
       <Tooltip content="Add child">
         <button
+          aria-label="Add child"
           ref={addBtnRef}
           onClick={() => setShowAddChild((v) => !v)}
           className="flex h-6 w-6 items-center justify-center rounded text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-white"
@@ -195,8 +203,20 @@ export function SelectionToolbar({ iframeRef }: Props) {
           <PlusCircle size={12} />
         </button>
       </Tooltip>
+      {componentFile && (
+        <Tooltip content="Enter component">
+          <ToolbarButton
+            ariaLabel="Enter component"
+            onClick={() => enterComponent(selectedNodeId)}
+            accent
+          >
+            <Component size={12} />
+          </ToolbarButton>
+        </Tooltip>
+      )}
       <Tooltip content="Move up">
         <ToolbarButton
+          ariaLabel="Move up"
           disabled={!canMoveUp}
           onClick={() => moveSibling(-1)}
         >
@@ -205,6 +225,7 @@ export function SelectionToolbar({ iframeRef }: Props) {
       </Tooltip>
       <Tooltip content="Move down">
         <ToolbarButton
+          ariaLabel="Move down"
           disabled={!canMoveDown}
           onClick={() => moveSibling(1)}
         >
@@ -213,6 +234,7 @@ export function SelectionToolbar({ iframeRef }: Props) {
       </Tooltip>
       <Tooltip content="Duplicate" shortcut="Ctrl+D">
         <ToolbarButton
+          ariaLabel="Duplicate"
           onClick={() =>
             applyMutation({ type: "duplicate-element", nodeId: selectedNodeId })
           }
@@ -222,6 +244,7 @@ export function SelectionToolbar({ iframeRef }: Props) {
       </Tooltip>
       <Tooltip content="Delete" shortcut="Del">
         <ToolbarButton
+          ariaLabel="Delete"
           destructive
           onClick={() =>
             applyMutation({ type: "remove-element", nodeId: selectedNodeId })
@@ -266,16 +289,21 @@ function findNode(
 function ToolbarButton({
   children,
   onClick,
+  ariaLabel,
   disabled,
   destructive,
+  accent,
 }: {
   children: React.ReactNode;
   onClick: () => void;
+  ariaLabel: string;
   disabled?: boolean;
   destructive?: boolean;
+  accent?: boolean;
 }) {
   return (
     <button
+      aria-label={ariaLabel}
       onClick={onClick}
       disabled={disabled}
       className={`flex h-6 w-6 items-center justify-center rounded transition-colors ${
@@ -283,6 +311,8 @@ function ToolbarButton({
           ? "text-zinc-700 cursor-not-allowed"
           : destructive
             ? "text-zinc-300 hover:bg-red-500/20 hover:text-red-300"
+            : accent
+              ? "text-emerald-300 hover:bg-emerald-500/15 hover:text-emerald-200"
             : "text-zinc-300 hover:bg-zinc-800 hover:text-white"
       }`}
     >

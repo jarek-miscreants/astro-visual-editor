@@ -102,6 +102,49 @@
 }
 .tve-toolbar__brand-icon { color: var(--shell-text-subtle); }
 
+.tve-component-return {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 4px 12px;
+  border-bottom: 1px solid var(--shell-border);
+  background-color: rgba(16, 185, 129, 0.08);
+  font-size: 11px;
+  color: var(--shell-text-muted);
+}
+.tve-component-return__button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: min(360px, 55vw);
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  border-radius: 4px;
+  background: rgba(16, 185, 129, 0.12);
+  color: #86efac;
+  cursor: pointer;
+  transition: background-color 100ms, color 100ms, border-color 100ms;
+}
+.tve-component-return__button:hover {
+  border-color: rgba(16, 185, 129, 0.45);
+  background: rgba(16, 185, 129, 0.18);
+  color: #bbf7d0;
+}
+.tve-component-return__button span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tve-component-return__meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  color: rgba(187, 247, 208, 0.75);
+}
+
 /* ──────────────────────────────────────────────
    Panels (left tree, right properties)
    ────────────────────────────────────────────── */

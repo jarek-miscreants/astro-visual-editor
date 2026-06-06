@@ -285,11 +285,17 @@ code,
 .mdxeditor-popup-container [class*="_tableColumnEditorPopoverContent"],
 .mdxeditor-popup-container [class*="_linkDialogPopoverContent"],
 .mdxeditor-popup-container [class*="_dialogContent"],
-.mdxeditor-popup-container [class*="_selectContent"] {
+.mdxeditor-popup-container [class*="_selectContent"],
+.mdxeditor-popup-container [class*="_selectViewport"],
+.mdxeditor-popup-container [role="listbox"],
+[data-radix-popper-content-wrapper] [class*="_selectContent"],
+[data-radix-popper-content-wrapper] [class*="_selectViewport"],
+[data-radix-popper-content-wrapper] [role="listbox"] {
   background: #0f0f11 !important;
   color: #e4e4e7 !important;
   border: 1px solid #27272a !important;
   border-radius: 4px;
+  color-scheme: dark;
 }
 .mdxeditor-popup-container button,
 .mdxeditor-popup-container [class*="_iconButton"],
@@ -330,12 +336,24 @@ code,
   background: #0f0f11 !important;
   color: #e4e4e7 !important;
   border: 1px solid #27272a !important;
+  color-scheme: dark;
 }
-[class*="_selectItem"] {
+[class*="_selectViewport"],
+[data-radix-select-viewport] {
+  background: #0f0f11 !important;
+  color: #e4e4e7 !important;
+}
+[class*="_selectItem"],
+[data-radix-select-item],
+[role="option"] {
+  background: transparent !important;
   color: #e4e4e7 !important;
 }
 [class*="_selectItem"][data-highlighted],
-[class*="_selectItem"]:hover {
+[class*="_selectItem"]:hover,
+[data-radix-select-item][data-highlighted],
+[role="option"][data-highlighted],
+[role="option"]:hover {
   background: #27272a !important;
   color: #fafafa !important;
 }

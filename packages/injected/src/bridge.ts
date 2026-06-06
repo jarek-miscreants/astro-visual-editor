@@ -30,6 +30,7 @@ export type IframeToEditorMessage =
       };
     }
   | { type: "tve:deselect" }
+  | { type: "tve:enter-component"; nodeId: string }
   | { type: "tve:text-edit"; nodeId: string; newText: string }
   | {
       type: "tve:move-element";

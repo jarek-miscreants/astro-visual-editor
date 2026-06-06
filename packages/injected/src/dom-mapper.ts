@@ -507,6 +507,11 @@ export class DomMapper {
     return this.elementToNodeId.size;
   }
 
+  isComponentNode(nodeId: string): boolean {
+    const node = this.findNode(this.ast, nodeId);
+    return !!node && (node.isComponent || this.isPascalCase(node.tagName));
+  }
+
   /** Find the closest mapped ancestor (or self) */
   getClosestMappedElement(element: Element): Element | null {
     let current: Element | null = element;
@@ -515,6 +520,15 @@ export class DomMapper {
         return current;
       }
       current = current.parentElement;
+    }
+    return null;
+  }
+
+  private findNode(nodes: ASTNodeLike[], nodeId: string): ASTNodeLike | null {
+    for (const node of nodes) {
+      if (node.nodeId === nodeId) return node;
+      const found = this.findNode(node.children, nodeId);
+      if (found) return found;
     }
     return null;
   }

@@ -184,6 +184,11 @@ export function setupInteraction(
       const nodeId = domMapper.getNodeId(mappedEl);
       if (!nodeId) return;
 
+      if (domMapper.isComponentNode(nodeId)) {
+        bridge.sendToEditor({ type: "tve:enter-component", nodeId });
+        return;
+      }
+
       // Only allow text editing on elements with direct text content
       const text = getDirectTextContent(mappedEl);
       if (text === null) return;

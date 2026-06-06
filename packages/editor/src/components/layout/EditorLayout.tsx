@@ -10,6 +10,7 @@ import { Toaster } from "../ui/Toaster";
 import { ShortcutsDialog, useShortcutsHotkey } from "../ui/ShortcutsDialog";
 import { ExitOverlay, useExitHotkey } from "../ui/ExitOverlay";
 import { Breadcrumb } from "../properties/Breadcrumb";
+import { ComponentReturnBar } from "./ComponentReturnBar";
 
 export function EditorLayout() {
   const mode = useEditorStore((s) => s.mode);
@@ -23,6 +24,7 @@ export function EditorLayout() {
   return (
     <div className="tve-shell">
       <Toolbar />
+      {!isContent && <ComponentReturnBar />}
       {/* Selection breadcrumb — shown under the toolbar whenever something
           is selected, so it stays visible regardless of which panel/tab the
           user is in. Hidden in markdown-content mode. */}
