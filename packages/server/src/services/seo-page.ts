@@ -9,6 +9,7 @@ import type {
   SeoWarning,
 } from "@tve/shared";
 import { parseAstroFileAsync } from "./astro-parser.js";
+import { parseFrontmatterImports, type FrontmatterImport } from "./frontmatter-imports.js";
 import * as sourceRange from "./source-range.js";
 
 type SeoKey = keyof SeoPageData;
@@ -51,6 +52,44 @@ const DEFAULT_FIELDS: Record<SeoKey, string> = {
   noindex: "noindex",
 };
 
+const DEFAULT_SEO_COMPONENT_PATH = "src/components/SEO.astro";
+const DEFAULT_SEO_COMPONENT_SOURCE = `---
+interface Props {
+  title?: string;
+  description?: string;
+  canonical?: string;
+  ogTitle?: string;
+  ogDescription?: string;
+  image?: string;
+  twitterImage?: string;
+  noindex?: boolean | string;
+}
+
+const {
+  title,
+  description,
+  canonical,
+  ogTitle = title,
+  ogDescription = description,
+  image,
+  twitterImage = image,
+  noindex = false,
+} = Astro.props;
+
+const isNoindex = noindex === true || noindex === "true";
+const robots = isNoindex ? "noindex,nofollow" : "index,follow";
+---
+
+{title && <title>{title}</title>}
+{description && <meta name="description" content={description} />}
+<meta name="robots" content={robots} />
+{canonical && <link rel="canonical" href={canonical} />}
+{ogTitle && <meta property="og:title" content={ogTitle} />}
+{ogDescription && <meta property="og:description" content={ogDescription} />}
+{image && <meta property="og:image" content={image} />}
+{twitterImage && <meta name="twitter:image" content={twitterImage} />}
+`;
+
 function emptyFields(): Record<SeoKey, SeoFieldState> {
   return Object.fromEntries(
     SEO_KEYS.map((key) => [
@@ -70,8 +109,8 @@ export async function analyzeSeoPage(
 ): Promise<SeoPageResponse> {
   const fullPath = path.join(projectPath, relPath);
   const config = await readSeoConfig(projectPath);
-  const { ast } = await parseAstroFileAsync(fullPath);
-  const componentConfig = normalizeComponentConfig(config?.component);
+  const { ast, source } = await parseAstroFileAsync(fullPath);
+  const componentConfig = await resolveComponentConfig(projectPath, source, ast, config?.component);
   const tagName = componentConfig.tagName;
   const seoNode = findFirstNode(ast, (node) => node.tagName === tagName);
   const fields = emptyFields();
@@ -122,8 +161,8 @@ export async function updateSeoPage(
 ): Promise<SeoPageResponse> {
   const fullPath = path.join(projectPath, relPath);
   const config = await readSeoConfig(projectPath);
-  const componentConfig = normalizeComponentConfig(config?.component);
   const { ast, source } = await parseAstroFileAsync(fullPath);
+  const componentConfig = await resolveComponentConfig(projectPath, source, ast, config?.component);
   const seoNode = findFirstNode(ast, (node) => node.tagName === componentConfig.tagName);
   if (!seoNode) throw new Error("SEO component not found on this page");
 
@@ -160,17 +199,19 @@ export async function addSeoToPage(
 ): Promise<SeoPageResponse> {
   const fullPath = path.join(projectPath, relPath);
   const config = await readSeoConfig(projectPath);
-  const componentConfig = normalizeComponentConfig(config?.component);
+  const { ast, source } = await parseAstroFileAsync(fullPath);
+  const componentConfig = await resolveComponentConfig(projectPath, source, ast, config?.component);
   if (!componentConfig.path || !componentConfig.insertion) {
     throw new Error("SEO component path and insertion mode must be configured");
   }
 
-  const { ast, source } = await parseAstroFileAsync(fullPath);
   if (findFirstNode(ast, (node) => node.tagName === componentConfig.tagName)) {
     return analyzeSeoPage(projectPath, relPath);
   }
 
   const s = new MagicString(source);
+  await ensureSeoComponentFile(projectPath, componentConfig);
+  await ensureLayoutHeadSlot(projectPath, fullPath, source, componentConfig);
   ensureImport(s, source, fullPath, projectPath, componentConfig);
   insertSeoComponent(s, source, ast, componentConfig, input);
   await fs.writeFile(fullPath, s.toString(), "utf-8");
@@ -191,10 +232,68 @@ async function readSeoConfig(projectPath: string): Promise<TveSeoConfig | null> 
 function normalizeComponentConfig(input: SeoComponentConfig | undefined): SeoComponentConfig {
   return {
     tagName: input?.tagName ?? "SEO",
-    path: input?.path,
+    path: input?.path ?? DEFAULT_SEO_COMPONENT_PATH,
     insertion: input?.insertion,
     fields: { ...DEFAULT_FIELDS, ...(input?.fields ?? {}) },
   };
+}
+
+async function resolveComponentConfig(
+  projectPath: string,
+  source: string,
+  ast: ASTNode[],
+  input: SeoComponentConfig | undefined
+): Promise<SeoComponentConfig> {
+  const config = normalizeComponentConfig(input);
+  if (!input?.path) {
+    config.path = await resolveDefaultSeoComponentPath(projectPath);
+  }
+  if (!config.insertion) {
+    config.insertion = inferLayoutSlotInsertion(source, ast);
+  }
+  if (config.insertion?.mode === "layout-slot" && !config.insertion.layout) {
+    config.insertion.layout = inferLayoutSlotInsertion(source, ast)?.layout;
+  }
+  return config;
+}
+
+async function resolveDefaultSeoComponentPath(projectPath: string): Promise<string> {
+  for (const candidate of [
+    DEFAULT_SEO_COMPONENT_PATH,
+    "src/components/Seo.astro",
+    "src/components/seo.astro",
+  ]) {
+    try {
+      await fs.access(path.join(projectPath, candidate));
+      return candidate;
+    } catch (err: any) {
+      if (err?.code !== "ENOENT") throw err;
+    }
+  }
+  return DEFAULT_SEO_COMPONENT_PATH;
+}
+
+function inferLayoutSlotInsertion(
+  source: string,
+  ast: ASTNode[]
+): SeoComponentConfig["insertion"] | undefined {
+  const imports = parseFrontmatterImports(source);
+  const layoutBindings = new Set(
+    imports
+      .filter((item) => !item.isExternal && isLayoutImport(item))
+      .map((item) => item.name)
+  );
+  const rootComponents = ast.filter((node) => node.isComponent);
+  const layout =
+    rootComponents.find((node) => layoutBindings.has(node.tagName)) ??
+    rootComponents.find((node) => /Layout$/.test(node.tagName));
+  if (!layout) return undefined;
+  return { mode: "layout-slot", layout: layout.tagName, slot: "head" };
+}
+
+function isLayoutImport(item: FrontmatterImport): boolean {
+  const source = item.source.replace(/\\/g, "/");
+  return source.includes("/layouts/") || source.endsWith("Layout.astro");
 }
 
 function findFirstNode(nodes: ASTNode[], predicate: (node: ASTNode) => boolean): ASTNode | null {
@@ -217,6 +316,102 @@ function canInsertSeo(ast: ASTNode[], config: SeoComponentConfig): boolean {
     return !layout || !!findFirstNode(ast, (node) => node.tagName === layout);
   }
   return false;
+}
+
+async function ensureSeoComponentFile(projectPath: string, config: SeoComponentConfig) {
+  if (!config.path) return;
+  const componentPath = path.join(projectPath, config.path);
+  try {
+    await fs.access(componentPath);
+    return;
+  } catch (err: any) {
+    if (err?.code !== "ENOENT") throw err;
+  }
+  await fs.mkdir(path.dirname(componentPath), { recursive: true });
+  await fs.writeFile(componentPath, DEFAULT_SEO_COMPONENT_SOURCE, "utf-8");
+}
+
+async function ensureLayoutHeadSlot(
+  projectPath: string,
+  pageFullPath: string,
+  pageSource: string,
+  config: SeoComponentConfig
+) {
+  const insertion = config.insertion;
+  if (insertion?.mode !== "layout-slot" || !insertion.layout) return;
+
+  const layoutPath = resolveImportedComponentPath(
+    projectPath,
+    pageFullPath,
+    pageSource,
+    insertion.layout
+  );
+  if (!layoutPath) return;
+
+  const layoutSource = await fs.readFile(layoutPath, "utf-8");
+  const next = withHeadSlot(layoutSource);
+  if (next !== layoutSource) {
+    await fs.writeFile(layoutPath, next, "utf-8");
+  }
+}
+
+function resolveImportedComponentPath(
+  projectPath: string,
+  importerFullPath: string,
+  source: string,
+  bindingName: string
+): string | null {
+  const imported = parseFrontmatterImports(source).find((item) => item.name === bindingName);
+  if (!imported || imported.isExternal) return null;
+  return resolveLocalSpecifier(projectPath, importerFullPath, imported.source);
+}
+
+function resolveLocalSpecifier(
+  projectPath: string,
+  importerFullPath: string,
+  specifier: string
+): string | null {
+  const normalized = specifier.replace(/\\/g, "/");
+  if (normalized.startsWith("./") || normalized.startsWith("../")) {
+    return path.resolve(path.dirname(importerFullPath), normalized);
+  }
+  if (normalized.startsWith("~/") || normalized.startsWith("@/")) {
+    return path.join(projectPath, "src", normalized.slice(2));
+  }
+  if (normalized.startsWith("/")) {
+    return path.join(projectPath, normalized.slice(1));
+  }
+  return null;
+}
+
+function withHeadSlot(source: string): string {
+  if (/<slot\b(?=[^>]*\bname\s*=\s*["']head["'])[^>]*>/i.test(source)) return source;
+
+  const newline = source.includes("\r\n") ? "\r\n" : "\n";
+  const headOpen = source.match(/<head\b[^>]*>/i);
+  if (!headOpen || headOpen.index === undefined) return source;
+  const headOpenEnd = headOpen.index + headOpen[0].length;
+  const headCloseIndex = source.slice(headOpenEnd).search(/<\/head\s*>/i);
+  if (headCloseIndex === -1) return source;
+  const headClose = headOpenEnd + headCloseIndex;
+  const headBody = source.slice(headOpenEnd, headClose);
+  const titleMatch = headBody.match(/^([ \t]*)<title\b[\s\S]*?<\/title>[^\S\r\n]*(?:\r?\n)?/m);
+
+  if (titleMatch && titleMatch.index !== undefined) {
+    const start = headOpenEnd + titleMatch.index;
+    const end = start + titleMatch[0].length;
+    const indent = titleMatch[1] ?? "";
+    const titleBlock = titleMatch[0].trimEnd();
+    const indentedTitle = titleBlock
+      .split(/\r?\n/)
+      .map((line) => `${indent}  ${line.trimStart()}`)
+      .join(newline);
+    const replacement = `${indent}<slot name="head">${newline}${indentedTitle}${newline}${indent}</slot>${newline}`;
+    return source.slice(0, start) + replacement + source.slice(end);
+  }
+
+  const indent = indentAt(source, headClose);
+  return source.slice(0, headClose) + `${indent}  <slot name="head" />${newline}` + source.slice(headClose);
 }
 
 function boolValue(value: string | undefined): boolean {
