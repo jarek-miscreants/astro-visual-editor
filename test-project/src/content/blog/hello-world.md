@@ -33,3 +33,6 @@ const greet = (name) => `Hello, ${name}!`;
 * [x] Read file
 * [x] Edit body
 * [ ] Add MDX support later
+*
+
+![Image](/images/dj-abby-stract.png)

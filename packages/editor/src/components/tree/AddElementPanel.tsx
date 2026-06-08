@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Search, Box, Type, Image, MousePointer, List, Component, Layers, Package } from "lucide-react";
-import type { ASTNode } from "@tve/shared";
+import type { ASTNode, ComponentRegistryItem } from "@tve/shared";
 import { ELEMENT_TEMPLATES, templateToHtml, type TemplateGroup } from "../../lib/element-templates";
 import { useEditorStore } from "../../store/editor-store";
+import { useComponentRegistryStore } from "../../store/component-registry-store";
 import { api } from "../../lib/api-client";
+import { buildRegistryComponentHtml } from "../../lib/component-insertion";
 
 interface AddElementPanelProps {
   onSelect: (html: string, options?: { componentPath?: string }) => void;
@@ -66,12 +68,26 @@ const GROUP_ICONS: Record<string, React.ReactNode> = {
 
 export function AddElementPanel({ onSelect, onClose, componentsOnly = false }: AddElementPanelProps) {
   const [search, setSearch] = useState("");
+  const [loadingPath, setLoadingPath] = useState<string | null>(null);
   const files = useEditorStore((s) => s.files);
   const currentFile = useEditorStore((s) => s.currentFile);
   const ast = useEditorStore((s) => s.ast);
+  const registryComponents = useComponentRegistryStore((s) => s.components);
+  const registryLoading = useComponentRegistryStore((s) => s.loading);
+  const registryError = useComponentRegistryStore((s) => s.lastError);
+  const loadRegistry = useComponentRegistryStore((s) => s.load);
+  const ensureRegistryEntry = useComponentRegistryStore((s) => s.ensureEntry);
+
+  useEffect(() => {
+    void loadRegistry();
+  }, [currentFile, loadRegistry]);
 
   // Project components
   const components = files.filter((f) => f.type === "component");
+  const registryByPath = useMemo(() => {
+    return new Map(registryComponents.map((component) => [component.componentPath, component]));
+  }, [registryComponents]);
+  const insertableRegistryComponents = registryComponents.filter((component) => component.insertable);
 
   // External components: parsed from the open file's frontmatter, filtered to
   // PascalCase names imported from non-relative sources. Fetched once per
@@ -110,25 +126,65 @@ export function AddElementPanel({ onSelect, onClose, componentsOnly = false }: A
     };
   }, [currentFile]);
 
-  const query = search.toLowerCase();
-  const filteredComponents = components.filter(
-    (c) => !query || c.path.toLowerCase().includes(query)
+  const query = search.trim().toLowerCase();
+  const filteredRegistryComponents = insertableRegistryComponents.filter((component) =>
+    matchesRegistryComponent(component, query)
   );
+  const groupedRegistryComponents = groupRegistryComponents(filteredRegistryComponents);
+  const filteredComponents = components.filter((component) => {
+    if (!query) return true;
+    const registry = registryByPath.get(component.path);
+    const name = componentNameFromPath(component.path);
+    return [
+      component.path,
+      name,
+      registry?.label,
+      registry?.category,
+      registry?.description,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase()
+      .includes(query);
+  });
   const filteredExternals = externals.filter(
     (e) => !query || e.name.toLowerCase().includes(query) || e.source.toLowerCase().includes(query)
   );
+
+  async function activateRegistryComponent(component: ComponentRegistryItem) {
+    setLoadingPath(component.componentPath);
+    try {
+      const entry = await ensureRegistryEntry(component.componentPath);
+      const html = buildRegistryComponentHtml(entry ?? component);
+      onSelect(html, { componentPath: component.componentPath });
+      onClose();
+    } finally {
+      setLoadingPath(null);
+    }
+  }
 
   // Flat ordered list of activatable items, in the order they're rendered
   // below. Drives keyboard navigation: each item gets an index, and
   // ArrowDown/Up move `activeIndex` while Enter triggers the item's
   // activate(). Recomputed when the filtered lists change.
-  const activators = useMemo<Array<() => void>>(() => {
-    const list: Array<() => void> = [];
-    for (const comp of filteredComponents) {
-      const name = comp.path.split("/").pop()?.replace(".astro", "") || comp.path;
-      list.push(() => onSelect(`<${name} />`, { componentPath: comp.path }));
+  const activators = useMemo<Array<() => void | Promise<void>>>(() => {
+    const list: Array<() => void | Promise<void>> = [];
+    if (componentsOnly) {
+      for (const component of filteredRegistryComponents) {
+        list.push(() => activateRegistryComponent(component));
+      }
+    } else {
+      for (const comp of filteredComponents) {
+        const registry = registryByPath.get(comp.path);
+        if (registry?.insertable) {
+          list.push(() => activateRegistryComponent(registry));
+        } else {
+          const name = componentNameFromPath(comp.path);
+          list.push(() => onSelect(`<${name} />`, { componentPath: comp.path }));
+        }
+      }
     }
-    for (const ext of filteredExternals) {
+    for (const ext of componentsOnly ? [] : filteredExternals) {
       list.push(() => onSelect(buildExternalComponentHtml(ext.name, ast)));
     }
     if (!componentsOnly) {
@@ -140,7 +196,16 @@ export function AddElementPanel({ onSelect, onClose, componentsOnly = false }: A
       }
     }
     return list;
-  }, [filteredComponents, filteredExternals, componentsOnly, query, ast, onSelect]);
+  }, [
+    filteredComponents,
+    filteredExternals,
+    filteredRegistryComponents,
+    componentsOnly,
+    query,
+    ast,
+    onSelect,
+    registryByPath,
+  ]);
 
   const [activeIndex, setActiveIndex] = useState(0);
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
@@ -184,7 +249,7 @@ export function AddElementPanel({ onSelect, onClose, componentsOnly = false }: A
   }
 
   return (
-    <div className="w-64 max-h-96 overflow-auto  border border-zinc-700 bg-zinc-800 shadow-xl">
+    <div className="w-72 max-h-96 overflow-auto border border-zinc-700 bg-zinc-800 shadow-xl">
       {/* Search */}
       <div className="sticky top-0 z-10 border-b border-zinc-700 bg-zinc-800 p-2">
         <div className="flex items-center gap-1  border border-zinc-600 bg-zinc-900 px-2">
@@ -193,7 +258,7 @@ export function AddElementPanel({ onSelect, onClose, componentsOnly = false }: A
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             onKeyDown={handleSearchKeyDown}
-            placeholder="Search elements..."
+            placeholder={componentsOnly ? "Search blocks..." : "Search elements..."}
             className="w-full bg-transparent py-1 text-xs text-zinc-200 outline-none placeholder:text-zinc-600"
             autoFocus
           />
@@ -201,49 +266,106 @@ export function AddElementPanel({ onSelect, onClose, componentsOnly = false }: A
       </div>
 
       <div className="p-1">
-        {/* Project components */}
-        {components.length > 0 && (
-          <div className="mb-1">
-            <div className="flex items-center gap-1 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-cyan-400">
-              <Component size={10} />
-              Components
+        {componentsOnly ? (
+          <>
+            {registryLoading && insertableRegistryComponents.length === 0 && (
+              <div className="px-2 py-4 text-center text-[11px] text-zinc-500">
+                Loading blocks...
+              </div>
+            )}
+            {registryError && insertableRegistryComponents.length === 0 && (
+              <div className="px-2 py-4 text-center text-[11px] text-red-300">
+                {registryError}
+              </div>
+            )}
+            {!registryLoading && !registryError && insertableRegistryComponents.length === 0 && (
+              <div className="px-2 py-4 text-center text-[11px] text-zinc-500">
+                No insertable blocks found.
+              </div>
+            )}
+            {insertableRegistryComponents.length > 0 && filteredRegistryComponents.length === 0 && (
+              <div className="px-2 py-3 text-center text-[11px] text-zinc-500">
+                No blocks match "{search}".
+              </div>
+            )}
+            {groupedRegistryComponents.map((group) => (
+              <div key={group.category} className="mb-1">
+                <div className="flex items-center gap-1 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-cyan-400">
+                  <Layers size={10} />
+                  {group.category}
+                </div>
+                {group.items.map((component) => {
+                  const idx = nextIndex();
+                  const isLoading = loadingPath === component.componentPath;
+                  return (
+                    <button
+                      key={component.componentPath}
+                      ref={(el) => { itemRefs.current[idx] = el; }}
+                      onClick={() => activateRegistryComponent(component)}
+                      onMouseEnter={() => setActiveIndex(idx)}
+                      data-active={activeIndex === idx || undefined}
+                      className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-xs text-zinc-300 hover:bg-zinc-700 data-[active]:bg-zinc-700"
+                    >
+                      <Component size={11} className="shrink-0 text-cyan-400" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-zinc-200">{component.label}</span>
+                        {component.description && (
+                          <span className="block truncate text-[10px] text-zinc-500">
+                            {component.description}
+                          </span>
+                        )}
+                      </span>
+                      <span className="shrink-0 text-[9px] text-zinc-600">
+                        {isLoading ? "Adding" : component.fieldCount ? `${component.fieldCount} fields` : component.tagName}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
+          </>
+        ) : (
+          components.length > 0 && (
+            <div className="mb-1">
+              <div className="flex items-center gap-1 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-cyan-400">
+                <Component size={10} />
+                Components
+              </div>
+              {filteredComponents.map((comp) => {
+                const registry = registryByPath.get(comp.path);
+                const name = componentNameFromPath(comp.path);
+                const idx = nextIndex();
+                const isLoading = loadingPath === comp.path;
+                return (
+                  <button
+                    key={comp.path}
+                    ref={(el) => { itemRefs.current[idx] = el; }}
+                    onClick={() => registry?.insertable ? activateRegistryComponent(registry) : onSelect(`<${name} />`, { componentPath: comp.path })}
+                    onMouseEnter={() => setActiveIndex(idx)}
+                    data-active={activeIndex === idx || undefined}
+                    className="flex w-full items-center gap-2 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-700 data-[active]:bg-zinc-700"
+                  >
+                    <Component size={11} className="text-cyan-400" />
+                    <span className={registry ? "truncate" : "font-mono truncate"}>
+                      {registry?.label ?? name}
+                    </span>
+                    {registry?.category && (
+                      <span className="ml-auto shrink-0 text-[9px] text-zinc-600">
+                        {isLoading ? "Adding" : registry.category}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
-            {filteredComponents.map((comp) => {
-              const name = comp.path.split("/").pop()?.replace(".astro", "") || comp.path;
-              const idx = nextIndex();
-              return (
-                <button
-                  key={comp.path}
-                  ref={(el) => { itemRefs.current[idx] = el; }}
-                  onClick={() => onSelect(`<${name} />`, { componentPath: comp.path })}
-                  onMouseEnter={() => setActiveIndex(idx)}
-                  data-active={activeIndex === idx || undefined}
-                  className="flex w-full items-center gap-2  px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-700 data-[active]:bg-zinc-700"
-                >
-                  <Component size={11} className="text-cyan-400" />
-                  <span className="font-mono">{name}</span>
-                </button>
-              );
-            })}
-          </div>
-        )}
-
-        {componentsOnly && components.length === 0 && (
-          <div className="px-2 py-4 text-center text-[11px] text-zinc-500">
-            No components found in this project.
-          </div>
-        )}
-        {componentsOnly && components.length > 0 && filteredComponents.length === 0 && (
-          <div className="px-2 py-3 text-center text-[11px] text-zinc-500">
-            No components match "{search}".
-          </div>
+          )
         )}
 
         {/* External components imported into this page (e.g. Icon from
             astro-icon). Listed only when present so empty pages don't get a
             stray section. The import already exists in this file, so the
             mutation engine won't need to add one. */}
-        {filteredExternals.length > 0 && (
+        {!componentsOnly && filteredExternals.length > 0 && (
           <div className="mb-1">
             <div className="flex items-center gap-1 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-amber-400">
               <Package size={10} />
@@ -305,4 +427,42 @@ export function AddElementPanel({ onSelect, onClose, componentsOnly = false }: A
       </div>
     </div>
   );
+}
+
+function componentNameFromPath(path: string): string {
+  return path.split("/").pop()?.replace(".astro", "") || path;
+}
+
+function matchesRegistryComponent(component: ComponentRegistryItem, query: string): boolean {
+  if (!query) return true;
+  return [
+    component.label,
+    component.tagName,
+    component.name,
+    component.category,
+    component.description,
+    component.componentPath,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase()
+    .includes(query);
+}
+
+function groupRegistryComponents(components: ComponentRegistryItem[]): Array<{
+  category: string;
+  items: ComponentRegistryItem[];
+}> {
+  const groups = new Map<string, ComponentRegistryItem[]>();
+  for (const component of components) {
+    const category = component.category || "Components";
+    const items = groups.get(category) ?? [];
+    items.push(component);
+    groups.set(category, items);
+  }
+
+  return Array.from(groups, ([category, items]) => ({
+    category,
+    items: [...items].sort((a, b) => a.label.localeCompare(b.label)),
+  })).sort((a, b) => a.category.localeCompare(b.category));
 }

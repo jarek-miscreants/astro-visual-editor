@@ -6,6 +6,9 @@ import { AddElementPanel } from "../tree/AddElementPanel";
 import { useEditorStore } from "../../store/editor-store";
 import { useModeStore } from "../../store/mode-store";
 import { useTreeUIStore } from "../../store/tree-ui-store";
+import { useComponentRegistryStore } from "../../store/component-registry-store";
+import { makeAddElementMutation } from "../../lib/component-insertion";
+import { toast } from "../../store/toast-store";
 import { Tooltip } from "../ui/Tooltip";
 
 export function LeftSidebar() {
@@ -14,9 +17,14 @@ export function LeftSidebar() {
   const selectedNodeId = useEditorStore((s) => s.selectedNodeId);
   const applyMutation = useEditorStore((s) => s.applyMutation);
   const userMode = useModeStore((s) => s.userMode);
+  const loadRegistry = useComponentRegistryStore((s) => s.load);
   const [showAddPanel, setShowAddPanel] = useState(false);
   const addBtnRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (currentFile) void loadRegistry();
+  }, [currentFile, loadRegistry]);
 
   // Close add panel on click outside
   useEffect(() => {
@@ -89,14 +97,18 @@ export function LeftSidebar() {
   }, []);
 
   function handleAddElement(html: string, options?: { componentPath?: string }) {
-    if (!selectedNodeId) return;
-    applyMutation({
-      type: "add-element",
-      parentNodeId: selectedNodeId,
-      position: useEditorStore.getState().nodeMap.get(selectedNodeId)?.children.length || 0,
+    const state = useEditorStore.getState();
+    const mutation = makeAddElementMutation(
+      state.ast,
+      state.selectedNodeId,
       html,
-      componentPath: options?.componentPath,
-    });
+      options?.componentPath
+    );
+    if (!mutation) {
+      toast.error("No insertion target", "Open a page with a block container.");
+      return;
+    }
+    applyMutation(mutation);
     setShowAddPanel(false);
   }
 
@@ -129,7 +141,7 @@ export function LeftSidebar() {
             <button
               ref={addBtnRef}
               onClick={() => setShowAddPanel(!showAddPanel)}
-              disabled={!selectedNodeId}
+              disabled={!currentFile || !ast}
               className="tve-icon-btn tve-icon-btn--sm"
             >
               <Plus size={13} />

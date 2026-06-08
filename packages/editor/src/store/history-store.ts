@@ -104,6 +104,10 @@ export function computeInverse(
 ): Mutation | null {
   const { previousClasses, previousText, previousContent, previousValue, ast } =
     opts || {};
+  const hasPreviousValue = Object.prototype.hasOwnProperty.call(
+    opts ?? {},
+    "previousValue"
+  );
 
   switch (mutation.type) {
     case "update-classes":
@@ -139,6 +143,7 @@ export function computeInverse(
       return null;
     }
     case "update-attribute":
+      if (!hasPreviousValue) return null;
       return {
         type: "update-attribute",
         nodeId: mutation.nodeId,

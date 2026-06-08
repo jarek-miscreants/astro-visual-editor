@@ -8,6 +8,12 @@ export interface ContentFileInfo {
   collection: string;
   format: "md" | "mdx";
   lastModified: number;
+  title?: string;
+  description?: string;
+  date?: string;
+  draft?: boolean;
+  status?: string;
+  slug?: string;
 }
 
 export interface ContentFile {
@@ -49,13 +55,35 @@ async function walk(dir: string, projectRoot: string, out: ContentFileInfo[]) {
     if (ext !== ".md" && ext !== ".mdx") continue;
 
     const rel = path.relative(projectRoot, full).replace(/\\/g, "/");
-    const stat = await fs.stat(full);
+    const [stat, metadata] = await Promise.all([
+      fs.stat(full),
+      readContentMetadata(full),
+    ]);
     out.push({
       path: rel,
       collection: deriveCollection(rel),
       format: ext === ".mdx" ? "mdx" : "md",
       lastModified: stat.mtimeMs,
+      slug: path.basename(entry.name, ext),
+      ...metadata,
     });
+  }
+}
+
+async function readContentMetadata(fullPath: string): Promise<Partial<ContentFileInfo>> {
+  try {
+    const raw = await fs.readFile(fullPath, "utf-8");
+    const parsed = matter(raw);
+    const data = parsed.data ?? {};
+    return {
+      title: readString(data.title ?? data.name ?? data.navTitle),
+      description: readString(data.description ?? data.excerpt ?? data.summary),
+      date: readDateString(data.publishedAt ?? data.date ?? data.updatedAt),
+      draft: readBoolean(data.draft),
+      status: readString(data.status),
+    };
+  } catch {
+    return {};
   }
 }
 
@@ -74,6 +102,26 @@ function deriveCollection(relPath: string): string {
     return parts[0];
   }
   return "root";
+}
+
+function readString(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return trimmed || undefined;
+}
+
+function readBoolean(value: unknown): boolean | undefined {
+  return typeof value === "boolean" ? value : undefined;
+}
+
+function readDateString(value: unknown): string | undefined {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value.toISOString().slice(0, 10);
+  }
+  if (typeof value === "string" && value.trim()) {
+    return value.trim().slice(0, 10);
+  }
+  return undefined;
 }
 
 function assertMarkdownPath(relPath: string) {

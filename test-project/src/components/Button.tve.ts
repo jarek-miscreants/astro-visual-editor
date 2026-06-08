@@ -2,6 +2,14 @@ export default {
   label: "Button",
   category: "CTA",
   description: "Reusable call-to-action button for marketing pages.",
+  thumbnail: "/images/zafcon-hero.webp",
+  insertable: true,
+  defaultProps: {
+    variant: "primary",
+    size: "md",
+    href: "/"
+  },
+  defaultChildren: "Learn more",
   fields: {
     variant: {
       type: "choice",

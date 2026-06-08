@@ -111,6 +111,12 @@ export interface ContentFileInfo {
   collection: string;
   format: "md" | "mdx";
   lastModified: number;
+  title?: string;
+  description?: string;
+  date?: string;
+  draft?: boolean;
+  status?: string;
+  slug?: string;
 }
 
 /** A parsed markdown/mdx file */
@@ -119,6 +125,31 @@ export interface ContentFile {
   frontmatter: Record<string, any>;
   body: string;
   format: "md" | "mdx";
+}
+
+export type ContentRoot = "src/content" | "src/pages" | "content";
+
+export interface TveContentViewCollection {
+  type: "collection";
+  collection: string;
+  label?: string;
+  description?: string;
+  defaultRoot?: ContentRoot;
+}
+
+export interface TveContentViewFolder {
+  type: "folder";
+  id?: string;
+  label: string;
+  description?: string;
+  items: TveContentViewItem[];
+}
+
+export type TveContentViewItem = TveContentViewCollection | TveContentViewFolder;
+
+export interface TveProjectConfig {
+  defaultMode: "dev" | "marketer";
+  contentView?: TveContentViewItem[];
 }
 
 /** Which project tree an image asset was found in. `public/` assets are
@@ -349,6 +380,34 @@ export interface ComponentEditorMeta {
   label?: string;
   category?: string;
   description?: string;
+  thumbnail?: string;
+  insertable?: boolean;
+  defaultProps?: Record<string, string | number | boolean | null>;
+  defaultChildren?: string;
+}
+
+export type ComponentRegistrySource = "tve-schema" | "props" | "empty";
+
+export interface ComponentRegistryItem {
+  componentPath: string;
+  name: string;
+  tagName: string;
+  label: string;
+  category: string;
+  description?: string;
+  thumbnail?: string;
+  insertable: boolean;
+  source: ComponentRegistrySource;
+  fieldCount: number;
+  slotCount: number;
+  warnings: string[];
+}
+
+export interface ComponentRegistryEntry extends ComponentRegistryItem {
+  props: ComponentPropSchema;
+  slots: ComponentSlotSchema;
+  defaultProps?: Record<string, string | number | boolean | null>;
+  defaultChildren?: string;
 }
 
 export interface SeoPageData {
@@ -390,6 +449,21 @@ export interface SeoPageResponse {
   data: Partial<SeoPageData>;
   fields: Record<keyof SeoPageData, SeoFieldState>;
   warnings: SeoWarning[];
+}
+
+export type LinkTargetKind = "page" | "content" | "template";
+
+export interface LinkTarget {
+  url: string;
+  label: string;
+  group: string;
+  kind: LinkTargetKind;
+  disabled?: boolean;
+  sourcePath?: string;
+  routeFile?: string;
+  collection?: string;
+  slug?: string;
+  description?: string;
 }
 
 /**

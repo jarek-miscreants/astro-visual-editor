@@ -226,7 +226,21 @@ export class DomMapper {
    *  wrapper, so the children aren't actually DOM siblings. */
   private findAndMatchInSubtree(astChildren: ASTNodeLike[], root: Element) {
     const firstAst = this.firstNonComponentDescendant(astChildren);
-    if (!firstAst) {
+    const preferredChildren = this.preferredSlotChildren(astChildren, root);
+    let matchedPreferredLevel = false;
+
+    if (preferredChildren.length > 0) {
+      const beforeCount = this.elementToNodeId.size;
+      this.matchChildren(astChildren, preferredChildren);
+      matchedPreferredLevel =
+        this.elementToNodeId.size > beforeCount ||
+        astChildren.some((child) => this.nodeIdToElement.has(child.nodeId));
+    }
+
+    if (matchedPreferredLevel) {
+      // The component's immediate slot/wrapper level matched. Do not let the
+      // deep fuzzy pass re-bind a component like <Grid> to a descendant <img>.
+    } else if (!firstAst) {
       // All children are components — match them at the wrapper's direct content level.
       const direct = this.getContentElements(root);
       if (direct.length > 0) this.matchChildren(astChildren, direct);
@@ -274,6 +288,39 @@ export class DomMapper {
       if (this.nodeIdToElement.has(astChild.nodeId)) continue;
       this.matchAstChildAnywhere(astChild, root);
     }
+  }
+
+  /**
+   * Prefer the DOM level that most likely corresponds to slotted child
+   * components before falling back to fuzzy deep matching.
+   *
+   * Example: SectionMain renders `section > decorative + content + decorative`;
+   * the page AST has a single child component `<Grid>`, and Grid itself renders
+   * a real wrapper `<div class="grid ...">`. A deep search sees Grid's first
+   * slotted image and can incorrectly map Grid to `<img>`. This helper chooses
+   * the content wrapper's direct children (`[div.grid]`) first.
+   */
+  private preferredSlotChildren(astChildren: ASTNodeLike[], root: Element): Element[] {
+    if (astChildren.length === 0) return [];
+    const direct = this.getContentElements(root);
+    const visibleDirect = direct.filter((el) => !this.isDecorativeElement(el));
+
+    if (
+      astChildren.length === 1 &&
+      (astChildren[0].isComponent || this.isPascalCase(astChildren[0].tagName)) &&
+      visibleDirect.length === 1
+    ) {
+      const slotChildren = this
+        .getContentElements(visibleDirect[0])
+        .filter((el) => !this.isDecorativeElement(el));
+      if (slotChildren.length > 0) return slotChildren;
+    }
+
+    if (visibleDirect.length === astChildren.length) {
+      return visibleDirect;
+    }
+
+    return [];
   }
 
   /** Find the best DOM match for a single AST child anywhere in `root`'s
@@ -496,6 +543,10 @@ export class DomMapper {
       elements.push(child);
     }
     return elements;
+  }
+
+  private isDecorativeElement(element: Element): boolean {
+    return element.getAttribute("aria-hidden") === "true";
   }
 
   getNodeId(element: Element): string | null {

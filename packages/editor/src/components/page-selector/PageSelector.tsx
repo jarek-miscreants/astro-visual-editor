@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { FileText, ChevronDown, FileType, Box, Plus, Trash2 } from "lucide-react";
+import { FileText, ChevronDown, FileType, Box, Plus, Trash2, PanelLeft } from "lucide-react";
 import { useEditorStore } from "../../store/editor-store";
 import { useContentStore } from "../../store/content-store";
 import { ContentFileDialog } from "../dialogs/ContentFileDialog";
@@ -13,8 +13,10 @@ export function PageSelector() {
   const clearComponentReturn = useEditorStore((s) => s.clearComponentReturn);
   const contentFiles = useContentStore((s) => s.files);
   const currentContentPath = useContentStore((s) => s.currentPath);
+  const contentBrowserOpen = useContentStore((s) => s.browserOpen);
   const contentDirty = useContentStore((s) => s.dirty);
   const deletingContent = useContentStore((s) => s.deleting);
+  const openContentBrowser = useContentStore((s) => s.openBrowser);
   const openContentFile = useContentStore((s) => s.openFile);
   const closeContentFile = useContentStore((s) => s.closeFile);
   const deleteContentFile = useContentStore((s) => s.deleteFile);
@@ -34,7 +36,7 @@ export function PageSelector() {
   );
 
   // Which category owns the currently-open file?
-  const isContentOpen = !!currentContentPath;
+  const isContentOpen = contentBrowserOpen || !!currentContentPath;
   const isComponentOpen =
     !isContentOpen && !!currentFile?.startsWith("src/components/");
   const isPageOpen = !isContentOpen && !isComponentOpen && !!currentFile;
@@ -139,11 +141,22 @@ export function PageSelector() {
       {/* Content collections */}
       <Dropdown
         icon={<FileType size={12} />}
-        label={isContentOpen ? contentShortName(currentContentPath!) : "Content"}
+        label={currentContentPath ? contentShortName(currentContentPath) : "Content"}
         active={isContentOpen}
       >
         {(close) => (
           <>
+            <button
+              onClick={() => {
+                clearComponentReturn();
+                openContentBrowser();
+                close();
+              }}
+              className="flex w-full items-center gap-1.5 px-3 py-2 text-xs text-emerald-300 hover:bg-zinc-700"
+            >
+              <PanelLeft size={12} />
+              Open content library
+            </button>
             {Object.entries(contentByCollection).map(([collection, items]) => (
               <FileGroup
                 key={`content-${collection}`}

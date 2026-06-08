@@ -1,0 +1,43 @@
+---
+type Tone = "blue" | "dark" | "light";
+
+interface Props {
+  headline?: string;
+  description?: string;
+  buttonLabel?: string;
+  buttonHref?: string;
+  tone?: Tone;
+  class?: string;
+}
+
+const {
+  headline = "Ready to hand this to marketing?",
+  description = "Give clients a focused editing workflow while the agency keeps ownership of design, components, and code.",
+  buttonLabel = "Start editing",
+  buttonHref = "/about",
+  tone = "blue",
+  class: className = "",
+} = Astro.props;
+
+const toneClasses: Record<Tone, string> = {
+  blue: "bg-blue-600 text-white",
+  dark: "bg-slate-950 text-white",
+  light: "bg-slate-100 text-slate-950",
+};
+
+const buttonClasses: Record<Tone, string> = {
+  blue: "bg-white text-blue-700 hover:bg-blue-50",
+  dark: "bg-white text-slate-950 hover:bg-slate-100",
+  light: "bg-slate-950 text-white hover:bg-slate-800",
+};
+---
+
+<section class:list={["rounded-xl px-6 py-10 text-center", toneClasses[tone], className]}>
+  <h2 class="mx-auto max-w-2xl text-3xl font-bold tracking-tight">{headline}</h2>
+  <p class:list={["mx-auto mt-3 max-w-2xl text-base leading-7", tone === "light" ? "text-slate-600" : "text-white/80"]}>
+    {description}
+  </p>
+  <a class:list={["mt-6 inline-flex rounded px-5 py-3 text-sm font-semibold", buttonClasses[tone]]} href={buttonHref}>
+    {buttonLabel}
+  </a>
+</section>

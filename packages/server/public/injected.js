@@ -382,7 +382,11 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
           return;
         }
         const el = domMapper.getElementByNodeId(message.nodeId);
-        if (!el) return;
+        if (!el) {
+          selectedElement = null;
+          overlay.clearSelected();
+          return;
+        }
         if (selectedElement === el) return;
         selectedElement = el;
         const rect = el.getBoundingClientRect();
@@ -617,7 +621,15 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
      *  wrapper, so the children aren't actually DOM siblings. */
     findAndMatchInSubtree(astChildren, root) {
       const firstAst = this.firstNonComponentDescendant(astChildren);
-      if (!firstAst) {
+      const preferredChildren = this.preferredSlotChildren(astChildren, root);
+      let matchedPreferredLevel = false;
+      if (preferredChildren.length > 0) {
+        const beforeCount = this.elementToNodeId.size;
+        this.matchChildren(astChildren, preferredChildren);
+        matchedPreferredLevel = this.elementToNodeId.size > beforeCount || astChildren.some((child) => this.nodeIdToElement.has(child.nodeId));
+      }
+      if (matchedPreferredLevel) ;
+      else if (!firstAst) {
         const direct = this.getContentElements(root);
         if (direct.length > 0) this.matchChildren(astChildren, direct);
       } else {
@@ -648,6 +660,29 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
         if (this.nodeIdToElement.has(astChild.nodeId)) continue;
         this.matchAstChildAnywhere(astChild, root);
       }
+    }
+    /**
+     * Prefer the DOM level that most likely corresponds to slotted child
+     * components before falling back to fuzzy deep matching.
+     *
+     * Example: SectionMain renders `section > decorative + content + decorative`;
+     * the page AST has a single child component `<Grid>`, and Grid itself renders
+     * a real wrapper `<div class="grid ...">`. A deep search sees Grid's first
+     * slotted image and can incorrectly map Grid to `<img>`. This helper chooses
+     * the content wrapper's direct children (`[div.grid]`) first.
+     */
+    preferredSlotChildren(astChildren, root) {
+      if (astChildren.length === 0) return [];
+      const direct = this.getContentElements(root);
+      const visibleDirect = direct.filter((el) => !this.isDecorativeElement(el));
+      if (astChildren.length === 1 && (astChildren[0].isComponent || this.isPascalCase(astChildren[0].tagName)) && visibleDirect.length === 1) {
+        const slotChildren = this.getContentElements(visibleDirect[0]).filter((el) => !this.isDecorativeElement(el));
+        if (slotChildren.length > 0) return slotChildren;
+      }
+      if (visibleDirect.length === astChildren.length) {
+        return visibleDirect;
+      }
+      return [];
     }
     /** Find the best DOM match for a single AST child anywhere in `root`'s
      *  subtree. For components, anchor on their first non-component
@@ -821,6 +856,9 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
         elements.push(child);
       }
       return elements;
+    }
+    isDecorativeElement(element) {
+      return element.getAttribute("aria-hidden") === "true";
     }
     getNodeId(element) {
       return this.elementToNodeId.get(element) || null;

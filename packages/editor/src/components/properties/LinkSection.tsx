@@ -1,7 +1,14 @@
-import { useMemo, useState } from "react";
-import { Link as LinkIcon, ExternalLink, FileText, Globe } from "lucide-react";
-import { useEditorStore } from "../../store/editor-store";
-import { useContentStore } from "../../store/content-store";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  Link as LinkIcon,
+  ExternalLink,
+  FileText,
+  Globe,
+  ChevronDown,
+  Search,
+} from "lucide-react";
+import type { LinkTarget } from "@tve/shared";
+import { api } from "../../lib/api-client";
 
 interface Props {
   /** Current href value (empty string if not set) */
@@ -12,81 +19,19 @@ interface Props {
   rel?: string;
   /** Emit one attribute change at a time. value=null deletes the attribute. */
   onAttrChange: (attr: string, value: string | null) => void;
-  /** Section label override — e.g. "Button link" for components */
+  /** Section label override, e.g. "Button link" for components */
   label?: string;
-  /** Hide the "Open in new tab" checkbox (for components that don't accept a target prop) */
+  /** Hide the "Open in new tab" checkbox for components that do not expose target. */
   hideNewTab?: boolean;
+}
+
+interface LinkTargetGroup {
+  group: string;
+  options: LinkTarget[];
 }
 
 const NEW_TAB_REL = "noopener noreferrer";
 
-/**
- * Convert an Astro source path to its served URL.
- *   src/pages/index.astro            → /
- *   src/pages/about.astro            → /about
- *   src/pages/blog/index.astro       → /blog
- *   src/pages/blog/[slug].astro      → /blog/[slug]    (template, can't link directly)
- */
-function pageFileToUrl(filePath: string): string | null {
-  const m = filePath.match(/^src\/pages\/(.*)\.astro$/);
-  if (!m) return null;
-  let route = m[1];
-  // Strip trailing /index
-  if (route === "index") return "/";
-  if (route.endsWith("/index")) route = route.slice(0, -"/index".length);
-  return "/" + route;
-}
-
-/**
- * Match a single-param dynamic route file. Returns the collection name (the
- * directory before the [param] segment) and the route prefix.
- *   src/pages/blog/[slug].astro     → { collection: "blog", prefix: "/blog" }
- *   src/pages/[slug].astro          → { collection: null, prefix: "" } (root-level dynamic)
- *   src/pages/blog/[...slug].astro  → null  (catch-all, skipped)
- */
-function parseDynamicRoute(
-  filePath: string
-): { collection: string | null; prefix: string } | null {
-  const m = filePath.match(/^src\/pages\/(.*)\/\[([^\]]+)\]\.astro$/);
-  if (m) {
-    if (m[2].startsWith("...")) return null; // catch-all
-    const prefix = "/" + m[1];
-    const collection = m[1].split("/").pop() || null;
-    return { collection, prefix };
-  }
-  // Root-level [slug].astro — no collection inference possible
-  const root = filePath.match(/^src\/pages\/\[([^\]]+)\]\.astro$/);
-  if (root && !root[1].startsWith("...")) {
-    return { collection: null, prefix: "" };
-  }
-  return null;
-}
-
-/** Extract slug from a content file path: src/content/blog/foo.md → "foo" */
-function contentPathToSlug(filePath: string, collection: string): string | null {
-  const escaped = collection.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const m = filePath.match(new RegExp(`^src\\/content\\/${escaped}\\/(.+)\\.(md|mdx)$`));
-  return m ? m[1] : null;
-}
-
-function capitalize(s: string): string {
-  return s.charAt(0).toUpperCase() + s.slice(1);
-}
-
-interface PageOption {
-  url: string;
-  label: string;
-  /** Group label for optgroup. "Pages" for static, collection name for content entries. */
-  group: string;
-  isTemplate: boolean;
-}
-
-/**
- * Marketer-friendly link editor. Edits href directly and offers a single
- * "Open in new tab" toggle that pairs target=_blank with a safe rel value.
- * Used for raw `<a>` elements and as a building block for component props
- * that expose href + target.
- */
 export function LinkSection({
   href,
   target,
@@ -95,118 +40,71 @@ export function LinkSection({
   label = "Link",
   hideNewTab = false,
 }: Props) {
-  const files = useEditorStore((s) => s.files);
-  const contentFiles = useContentStore((s) => s.files);
+  const [linkTargets, setLinkTargets] = useState<LinkTarget[]>([]);
+  const [loadingTargets, setLoadingTargets] = useState(false);
+  const [targetError, setTargetError] = useState<string | null>(null);
+  const [mode, setModeState] = useState<"url" | "page">("url");
+  const modeTouchedRef = useRef(false);
 
-  const pageOptions: PageOption[] = useMemo(() => {
-    const list: PageOption[] = [];
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingTargets(true);
+    setTargetError(null);
 
-    // Static pages — non-dynamic .astro files
-    for (const f of files) {
-      if (f.type !== "page") continue;
-      const url = pageFileToUrl(f.path);
-      if (!url) continue;
-      if (url.includes("[")) continue; // dynamic templates handled below
-      list.push({ url, label: url, group: "Pages", isTemplate: false });
-    }
-
-    // Dynamic routes paired with content collections — generate one URL per
-    // collection entry. Heuristic: pages/X/[slug].astro pairs with the X
-    // collection. Custom slugs in frontmatter aren't followed (filename slug
-    // is used). Catch-all routes are skipped.
-    for (const f of files) {
-      if (f.type !== "page") continue;
-      const route = parseDynamicRoute(f.path);
-      if (!route) {
-        // Surface the dynamic file as a disabled "template" entry so the user
-        // sees it exists but knows they need URL mode.
-        const url = pageFileToUrl(f.path);
-        if (url && url.includes("[")) {
-          list.push({ url, label: `${url} (dynamic — use URL mode)`, group: "Templates", isTemplate: true });
-        }
-        continue;
-      }
-      if (!route.collection) {
-        // Root-level [slug].astro — can't infer collection
-        list.push({
-          url: f.path,
-          label: `/${f.path} (custom routing — use URL mode)`,
-          group: "Templates",
-          isTemplate: true,
-        });
-        continue;
-      }
-      // Pair with content collection of the same name
-      const entries = contentFiles.filter((c) => c.collection === route.collection);
-      if (entries.length === 0) {
-        // Dynamic route exists but no entries yet — show as template
-        const url = pageFileToUrl(f.path);
-        if (url) {
-          list.push({
-            url,
-            label: `${url} (no entries yet)`,
-            group: "Templates",
-            isTemplate: true,
-          });
-        }
-        continue;
-      }
-      for (const entry of entries) {
-        const slug = contentPathToSlug(entry.path, route.collection);
-        if (!slug) continue;
-        const url = `${route.prefix}/${slug}`;
-        list.push({
-          url,
-          label: url,
-          group: capitalize(route.collection),
-          isTemplate: false,
-        });
-      }
-    }
-
-    return list;
-  }, [files, contentFiles]);
-
-  // Group options by section for the dropdown's optgroups. Pages always first.
-  const groupedOptions = useMemo(() => {
-    const groups = new Map<string, PageOption[]>();
-    for (const opt of pageOptions) {
-      const arr = groups.get(opt.group) || [];
-      arr.push(opt);
-      groups.set(opt.group, arr);
-    }
-    // Sort within each group: home first, then alpha
-    for (const arr of groups.values()) {
-      arr.sort((a, b) => {
-        if (a.url === "/" && b.url !== "/") return -1;
-        if (b.url === "/" && a.url !== "/") return 1;
-        return a.url.localeCompare(b.url);
+    api
+      .getLinkTargets()
+      .then(({ targets }) => {
+        if (!cancelled) setLinkTargets(targets);
+      })
+      .catch((err: any) => {
+        if (!cancelled) setTargetError(err.message || "Failed to load link targets");
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingTargets(false);
       });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const groupedOptions = useMemo<LinkTargetGroup[]>(() => {
+    const groups = new Map<string, LinkTarget[]>();
+    for (const option of linkTargets) {
+      const list = groups.get(option.group) ?? [];
+      list.push(option);
+      groups.set(option.group, list);
     }
-    // Fixed group order: Pages, then alpha-sorted collections, then Templates last
-    const fixed = ["Pages"];
+
     const collectionGroups = [...groups.keys()]
-      .filter((g) => g !== "Pages" && g !== "Templates")
+      .filter((group) => group !== "Pages" && group !== "Templates")
       .sort();
-    const order = [...fixed, ...collectionGroups, "Templates"];
+    const order = ["Pages", ...collectionGroups, "Templates"];
+
     return order
-      .filter((g) => groups.has(g))
-      .map((g) => ({ group: g, options: groups.get(g)! }));
-  }, [pageOptions]);
+      .filter((group) => groups.has(group))
+      .map((group) => ({ group, options: groups.get(group)! }));
+  }, [linkTargets]);
 
-  // Detect mode from the current href: page-shaped if it matches a known
-  // (non-template) page URL.
-  const initialMode = useMemo<"url" | "page">(() => {
-    if (!href) return "url";
-    return pageOptions.some((p) => !p.isTemplate && p.url === href) ? "page" : "url";
-  }, [href, pageOptions]);
+  const selectedTarget = useMemo(
+    () => linkTargets.find((option) => !option.disabled && option.url === href) ?? null,
+    [href, linkTargets]
+  );
 
-  const [mode, setMode] = useState<"url" | "page">(initialMode);
+  useEffect(() => {
+    if (modeTouchedRef.current) return;
+    setModeState(selectedTarget ? "page" : "url");
+  }, [selectedTarget]);
 
   const isNewTab = target === "_blank";
-  // We only manage the rel value when we own it (i.e. when we set it for new
-  // tab safety). If the user has a custom rel, we leave it alone on toggle-off.
   const ourRel = rel === NEW_TAB_REL || rel === "noopener" || rel === "noreferrer";
+  const isExternalUrl = href.startsWith("http://") || href.startsWith("https://");
+  const hasInternalTargets = loadingTargets || linkTargets.length > 0;
+
+  function setMode(nextMode: "url" | "page") {
+    modeTouchedRef.current = true;
+    setModeState(nextMode);
+  }
 
   function handleNewTabToggle(checked: boolean) {
     if (checked) {
@@ -218,8 +116,6 @@ export function LinkSection({
     }
   }
 
-  const isExternalUrl = href.startsWith("http://") || href.startsWith("https://");
-
   return (
     <div className="tve-prop-section">
       <div className="tve-prop-section__header" style={{ justifyContent: "space-between" }}>
@@ -227,7 +123,7 @@ export function LinkSection({
           <LinkIcon size={11} className="tve-prop-section__header-icon--link" />
           {label}
         </span>
-        {pageOptions.length > 0 && (
+        {hasInternalTargets && (
           <div className="tve-prop-mode">
             <button
               type="button"
@@ -258,10 +154,10 @@ export function LinkSection({
               type="text"
               key={href}
               defaultValue={href}
-              placeholder="https://… or /path or #anchor"
+              placeholder="https://... or /path or #anchor"
               onBlur={(e) => {
-                const v = e.target.value.trim();
-                if (v !== href) onAttrChange("href", v === "" ? null : v);
+                const value = e.target.value.trim();
+                if (value !== href) onAttrChange("href", value === "" ? null : value);
               }}
               className="tve-prop-input"
               style={{ flex: 1, minWidth: 0 }}
@@ -278,31 +174,14 @@ export function LinkSection({
             )}
           </div>
         ) : (
-          <select
-            value={
-              pageOptions.some((p) => !p.isTemplate && p.url === href) ? href : ""
-            }
-            onChange={(e) => {
-              const v = e.target.value;
-              onAttrChange("href", v === "" ? null : v);
-            }}
-            className="tve-prop-select"
-          >
-            <option value="">— Select a page —</option>
-            {groupedOptions.map(({ group, options }) => (
-              <optgroup key={group} label={group}>
-                {options.map((p) => (
-                  <option
-                    key={p.url + p.label}
-                    value={p.isTemplate ? "" : p.url}
-                    disabled={p.isTemplate}
-                  >
-                    {p.label}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
+          <LinkTargetPicker
+            value={href}
+            selectedTarget={selectedTarget}
+            groups={groupedOptions}
+            loading={loadingTargets}
+            error={targetError}
+            onChange={(value) => onAttrChange("href", value === "" ? null : value)}
+          />
         )}
 
         {!hideNewTab && (
@@ -318,12 +197,163 @@ export function LinkSection({
         )}
         {!href && mode === "url" && (
           <p className="tve-prop-section__hint">
-            Tip: use <span>/page</span> for
-            internal links, <span>#section</span>{" "}
-            for in-page anchors, or a full URL for external sites.
+            Tip: use <span>/page</span> for internal links, <span>#section</span> for
+            in-page anchors, or a full URL for external sites.
           </p>
         )}
       </div>
     </div>
   );
+}
+
+function LinkTargetPicker({
+  value,
+  selectedTarget,
+  groups,
+  loading,
+  error,
+  onChange,
+}: {
+  value: string;
+  selectedTarget: LinkTarget | null;
+  groups: LinkTargetGroup[];
+  loading: boolean;
+  error: string | null;
+  onChange: (value: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  const filteredGroups = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return groups;
+
+    return groups
+      .map(({ group, options }) => ({
+        group,
+        options: options.filter((option) => targetMatches(option, group, q)),
+      }))
+      .filter(({ options }) => options.length > 0);
+  }, [groups, query]);
+
+  const firstSelectable = useMemo(
+    () => filteredGroups.flatMap((group) => group.options).find((option) => !option.disabled),
+    [filteredGroups]
+  );
+
+  useEffect(() => {
+    if (!open) return;
+
+    function onMouseDown(event: MouseEvent) {
+      if (!rootRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", onMouseDown);
+    window.setTimeout(() => inputRef.current?.focus(), 0);
+    return () => document.removeEventListener("mousedown", onMouseDown);
+  }, [open]);
+
+  const buttonLabel = selectedTarget?.label ?? (value ? value : "Select page or content");
+  const buttonMeta = selectedTarget?.url ?? "";
+
+  function choose(option: LinkTarget) {
+    if (option.disabled) return;
+    onChange(option.url);
+    setOpen(false);
+    setQuery("");
+  }
+
+  return (
+    <div ref={rootRef} className="tve-link-picker">
+      <button
+        type="button"
+        className="tve-link-picker__button"
+        onClick={() => setOpen((current) => !current)}
+        aria-expanded={open}
+      >
+        <span className="tve-link-picker__button-text">
+          <span className="tve-link-picker__button-label">{buttonLabel}</span>
+          {buttonMeta && <span className="tve-link-picker__button-meta">{buttonMeta}</span>}
+        </span>
+        <ChevronDown size={13} className="tve-link-picker__chevron" />
+      </button>
+
+      {open && (
+        <div className="tve-link-picker__popover">
+          <div className="tve-link-picker__search">
+            <Search size={12} className="tve-link-picker__search-icon" />
+            <input
+              ref={inputRef}
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  event.preventDefault();
+                  setOpen(false);
+                }
+                if (event.key === "Enter" && firstSelectable) {
+                  event.preventDefault();
+                  choose(firstSelectable);
+                }
+              }}
+              placeholder="Search pages and content..."
+              className="tve-link-picker__search-input"
+            />
+          </div>
+
+          <div className="tve-link-picker__list">
+            {loading && <div className="tve-link-picker__empty">Loading link targets...</div>}
+            {error && <div className="tve-link-picker__empty" data-tone="error">{error}</div>}
+            {!loading && !error && filteredGroups.length === 0 && (
+              <div className="tve-link-picker__empty">No matching pages or content</div>
+            )}
+
+            {!loading &&
+              !error &&
+              filteredGroups.map(({ group, options }) => (
+                <div key={group} className="tve-link-picker__group">
+                  <div className="tve-link-picker__group-label">{group}</div>
+                  {options.map((option) => (
+                    <button
+                      key={`${option.kind}-${option.routeFile ?? ""}-${option.sourcePath ?? ""}-${option.url}`}
+                      type="button"
+                      disabled={option.disabled}
+                      data-active={!option.disabled && option.url === value ? "true" : undefined}
+                      className="tve-link-picker__option"
+                      onClick={() => choose(option)}
+                    >
+                      <span className="tve-link-picker__option-main">
+                        <span className="tve-link-picker__option-label">{option.label}</span>
+                        <span className="tve-link-picker__option-url">{option.url}</span>
+                      </span>
+                      <span className="tve-link-picker__option-meta">
+                        {option.kind === "content" ? option.collection : option.kind}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function targetMatches(option: LinkTarget, group: string, query: string): boolean {
+  return [
+    option.label,
+    option.url,
+    group,
+    option.collection,
+    option.slug,
+    option.sourcePath,
+    option.routeFile,
+  ]
+    .filter(Boolean)
+    .some((value) => String(value).toLowerCase().includes(query));
 }

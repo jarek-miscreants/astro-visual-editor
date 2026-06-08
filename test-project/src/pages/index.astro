@@ -4,6 +4,9 @@ import GridColumns from '../components/GridColumns.astro';
 import Button from '../components/Button.astro';
 import Test from "../components/Test.astro";
 import SEO from "../components/SEO.astro";
+import MarketingHero from "../components/MarketingHero.astro";
+import ResourceCard from "../components/ResourceCard.astro";
+import LandingCTA from "../components/LandingCTA.astro";
 ---
 
 <Layout title="Home">
@@ -27,11 +30,63 @@ import SEO from "../components/SEO.astro";
   
 
     <Button />
+  
   </header>
 
   <main class="max-w-4xl mx-auto px-4 py-12">
+    <MarketingHero
+      eyebrow="Agency handoff"
+      headline="A friendly editor for real Astro sites"
+      description="Marketers can update campaign copy, CTAs, images, and approved sections while developers keep the build in code."
+      primaryLabel="Open the editor"
+      primaryHref="/about"
+      secondaryLabel="Read the guide"
+      secondaryHref="/about"
+      image="/images/zafcon-hero.webp"
+      imageAlt="Colorful abstract campaign artwork"
+      variant="image-right"
+      class="mb-10"
+    />
+
     <GridColumns>
     </GridColumns>
+
+    <section class="my-10 grid gap-4 md:grid-cols-3">
+      <ResourceCard
+        type="whitepaper"
+        title="Astro client editing checklist"
+        summary="A practical handoff checklist for blogs, resources, landing pages, and SEO work."
+        image="/images/dj-abby-stract.png"
+        href="/about"
+        gated={true}
+      />
+      <ResourceCard
+        type="case-study"
+        title="How an agency keeps design control"
+        summary="A structured component workflow that gives clients confidence without opening layout controls."
+        image="/images/zafcon-hero.webp"
+        href="/about"
+        gated={false}
+      />
+      <ResourceCard
+        type="blog"
+        title="Why marketers need safe fields"
+        summary="Turn component props into friendly editing controls for common client updates."
+        image="/images/dj-abby-stract.png"
+        href="/about"
+        gated={false}
+      />
+    </section>
+
+    <LandingCTA
+      headline="Build the page from approved sections"
+      description="This section exists to test the block inserter path: defaults, schema fields, variants, and safe CTA editing."
+      buttonLabel="Review the page"
+      buttonHref="/about"
+      tone="dark"
+      class="mb-10"
+    />
+
     <section class="grid gap-2 grid-cols-1 md:grid-cols-3">
       <div class="bg-white p-6 rounded-sm border">
         <h2 class="text-xl font-semibold text-gray-800">Live Preview</h2>
@@ -65,7 +120,8 @@ import SEO from "../components/SEO.astro";
 </Button>
       <Button>This is new text</Button>
     </div>
-    </main>
+    
+  </main>
 
   <footer class="flex">
     <p>Built with Astro + Tailwind CSS</p>

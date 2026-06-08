@@ -44,6 +44,26 @@ describe("scanContentFiles", () => {
     expect(files.find((f) => f.path === "README.md")?.collection).toBe("root");
     expect(files.find((f) => f.path === "src/content/blog/post.mdx")?.collection).toBe("blog");
   });
+
+  it("extracts lightweight frontmatter metadata for collection lists", async () => {
+    await writeFixture(
+      "src/content/blog/post.md",
+      "---\ntitle: Launch Notes\ndescription: Product update\npublishedAt: 2026-06-08\ndraft: true\nstatus: review\n---\nBody\n"
+    );
+
+    const files = await scanContentFiles(tmpDir);
+
+    expect(files[0]).toMatchObject({
+      path: "src/content/blog/post.md",
+      collection: "blog",
+      slug: "post",
+      title: "Launch Notes",
+      description: "Product update",
+      date: "2026-06-08",
+      draft: true,
+      status: "review",
+    });
+  });
 });
 
 describe("content file read/write", () => {

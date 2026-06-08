@@ -259,7 +259,11 @@ export function setupInteraction(
         return;
       }
       const el = domMapper.getElementByNodeId(message.nodeId);
-      if (!el) return;
+      if (!el) {
+        selectedElement = null;
+        overlay.clearSelected();
+        return;
+      }
       if (selectedElement === el) return; // idempotent — avoids loop with tve:select round-trip
       selectedElement = el;
       const rect = el.getBoundingClientRect();

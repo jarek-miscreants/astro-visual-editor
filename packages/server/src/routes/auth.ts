@@ -69,6 +69,16 @@ function persistSignedIn(): void {
   else attachedStore.setPref(TOKEN_PREF_KEY, null);
 }
 
+function getValidSignedIn(): SignedInState | null {
+  if (!signedIn) return null;
+  if (signedIn.expiresAt !== null && signedIn.expiresAt <= Date.now()) {
+    signedIn = null;
+    persistSignedIn();
+    return null;
+  }
+  return signedIn;
+}
+
 /** Periodic state cleanup. Cheap; runs on every /start. */
 function pruneStates(): void {
   const cutoff = Date.now() - STATE_TTL_MS;
@@ -250,16 +260,17 @@ authRouter.get("/github/callback", async (req, res) => {
 });
 
 authRouter.get("/whoami", (_req, res) => {
-  if (!signedIn) {
+  const current = getValidSignedIn();
+  if (!current) {
     res.json({ signedIn: false });
     return;
   }
   res.json({
     signedIn: true,
-    user: signedIn.user ?? null,
-    installationId: signedIn.installationId,
-    storedAt: signedIn.storedAt,
-    expiresAt: signedIn.expiresAt,
+    user: current.user ?? null,
+    installationId: current.installationId,
+    storedAt: current.storedAt,
+    expiresAt: current.expiresAt,
   });
 });
 
@@ -281,6 +292,18 @@ export function getCurrentAccessToken(): string | null {
     return null;
   }
   return signedIn.accessToken;
+}
+
+/** Current non-secret GitHub identity for server-side authorization. */
+export function getCurrentAuthIdentity(): {
+  signedIn: boolean;
+  login: string | null;
+} {
+  const current = getValidSignedIn();
+  return {
+    signedIn: current !== null,
+    login: current?.user?.login ?? null,
+  };
 }
 
 /** Test-only hook: lets `routes/auth.test.ts` plant a token without

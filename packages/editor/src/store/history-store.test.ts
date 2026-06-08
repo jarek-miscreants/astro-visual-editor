@@ -79,6 +79,32 @@ describe("computeInverse", () => {
       };
       expect(computeInverse(m)).toBeNull();
     });
+
+    it("restores the previous attribute value when supplied", () => {
+      const inv = computeInverse(
+        { type: "update-attribute", nodeId: "n1", attr: "href", value: "/new" },
+        { previousValue: "/old" }
+      );
+      expect(inv).toEqual({
+        type: "update-attribute",
+        nodeId: "n1",
+        attr: "href",
+        value: "/old",
+      });
+    });
+
+    it("removes the attribute when it was previously absent", () => {
+      const inv = computeInverse(
+        { type: "update-attribute", nodeId: "n1", attr: "href", value: "/new" },
+        { previousValue: null }
+      );
+      expect(inv).toEqual({
+        type: "update-attribute",
+        nodeId: "n1",
+        attr: "href",
+        value: null,
+      });
+    });
   });
 
   describe("move-element", () => {

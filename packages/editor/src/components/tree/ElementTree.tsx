@@ -16,6 +16,7 @@ import { useEditorStore } from "../../store/editor-store";
 import { useModeStore } from "../../store/mode-store";
 import { useTreeUIStore } from "../../store/tree-ui-store";
 import { useComponentSlotsStore } from "../../store/component-slots-store";
+import { useComponentRegistryStore } from "../../store/component-registry-store";
 import { highlightNodeInIframe } from "../../lib/iframe-bridge";
 import { ContextMenu } from "./ContextMenu";
 import { AddElementPanel } from "./AddElementPanel";
@@ -139,6 +140,11 @@ export function ElementTree({ nodes, depth }: ElementTreeProps) {
   const query = useTreeUIStore((s) => s.query).trim();
   const marketerZoom = useTreeUIStore((s) => s.marketerZoom);
   const zoomActive = userMode === "marketer" && marketerZoom;
+  const registryComponents = useComponentRegistryStore((s) => s.components);
+  const componentLabels = useMemo(() => {
+    return new Map(registryComponents.map((component) => [component.tagName, component.label]));
+  }, [registryComponents]);
+  const showFriendlyLabels = userMode === "marketer";
 
   // distance: 8px threshold lets plain clicks through without starting a drag,
   // without adding delay (which would make the drag feel sluggish, not snappier).
@@ -316,6 +322,8 @@ export function ElementTree({ nodes, depth }: ElementTreeProps) {
           draggedNodeId={draggedNodeId}
           zoomActive={zoomActive}
           query={query}
+          showFriendlyLabels={showFriendlyLabels}
+          componentLabels={componentLabels}
         />
       ))}
 
@@ -344,6 +352,8 @@ function TreeNode({
   draggedNodeId,
   zoomActive,
   query,
+  showFriendlyLabels,
+  componentLabels,
 }: {
   node: ASTNode;
   depth: number;
@@ -351,6 +361,8 @@ function TreeNode({
   draggedNodeId: string | null;
   zoomActive: boolean;
   query: string;
+  showFriendlyLabels: boolean;
+  componentLabels: Map<string, string>;
 }) {
   // Zoom: when the node isn't "meaningful" (structural wrapper), don't render its
   // own row — flatten by rendering its children at the same depth. Keep rendering
@@ -367,6 +379,8 @@ function TreeNode({
             draggedNodeId={draggedNodeId}
             zoomActive={zoomActive}
             query={query}
+            showFriendlyLabels={showFriendlyLabels}
+            componentLabels={componentLabels}
           />
         ))}
       </>
@@ -429,7 +443,10 @@ function TreeNode({
   const dropPosition = isDropTarget ? dropTarget.position : null;
 
   const icon = getNodeIcon(node);
-  const label = node.tagName;
+  const label =
+    showFriendlyLabels && node.isComponent
+      ? componentLabels.get(node.tagName) ?? node.tagName
+      : node.tagName;
   const classPreview = node.classes
     ? node.classes.split(" ").slice(0, 3).join(" ") +
       (node.classes.split(" ").length > 3 ? "..." : "")
@@ -566,6 +583,8 @@ function TreeNode({
             draggedNodeId={draggedNodeId}
             zoomActive={zoomActive}
             query={query}
+            showFriendlyLabels={showFriendlyLabels}
+            componentLabels={componentLabels}
           />
         ) : hasChildren ? (
           <div>
@@ -578,6 +597,8 @@ function TreeNode({
                 draggedNodeId={draggedNodeId}
                 zoomActive={zoomActive}
                 query={query}
+                showFriendlyLabels={showFriendlyLabels}
+                componentLabels={componentLabels}
               />
             ))}
           </div>
@@ -599,6 +620,8 @@ function ComponentChildren({
   draggedNodeId,
   zoomActive,
   query,
+  showFriendlyLabels,
+  componentLabels,
 }: {
   node: ASTNode;
   depth: number;
@@ -606,6 +629,8 @@ function ComponentChildren({
   draggedNodeId: string | null;
   zoomActive: boolean;
   query: string;
+  showFriendlyLabels: boolean;
+  componentLabels: Map<string, string>;
 }) {
   const files = useEditorStore((s) => s.files);
   const ensureSlots = useComponentSlotsStore((s) => s.ensure);
@@ -640,6 +665,8 @@ function ComponentChildren({
                 draggedNodeId={draggedNodeId}
                 zoomActive={zoomActive}
                 query={query}
+                showFriendlyLabels={showFriendlyLabels}
+                componentLabels={componentLabels}
               />
             ))}
           </div>
@@ -687,6 +714,8 @@ function ComponentChildren({
             draggedNodeId={draggedNodeId}
             zoomActive={zoomActive}
             query={query}
+            showFriendlyLabels={showFriendlyLabels}
+            componentLabels={componentLabels}
           />
         );
       })}
@@ -709,6 +738,8 @@ function ComponentChildren({
               draggedNodeId={draggedNodeId}
               zoomActive={zoomActive}
               query={query}
+              showFriendlyLabels={showFriendlyLabels}
+              componentLabels={componentLabels}
             />
           ))}
         </div>
@@ -729,6 +760,8 @@ function SlotSection({
   draggedNodeId,
   zoomActive,
   query,
+  showFriendlyLabels,
+  componentLabels,
 }: {
   parentNodeId: string;
   slotName: string | null;
@@ -738,6 +771,8 @@ function SlotSection({
   draggedNodeId: string | null;
   zoomActive: boolean;
   query: string;
+  showFriendlyLabels: boolean;
+  componentLabels: Map<string, string>;
 }) {
   return (
     <>
@@ -756,6 +791,8 @@ function SlotSection({
           draggedNodeId={draggedNodeId}
           zoomActive={zoomActive}
           query={query}
+          showFriendlyLabels={showFriendlyLabels}
+          componentLabels={componentLabels}
         />
       ))}
     </>

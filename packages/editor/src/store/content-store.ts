@@ -1,9 +1,11 @@
 import { create } from "zustand";
-import type { ContentFileInfo, ContentFile } from "@tve/shared";
+import type { ContentFileInfo, ContentFile, TveContentViewItem } from "@tve/shared";
 import { api } from "../lib/api-client";
 
 interface ContentState {
   files: ContentFileInfo[];
+  contentView: TveContentViewItem[] | null;
+  browserOpen: boolean;
   currentPath: string | null;
   current: ContentFile | null;
   dirty: boolean;
@@ -13,6 +15,7 @@ interface ContentState {
   revision: number;
 
   loadFiles: () => Promise<void>;
+  openBrowser: () => void;
   openFile: (path: string) => Promise<void>;
   closeFile: () => void;
   createFile: (input: {
@@ -33,6 +36,8 @@ interface ContentState {
 
 export const useContentStore = create<ContentState>((set, get) => ({
   files: [],
+  contentView: null,
+  browserOpen: false,
   currentPath: null,
   current: null,
   dirty: false,
@@ -43,15 +48,19 @@ export const useContentStore = create<ContentState>((set, get) => ({
 
   async loadFiles() {
     try {
-      const { files } = await api.getContentFiles();
-      set({ files });
+      const { files, contentView } = await api.getContentFiles();
+      set({ files, contentView: contentView ?? null });
     } catch (err: any) {
       set({ lastError: err.message });
     }
   },
 
+  openBrowser() {
+    set({ browserOpen: true, lastError: null });
+  },
+
   async openFile(path) {
-    set({ currentPath: path, current: null, dirty: false, lastError: null, revision: 0 });
+    set({ browserOpen: true, currentPath: path, current: null, dirty: false, lastError: null, revision: 0 });
     try {
       const file = await api.readContentFile(path);
       set({ current: file, revision: 0 });
@@ -61,7 +70,14 @@ export const useContentStore = create<ContentState>((set, get) => ({
   },
 
   closeFile() {
-    set({ currentPath: null, current: null, dirty: false, lastError: null, revision: 0 });
+    set({
+      browserOpen: false,
+      currentPath: null,
+      current: null,
+      dirty: false,
+      lastError: null,
+      revision: 0,
+    });
   },
 
   async createFile(input) {
@@ -76,10 +92,11 @@ export const useContentStore = create<ContentState>((set, get) => ({
     set({ deleting: true, lastError: null });
     try {
       await api.deleteContentFile(path);
-      const { files } = await api.getContentFiles();
+      const { files, contentView } = await api.getContentFiles();
       const isCurrent = get().currentPath === path;
       set({
         files,
+        contentView: contentView ?? null,
         deleting: false,
         currentPath: isCurrent ? null : get().currentPath,
         current: isCurrent ? null : get().current,
@@ -134,8 +151,11 @@ export const useContentStore = create<ContentState>((set, get) => ({
     set({ saving: true, lastError: null });
     try {
       await api.writeContentFile(currentPath, current.frontmatter, current.body);
+      const { files, contentView } = await api.getContentFiles();
       const latest = get();
       set({
+        files,
+        contentView: contentView ?? null,
         saving: false,
         dirty: latest.currentPath === currentPath && latest.revision === revision ? false : latest.dirty,
       });

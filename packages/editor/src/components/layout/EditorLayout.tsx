@@ -3,7 +3,7 @@ import { Toolbar } from "./Toolbar";
 import { LeftSidebar } from "./LeftSidebar";
 import { RightSidebar } from "./RightSidebar";
 import { IframeCanvas } from "../canvas/IframeCanvas";
-import { MarkdownEditor } from "../markdown/MarkdownEditor";
+import { ContentBrowser } from "../markdown/ContentBrowser";
 import { useEditorStore } from "../../store/editor-store";
 import { useContentStore } from "../../store/content-store";
 import { Toaster } from "../ui/Toaster";
@@ -15,8 +15,9 @@ import { ComponentReturnBar } from "./ComponentReturnBar";
 export function EditorLayout() {
   const mode = useEditorStore((s) => s.mode);
   const isPreview = mode === "preview";
+  const contentBrowserOpen = useContentStore((s) => s.browserOpen);
   const contentPath = useContentStore((s) => s.currentPath);
-  const isContent = !!contentPath;
+  const isContent = contentBrowserOpen || !!contentPath;
   const selectedNodeId = useEditorStore((s) => s.selectedNodeId);
 
   useShortcutsHotkey();
@@ -31,7 +32,7 @@ export function EditorLayout() {
       {!isContent && selectedNodeId && <Breadcrumb nodeId={selectedNodeId} />}
       {isContent ? (
         <div className="tve-shell__body">
-          <MarkdownEditor />
+          <ContentBrowser />
         </div>
       ) : isPreview ? (
         <div className="tve-shell__body">

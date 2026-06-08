@@ -2,6 +2,9 @@ import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "re
 import { Copy, Trash2, ArrowUp, ArrowDown, PlusCircle, Component } from "lucide-react";
 import { createPortal } from "react-dom";
 import { useEditorStore } from "../../store/editor-store";
+import { useModeStore } from "../../store/mode-store";
+import { makeAddElementMutation } from "../../lib/component-insertion";
+import { toast } from "../../store/toast-store";
 import { Tooltip } from "../ui/Tooltip";
 import { AddElementPanel } from "../tree/AddElementPanel";
 import { findComponentFile } from "../../lib/component-files";
@@ -24,6 +27,7 @@ export function SelectionToolbar({ iframeRef }: Props) {
   const files = useEditorStore((s) => s.files);
   const applyMutation = useEditorStore((s) => s.applyMutation);
   const enterComponent = useEditorStore((s) => s.enterComponent);
+  const userMode = useModeStore((s) => s.userMode);
 
   const [coords, setCoords] = useState<{ top: number; left: number } | null>(null);
   const [showAddChild, setShowAddChild] = useState(false);
@@ -72,24 +76,7 @@ export function SelectionToolbar({ iframeRef }: Props) {
       const tbWidth = toolbarRef.current?.offsetWidth ?? 138;
       const tbHeight = toolbarRef.current?.offsetHeight ?? 30;
 
-      // Center horizontally over the selection. Clamp inside the iframe
-      // viewport so very small selections near the edges don't push the
-      // toolbar offscreen.
-      const selCenterX = iframeRect.left + sel.x + sel.width / 2;
-      let left = selCenterX - tbWidth / 2;
-      const minLeft = iframeRect.left + 4;
-      const maxLeft = iframeRect.left + iframeRect.width - tbWidth - 4;
-      if (left < minLeft) left = minLeft;
-      if (left > maxLeft) left = Math.max(minLeft, maxLeft);
-
-      // Vertical: place just above the selection. If there isn't room above
-      // (selection touches the iframe top), drop the toolbar inside the
-      // selection at its top edge so it stays visible without escaping.
-      const aboveTop = iframeRect.top + sel.y - tbHeight - 6;
-      const top = aboveTop >= iframeRect.top + 4
-        ? aboveTop
-        : iframeRect.top + sel.y + 6;
-      setCoords({ top, left });
+      setCoords(computeToolbarCoords(iframeRect, sel, tbWidth, tbHeight));
     }
 
     recompute();
@@ -124,16 +111,7 @@ export function SelectionToolbar({ iframeRef }: Props) {
     const sel = selectedElementInfo.rect;
     const tbWidth = toolbarRef.current.offsetWidth;
     const tbHeight = toolbarRef.current.offsetHeight;
-    const selCenterX = iframeRect.left + sel.x + sel.width / 2;
-    let left = selCenterX - tbWidth / 2;
-    const minLeft = iframeRect.left + 4;
-    const maxLeft = iframeRect.left + iframeRect.width - tbWidth - 4;
-    if (left < minLeft) left = minLeft;
-    if (left > maxLeft) left = Math.max(minLeft, maxLeft);
-    const aboveTop = iframeRect.top + sel.y - tbHeight - 6;
-    const top = aboveTop >= iframeRect.top + 4
-      ? aboveTop
-      : iframeRect.top + sel.y + 6;
+    const { top, left } = computeToolbarCoords(iframeRect, sel, tbWidth, tbHeight);
     setCoords((prev) => {
       if (prev && Math.abs(prev.left - left) < 0.5 && Math.abs(prev.top - top) < 0.5) {
         return prev;
@@ -177,6 +155,17 @@ export function SelectionToolbar({ iframeRef }: Props) {
 
   function handleAddChild(html: string, options?: { componentPath?: string }) {
     if (!selectedNodeId) return;
+    if (userMode === "marketer") {
+      const mutation = makeAddElementMutation(ast, selectedNodeId, html, options?.componentPath);
+      if (!mutation) {
+        toast.error("No insertion target", "Open a page with a block container.");
+        return;
+      }
+      applyMutation(mutation);
+      setShowAddChild(false);
+      return;
+    }
+
     applyMutation({
       type: "add-element",
       parentNodeId: selectedNodeId,
@@ -193,7 +182,7 @@ export function SelectionToolbar({ iframeRef }: Props) {
       className="fixed z-[60] flex items-center gap-0.5 rounded-md border border-zinc-700 bg-zinc-900/95 p-0.5 shadow-lg shadow-black/30 backdrop-blur"
       style={{ top: coords.top, left: coords.left }}
     >
-      <Tooltip content="Add child">
+      <Tooltip content={userMode === "marketer" ? "Add block" : "Add child"}>
         <button
           aria-label="Add child"
           ref={addBtnRef}
@@ -266,6 +255,7 @@ export function SelectionToolbar({ iframeRef }: Props) {
           <AddElementPanel
             onSelect={handleAddChild}
             onClose={() => setShowAddChild(false)}
+            componentsOnly={userMode === "marketer"}
           />
         </div>,
         document.body
@@ -284,6 +274,62 @@ function findNode(
     if (found) return found;
   }
   return null;
+}
+
+function computeToolbarCoords(
+  iframeRect: DOMRect,
+  sel: { x: number; y: number; width: number; height: number },
+  tbWidth: number,
+  tbHeight: number
+): { top: number; left: number } {
+  const inset = 4;
+  const gap = 6;
+
+  // Center horizontally over the selection. Clamp inside the iframe viewport
+  // so small components near an edge keep the toolbar reachable.
+  const selCenterX = iframeRect.left + sel.x + sel.width / 2;
+  let left = selCenterX - tbWidth / 2;
+  const minLeft = iframeRect.left + inset;
+  const maxLeft = iframeRect.left + iframeRect.width - tbWidth - inset;
+  if (left < minLeft) left = minLeft;
+  if (left > maxLeft) left = Math.max(minLeft, maxLeft);
+
+  const viewportTop = iframeRect.top + inset;
+  const viewportBottom = iframeRect.top + iframeRect.height - inset;
+  const selectionTop = iframeRect.top + sel.y;
+  const selectionBottom = selectionTop + sel.height;
+  const aboveTop = selectionTop - tbHeight - gap;
+  const belowTop = selectionBottom + gap;
+  const aboveFrameTop = iframeRect.top - tbHeight - gap;
+
+  if (sel.width <= 1 && sel.height <= 1) {
+    const cornerLeft = iframeRect.left + iframeRect.width - tbWidth - inset;
+    return {
+      top:
+        aboveFrameTop >= inset
+          ? aboveFrameTop
+          : Math.max(viewportTop, viewportBottom - tbHeight),
+      left: Math.max(minLeft, cornerLeft),
+    };
+  }
+
+  let top: number;
+  if (aboveTop >= viewportTop) {
+    top = aboveTop;
+  } else if (aboveFrameTop >= inset) {
+    top = aboveFrameTop;
+  } else if (belowTop + tbHeight <= viewportBottom) {
+    top = belowTop;
+  } else {
+    // Last resort for selections that occupy most of the viewport: keep the
+    // toolbar visible, even if there is no fully external position available.
+    top = Math.min(
+      Math.max(selectionTop + gap, viewportTop),
+      viewportBottom - tbHeight
+    );
+  }
+
+  return { top, left };
 }
 
 function ToolbarButton({

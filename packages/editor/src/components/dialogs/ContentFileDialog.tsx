@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { X } from "lucide-react";
+import type { ContentRoot, TveContentViewItem } from "@tve/shared";
 import { useContentStore } from "../../store/content-store";
 import { useEditorStore } from "../../store/editor-store";
 import { ApiError } from "../../lib/api-client";
@@ -7,21 +8,24 @@ import { ApiError } from "../../lib/api-client";
 interface ContentFileDialogProps {
   /** Optional pre-filled collection (when invoked from a specific collection's "+" button) */
   defaultCollection?: string;
+  defaultRoot?: ContentRoot;
   onClose: () => void;
 }
 
 const NEW_COLLECTION_VALUE = "__new__";
 
-export function ContentFileDialog({ defaultCollection, onClose }: ContentFileDialogProps) {
+export function ContentFileDialog({ defaultCollection, defaultRoot, onClose }: ContentFileDialogProps) {
   const files = useContentStore((s) => s.files);
+  const contentView = useContentStore((s) => s.contentView);
   const createFile = useContentStore((s) => s.createFile);
   const clearComponentReturn = useEditorStore((s) => s.clearComponentReturn);
 
   const existingCollections = useMemo(() => {
     const set = new Set<string>();
     for (const f of files) set.add(f.collection);
+    for (const collection of collectConfiguredCollections(contentView)) set.add(collection);
     return Array.from(set).sort();
-  }, [files]);
+  }, [contentView, files]);
 
   const initialCollection =
     defaultCollection && existingCollections.includes(defaultCollection)
@@ -84,6 +88,7 @@ export function ContentFileDialog({ defaultCollection, onClose }: ContentFileDia
         collection,
         slug,
         format,
+        root: defaultCollection === collection ? defaultRoot : undefined,
         frontmatter,
         body: "",
       });
@@ -217,4 +222,18 @@ export function ContentFileDialog({ defaultCollection, onClose }: ContentFileDia
       </div>
     </div>
   );
+}
+
+function collectConfiguredCollections(view: TveContentViewItem[] | null): string[] {
+  if (!view) return [];
+
+  const out: string[] = [];
+  for (const item of view) {
+    if (item.type === "collection") {
+      out.push(item.collection);
+    } else {
+      out.push(...collectConfiguredCollections(item.items));
+    }
+  }
+  return out;
 }

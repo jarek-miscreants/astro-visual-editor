@@ -15,6 +15,7 @@ import {
   ensureStaging,
   promote,
 } from "../services/git.js";
+import { getCurrentAuthIdentity } from "./auth.js";
 import type { TveBranchConfig } from "@tve/shared";
 
 export const gitRouter = Router();
@@ -26,6 +27,66 @@ function requireProject(req: any, res: any): string | null {
     return null;
   }
   return projectPath;
+}
+
+function sanitizeRoleList(value: unknown, fallback: string[]): string[] {
+  if (!Array.isArray(value)) return fallback;
+  return value
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function normalizeRoleEntry(entry: string): string {
+  return entry.trim().replace(/^github:/i, "").replace(/^@/, "").toLowerCase();
+}
+
+function roleMatches(entries: string[], githubLogin: string | null): boolean {
+  if (!githubLogin) return false;
+  const login = normalizeRoleEntry(githubLogin);
+  return entries.some((entry) => {
+    const normalized = normalizeRoleEntry(entry);
+    return normalized === "*" || normalized === login;
+  });
+}
+
+function roleConfigEmpty(config: TveBranchConfig): boolean {
+  return (
+    config.roles.admins.length === 0 &&
+    config.roles.publishers.length === 0 &&
+    config.roles.reviewers.length === 0
+  );
+}
+
+function canPublishToProduction(config: TveBranchConfig): boolean {
+  const identity = getCurrentAuthIdentity();
+  switch (config.publishing.productionMode) {
+    case "anyone":
+      return true;
+    case "any-signed-in":
+      return identity.signedIn;
+    case "admins-only":
+    default:
+      // Preserve local/dev projects with no configured role policy.
+      if (roleConfigEmpty(config)) return true;
+      return roleMatches(config.roles.admins, identity.login);
+  }
+}
+
+async function requireProductionPublishAccess(
+  projectPath: string,
+  targetBranch: string,
+  res: any
+): Promise<boolean> {
+  const config = await readConfig(projectPath);
+  if (targetBranch !== config.branches.production) return true;
+  if (canPublishToProduction(config)) return true;
+
+  res.status(403).json({
+    error: `Not authorized to publish to ${config.branches.production}`,
+    code: "production-publish-forbidden",
+  });
+  return false;
 }
 
 gitRouter.get("/status", async (req, res) => {
@@ -102,6 +163,13 @@ gitRouter.post("/push", async (req, res) => {
   if (!projectPath) return;
   try {
     const body = (req.body || {}) as { branch?: string; setUpstream?: boolean };
+    const branch =
+      typeof body.branch === "string"
+        ? body.branch
+        : (await getStatus(projectPath)).currentBranch;
+    if (branch && !(await requireProductionPublishAccess(projectPath, branch, res))) {
+      return;
+    }
     await push(projectPath, {
       branch: typeof body.branch === "string" ? body.branch : undefined,
       setUpstream: !!body.setUpstream,
@@ -196,6 +264,9 @@ gitRouter.post("/promote", async (req, res) => {
       res.status(400).json({ error: "from and to are required" });
       return;
     }
+    if (!(await requireProductionPublishAccess(projectPath, body.to, res))) {
+      return;
+    }
     const result = await promote(projectPath, {
       from: body.from,
       to: body.to,
@@ -228,13 +299,9 @@ gitRouter.put("/config", async (req, res) => {
       git: { ...current.git, ...(body.git || {}) },
       publishing: { ...current.publishing, ...(body.publishing || {}) },
       roles: {
-        admins: Array.isArray(body.roles?.admins) ? body.roles.admins : current.roles.admins,
-        publishers: Array.isArray(body.roles?.publishers)
-          ? body.roles.publishers
-          : current.roles.publishers,
-        reviewers: Array.isArray(body.roles?.reviewers)
-          ? body.roles.reviewers
-          : current.roles.reviewers,
+        admins: sanitizeRoleList(body.roles?.admins, current.roles.admins),
+        publishers: sanitizeRoleList(body.roles?.publishers, current.roles.publishers),
+        reviewers: sanitizeRoleList(body.roles?.reviewers, current.roles.reviewers),
       },
     };
     await writeConfig(projectPath, next);

@@ -5,6 +5,9 @@ import type {
   ProjectInfo,
   ContentFileInfo,
   ContentFile,
+  TveContentViewItem,
+  ComponentRegistryEntry,
+  ComponentRegistryItem,
   ComponentPropSchema,
   ComponentSlotSchema,
   RecentProject,
@@ -17,6 +20,7 @@ import type {
   AssetInfo,
   SeoPageData,
   SeoPageResponse,
+  LinkTarget,
 } from "@tve/shared";
 
 const API_BASE = "/api";
@@ -289,6 +293,17 @@ export const api = {
     return fetchJson(`/components/slots?path=${qs}`);
   },
 
+  /** List project components with marketer-facing registry metadata. */
+  getComponentRegistry(): Promise<{ components: ComponentRegistryItem[] }> {
+    return fetchJson("/registry/components");
+  },
+
+  /** Fetch one component's resolved registry entry, including fields and slots. */
+  getComponentRegistryEntry(componentPath: string): Promise<ComponentRegistryEntry> {
+    const qs = encodeURIComponent(componentPath);
+    return fetchJson(`/registry/component?path=${qs}`);
+  },
+
   /** Get TVE project config (defaultMode, etc.) */
   getTveConfig(): Promise<{ defaultMode: "dev" | "marketer" }> {
     return fetchJson("/config/tve");
@@ -321,7 +336,7 @@ export const api = {
   },
 
   /** List .md/.mdx files in the project */
-  getContentFiles(): Promise<{ files: ContentFileInfo[] }> {
+  getContentFiles(): Promise<{ files: ContentFileInfo[]; contentView?: TveContentViewItem[] }> {
     return fetchJson("/content/list");
   },
 
@@ -362,6 +377,11 @@ export const api = {
     return fetchJson(`/content/delete/${encodePath(path)}`, {
       method: "DELETE",
     });
+  },
+
+  /** List internal link targets: static pages plus routed content entries. */
+  getLinkTargets(): Promise<{ targets: LinkTarget[] }> {
+    return fetchJson("/links/targets");
   },
 
   /** Extract an element into a new Astro component */

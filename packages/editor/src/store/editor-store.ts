@@ -21,6 +21,7 @@ import { toast } from "./toast-store";
 import { useGitStore } from "./git-store";
 import { useComponentSlotsStore } from "./component-slots-store";
 import { useComponentPropsStore } from "./component-props-store";
+import { useComponentRegistryStore } from "./component-registry-store";
 import { useContentStore } from "./content-store";
 import { findComponentFile } from "../lib/component-files";
 
@@ -238,8 +239,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           // caches are independent stores but share the same trigger — both
           // are derived from the component file's frontmatter + body.
           if (msg.path.startsWith("src/components/")) {
-            useComponentSlotsStore.getState().invalidate(msg.path);
-            useComponentPropsStore.getState().invalidate(msg.path);
+            const componentPath = msg.path.replace(/\.tve\.ts$/, ".astro");
+            useComponentSlotsStore.getState().invalidate(componentPath);
+            useComponentPropsStore.getState().invalidate(componentPath);
+            useComponentRegistryStore.getState().invalidate(componentPath);
           }
           const state = get();
           if (state.currentFile === msg.path) {

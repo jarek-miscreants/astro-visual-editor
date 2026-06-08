@@ -34,7 +34,7 @@ const GET_COLLECTION_RE = /\bgetCollection\s*\(\s*['"`]([\w-]+)['"`]/g;
 
 /** Find every `getCollection('X')` reference in a source string and return
  *  the set of collection names. */
-function extractCollectionRefs(source: string): Set<string> {
+export function extractCollectionRefs(source: string): Set<string> {
   const refs = new Set<string>();
   for (const m of source.matchAll(GET_COLLECTION_RE)) {
     refs.add(m[1]);

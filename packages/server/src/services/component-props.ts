@@ -208,6 +208,10 @@ async function readTveComponentSchema(schemaPath: string): Promise<ParsedTveSche
     label: readString(parsed.label),
     category: readString(parsed.category),
     description: readString(parsed.description),
+    thumbnail: readString(parsed.thumbnail),
+    insertable: readBoolean(parsed.insertable),
+    defaultProps: readDefaultProps(parsed.defaultProps),
+    defaultChildren: readString(parsed.defaultChildren),
   };
 
   const fields: Record<string, ComponentPropMeta> = {};
@@ -341,6 +345,24 @@ function readBoolean(value: unknown): boolean | undefined {
 
 function readNumber(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function readDefaultProps(
+  value: unknown
+): Record<string, string | number | boolean | null> | undefined {
+  if (!isRecord(value)) return undefined;
+  const out: Record<string, string | number | boolean | null> = {};
+  for (const [key, raw] of Object.entries(value)) {
+    if (
+      typeof raw === "string" ||
+      typeof raw === "number" ||
+      typeof raw === "boolean" ||
+      raw === null
+    ) {
+      out[key] = raw;
+    }
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
 }
 
 /** Extract leading JSDoc text above a property signature. We strip the

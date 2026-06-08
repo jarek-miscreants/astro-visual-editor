@@ -21,5 +21,43 @@
         "noindex": "noindex"
       }
     }
-  }
+  },
+  "contentView": [
+    {
+      "id": "publishing",
+      "label": "Publishing",
+      "items": [
+        {
+          "collection": "blog",
+          "label": "Blog posts",
+          "description": "Articles, news, and campaign updates",
+          "defaultRoot": "src/content"
+        },
+        {
+          "collection": "whitepapers",
+          "label": "White papers",
+          "description": "Long-form gated resources",
+          "defaultRoot": "src/content"
+        }
+      ]
+    },
+    {
+      "id": "supporting-content",
+      "label": "Supporting content",
+      "items": [
+        {
+          "collection": "authors",
+          "label": "Authors",
+          "description": "Reusable author profiles",
+          "defaultRoot": "src/content"
+        },
+        {
+          "collection": "categories",
+          "label": "Categories",
+          "description": "Editorial taxonomy used across content",
+          "defaultRoot": "src/content"
+        }
+      ]
+    }
+  ]
 }

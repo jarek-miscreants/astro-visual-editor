@@ -10,6 +10,7 @@ import {
   getCollectionRouting,
   resolveEntryUrl,
 } from "../services/collection-routing.js";
+import { readTveProjectConfig } from "../services/tve-config.js";
 import { resolveProjectPath, PathTraversalError } from "../lib/path-guard.js";
 
 export const contentRouter = Router();
@@ -18,8 +19,11 @@ export const contentRouter = Router();
 contentRouter.get("/list", async (req, res) => {
   try {
     const projectPath = req.app.locals.projectPath as string;
-    const files = await scanContentFiles(projectPath);
-    res.json({ files });
+    const [files, config] = await Promise.all([
+      scanContentFiles(projectPath),
+      readTveProjectConfig(projectPath),
+    ]);
+    res.json({ files, contentView: config.contentView });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

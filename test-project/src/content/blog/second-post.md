@@ -11,6 +11,9 @@ Just a second file so the collection has more than one item.
 
 Read more about it on [the Astro docs site](https://docs.astro.build).
 
+```ts
+```
+
 | ![Image](/images/zafcon-hero.webp) | Test |   |
 | ---------------------------------- | ---- | - |
 |                                    |      |   |
