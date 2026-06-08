@@ -7,6 +7,29 @@ Categories: `Added`, `Changed`, `Fixed`, `Removed`, `Deprecated`, `Security`.
 
 ## [Unreleased]
 
+### Added - Marketer content and component workflows (2026-06-08)
+- **Component registry for marketer-friendly editing.** TVE now reads optional `*.tve.ts` component metadata for labels, categories, descriptions, thumbnails, insertability, default props, and default children. The server exposes registry endpoints, the editor caches them, and Marketer mode uses the registry for friendlier component names and safer block insertion.
+- **Section/block inserter foundation.** The Add Element panel and selection toolbar can insert configured Astro components with generated props/children and auto-import handling. The test project now includes sample editable marketing blocks (`MarketingHero`, `ResourceCard`, `LandingCTA`, `GridColumns`) with `.tve.ts` metadata.
+- **Sanity-style content library view.** Content mode now has a three-column browser: configured collections on the left, entries in the middle, and the existing Markdown/MDX editor on the right. Entry rows show lightweight frontmatter metadata such as title, description, date, draft/status, slug, and format.
+- **Editor-only `contentView` config.** `tve.config.json` can define display-only content folders and collection labels without affecting Astro routes, file locations, or the shipped site. Configured-but-empty collections still appear so marketers can create the first entry; unconfigured collections fall back automatically.
+- **Internal link target API.** Added server-side link target discovery for static pages and routed content entries, plus editor-side API plumbing for link controls.
+- **Content entry deletion.** Markdown/MDX entries can be deleted from the content UI, with path-guarded server routes and tests.
+
+### Changed - Marketer workflow polish (2026-06-08)
+- **Content mode can open without a selected file.** The toolbar now includes "Open content library", so marketers can browse configured collections before picking an entry.
+- **Content lists refresh after saves.** Saving frontmatter reloads content metadata so edited titles, dates, descriptions, and draft/status flags update in the list.
+- **Project component insertion is registry-aware.** Marketer mode prefers configured component labels and insertion defaults instead of exposing only raw file/component names.
+- **Test project now exercises the marketer workflow.** The sample Astro project has registry metadata, block examples, sample content, and a `contentView` layout with Publishing and Supporting content groups.
+
+### Fixed - SEO, selection, and editing stability (2026-06-08)
+- **SEO component insertion is now automatic where possible.** When a page is missing the configured SEO component, TVE can infer or use the configured insertion target, create the default SEO component if needed, add a layout head slot, import the component, and insert populated SEO props.
+- **Content metadata extraction is more useful.** Content scanning now reads common frontmatter aliases for title, description, date, draft, status, and slug so lists are marketer-readable instead of path-only.
+- **Selection/overlay behavior around component-rendered content was tightened.** DOM mapping and selection toolbar behavior were adjusted so editing operations target the intended selected component/block more reliably.
+- **Undo for explicit `null` attribute values is honest.** History inverse logic now distinguishes an absent previous value from an intentional `previousValue: null`, with regression tests.
+
+### Added - Git workflow coverage (2026-06-08)
+- Added route-level Git tests around commit/push/pull/promotion behavior and related auth-route hardening for the local-SaaS workflow.
+
 ### Added — Image picker (2026-06-01)
 - **Webflow-style image library for `<img src>`.** Selecting an `<img>` in Dev mode now shows an Image section (thumbnail + src field + "Choose from library…") above Attributes. The picker browses every image in the project's `public/` and `src/` trees with thumbnails and search. Choosing a `public/` asset writes its URL (e.g. `/logos/miscreants.svg`) into `src` via the existing `update-attribute` mutation, with an optimistic iframe swap. `src/` assets are listed but disabled — they need a frontmatter import (a separate, larger feature) — and a `src` bound to an Astro expression (`{x.src}`) shows a read-only note rather than letting a string overwrite the binding. (server: `services/asset-scanner.ts`, `routes/assets.ts` — `GET /api/assets` list + `GET /api/assets/raw/*` thumbnail serve, path-guarded, image-extensions only, dotfiles skipped; editor: `dialogs/ImagePickerDialog.tsx`, `properties/ImageSection.tsx`, wired into `PropertiesPanel`; shared: `AssetInfo`/`AssetLocation` types.)
 - **Optimistic `update-attribute` in the iframe + undo.** Added a `tve:update-attribute` postMessage handler (set/remove an attribute on the live element) so attribute edits — including image swaps — reflect instantly instead of waiting for the HMR reload. Also gave `update-attribute` an honest history-store inverse (capturing the prior value, or removal when the attribute was absent), so attribute changes are now undoable — previously `computeInverse` returned `null` for them and no history entry was recorded. (`shared/protocol.ts`, `injected/bridge.ts`, `editor/lib/iframe-bridge.ts`, `editor/store/editor-store.ts`, `editor/store/history-store.ts`.)
