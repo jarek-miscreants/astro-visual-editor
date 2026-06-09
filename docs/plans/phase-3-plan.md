@@ -15,7 +15,10 @@ Status: draft for review — do not implement until approved.
 > (old Steps 15a, 15b, 15d) is **no longer planned** — kept below for
 > reference and rationale only. Phase 4 runs the bundled server via
 > `utilityProcess.fork()` on Electron's Node; native modules are rebuilt
-> for Electron's ABI with `electron-rebuild`.
+> for Electron's ABI with `electron-rebuild`. Phase 3 must **also package
+> pnpm's standalone `pnpm.cjs` into app resources** so the user's project
+> installs with no system Node/pnpm — see
+> [`desktop-zero-install-runtime.md`](desktop-zero-install-runtime.md).
 
 Companion to `migration-plan.md` Phase 3 (steps 15–16). Phases 0–2 are
 complete and **merged to `main`** (2026-06-09): the server boots in `cli`

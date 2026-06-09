@@ -86,6 +86,20 @@ server JS, keep the `/api/health` endpoint + boot ordering, and confirm
 the server static-serves `editor/dist/`. The SEA / `postject` /
 single-binary work (old Step 15a/15b/15d) is **dropped**.
 
+## 2b. Zero-install runtime for the user's project → **bundle Node (Electron's) + pnpm; build is remote**
+
+*Decided 2026-06-09.* A non-technical user installs nothing — no Node,
+no package manager, no git. The app provides the toolchain: the project's
+`pnpm install` and `astro dev` run on **Electron's bundled Node** (via
+`ELECTRON_RUN_AS_NODE=1`), and a **standalone `pnpm.cjs` is shipped in
+app resources** (Electron's Node has no `npm`/`npx`). The production
+`astro build` is **not** local — it runs on Cloudflare Pages on push, so
+the local runtime only needs install + dev-server + push.
+
+Full design, code touch-points, POC pnpm-only simplification, honest
+limitations, and the pre-shell spike: see
+[`desktop-zero-install-runtime.md`](desktop-zero-install-runtime.md).
+
 ## 3. Preview iframe isolation → **same origin, no `sandbox` attribute, tighter CSP on the editor shell**
 
 The preview iframe loads from `/preview/*` on the same origin as the

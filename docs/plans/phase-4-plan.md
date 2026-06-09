@@ -28,6 +28,12 @@ or 2 follow-up, not a smuggled change here.
 | 20 | Lifecycle (single-instance, quit, crash) | `packages/desktop/src/lifecycle.ts` | `packages/desktop/src/main.ts` |
 | 21 | Menus + window state | `packages/desktop/src/menu.ts`, `packages/desktop/src/window-state.ts` | `packages/desktop/src/main.ts`, `packages/server/src/services/state-store.ts` (window-state pref keys) |
 
+> **Zero-install user runtime.** The desktop env must propagate
+> `ELECTRON_RUN_AS_NODE` to grandchild spawns (the project's `astro dev`
+> and `pnpm install`) so they run on Electron's bundled Node, and the
+> resource layout must include the bundled `pnpm.cjs`. Full design:
+> [`desktop-zero-install-runtime.md`](desktop-zero-install-runtime.md).
+
 ## Guiding constraints
 
 - **No editor code changes.** The editor is a static bundle by Phase 3.
