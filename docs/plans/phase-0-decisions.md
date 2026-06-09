@@ -45,9 +45,46 @@ Keeping that invariant in production means zero code changes in the
 editor for desktop, no CORS surface, and the existing browser dev
 workflow on `pnpm dev` keeps working unchanged.
 
-**Implication for Phase 3.** The server binary is the single artifact
-that needs cross-platform builds; the editor is just a static bundle
-copied into it.
+**Implication for Phase 3.** The editor is just a static bundle the
+server serves at `/`; that invariant holds regardless of how the server
+is packaged (see decision 2a).
+
+## 2a. Server runtime in production → **run on Electron's bundled Node (`utilityProcess.fork`), NOT a Node SEA binary**
+
+*Decided 2026-06-09.* Electron is the **only** delivery path — there is
+no plan to ship TVE as a hosted web app or a standalone headless server
+CLI. (Complexity and market traction don't justify a web build.) That
+removes the sole justification for compiling `packages/server` into a
+standalone Node SEA single-binary: the only consumer is the Electron
+shell, and Electron already ships a full Node runtime.
+
+So in production the server is **esbuild-bundled to a single JS file**
+and run by Electron via `utilityProcess.fork()` (or a forked child on
+Electron's Node). The renderer still loads `http://localhost:{tvePort}/`
+exactly as decision 2 specifies.
+
+**Why over the SEA binary (the earlier draft assumption).**
+- No second Node runtime shipped — the SEA path would embed a whole
+  Node inside the app *in addition to* Electron's, inflating size for no
+  benefit when Electron is the only host.
+- Drops the entire SEA toolchain: no `postject`, no per-OS Node binary,
+  no embedded-WASM-via-`sea.getAsset` step, no native `.node` sidecar
+  vendoring as a packaging concern.
+- Native modules (`better-sqlite3`, `keytar`) are rebuilt against
+  Electron's Node ABI via `electron-rebuild` / `@electron/rebuild` —
+  routine, and the keychain decision already keeps `keytar` in the
+  Electron main process anyway.
+
+**Cost accepted.** We lose the "standalone `tve-server` CLI works
+without Electron" side benefit. Given Electron-only delivery, that
+artifact has no consumer, so it's not a loss in practice. The source
+`tve <path>` CLI dev workflow (`tsx`) is unaffected — it never used the
+binary.
+
+**Implication for Phase 3.** Phase 3 shrinks to: esbuild-bundle the
+server JS, keep the `/api/health` endpoint + boot ordering, and confirm
+the server static-serves `editor/dist/`. The SEA / `postject` /
+single-binary work (old Step 15a/15b/15d) is **dropped**.
 
 ## 3. Preview iframe isolation → **same origin, no `sandbox` attribute, tighter CSP on the editor shell**
 

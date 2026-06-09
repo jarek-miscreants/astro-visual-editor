@@ -2,25 +2,42 @@
 
 Status: draft for review — do not implement until approved.
 
+> **⚠️ SUPERSEDED IN PART (2026-06-09) — the Node SEA single-binary plan is dropped.**
+> Electron is the **only** delivery path (no hosted web app, no
+> standalone server CLI — see `phase-0-decisions.md` §2a). With Electron
+> as the sole host, there's no reason to compile the server into a
+> standalone SEA binary that embeds its own Node — Electron already ships
+> one. **Phase 3 is reduced to:** (1) esbuild-bundle `packages/server` to
+> a single JS file, (2) ship the `/api/health` endpoint + boot ordering
+> (Step 15c — unchanged), and (3) the server static-serves
+> `editor/dist/` (Step 16 — unchanged). The SEA blob / `postject` /
+> per-OS Node binary / embedded-WASM / native-sidecar work below
+> (old Steps 15a, 15b, 15d) is **no longer planned** — kept below for
+> reference and rationale only. Phase 4 runs the bundled server via
+> `utilityProcess.fork()` on Electron's Node; native modules are rebuilt
+> for Electron's ABI with `electron-rebuild`.
+
 Companion to `migration-plan.md` Phase 3 (steps 15–16). Phases 0–2 are
 complete and **merged to `main`** (2026-06-09): the server boots in `cli`
 or auth-enabled mode against a real GitHub App, the editor is a Vite SPA at
 `packages/editor/dist/`, and `pnpm dev` against `test-project/` still
 passes.
 
-This phase produces **a single shippable server artifact per platform**
-that does not require a system-wide Node install, statically serves the
-production editor bundle on the same origin, and is bootable as a child
-process by the Phase 4 Electron shell. **No Electron code lands here.**
+~~This phase produces **a single shippable server artifact per platform**
+that does not require a system-wide Node install~~ (superseded — see
+banner above). The surviving Phase 3 goal: an esbuild-bundled server that
+statically serves the production editor bundle on the same origin and is
+forkable by the Phase 4 Electron shell on Electron's own Node. **No
+Electron code lands here.**
 
 ## Phase 3 scope (one-line summary per step)
 
 | # | Step | New files | Touched files |
 |---|------|-----------|---------------|
-| 15a | Bundle the server JS | `packages/server/build/bundle.mjs`, `packages/server/build/sea-config.json` | `packages/server/package.json` (scripts), `packages/server/tsconfig.json` |
-| 15b | Vendor native deps + WASM | `packages/server/build/copy-natives.mjs` | — |
+| 15a | esbuild-bundle the server JS to a single file (**SEA blob/postject part DROPPED**) | `packages/server/build/bundle.mjs` | `packages/server/package.json` (scripts), `packages/server/tsconfig.json` |
+| ~~15b~~ | ~~Vendor native deps + WASM as sidecars~~ — **DROPPED** (Electron's Node + `electron-rebuild` handles natives; WASM resolves from `node_modules`) | — | — |
 | 15c | Health endpoint + boot ordering | `packages/server/src/routes/health.ts` | `packages/server/src/index.ts` |
-| 15d | Cross-platform build pipeline | `.github/workflows/server-binary.yml`, `packages/server/build/README.md` | — |
+| ~~15d~~ | ~~Cross-platform Node-binary build pipeline~~ — **DROPPED** (no per-OS server binary; the Electron build in Phase 5 produces the per-OS artifacts) | — | — |
 | 16 | Statically serve editor `dist/` | — | `packages/server/src/index.ts`, `packages/editor/package.json` (build script reachable from server) |
 
 ## Guiding constraints

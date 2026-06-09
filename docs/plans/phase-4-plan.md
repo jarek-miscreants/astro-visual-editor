@@ -3,11 +3,13 @@
 Status: draft for review — do not implement until approved.
 
 Companion to `migration-plan.md` Phase 4 (steps 17–21). Phase 3 has
-produced a self-contained `tve-server` binary per OS and the editor
-ships inside it as a static bundle. This phase wraps that binary in an
-Electron shell so a non-technical user can install a `.exe` / `.dmg` /
-`.AppImage`, double-click, and land in the editor — no terminal, no
-git config, no Node install.
+esbuild-bundled `packages/server` into a single JS file that
+static-serves the editor bundle and exposes `/api/health`. This phase
+wraps that bundle in an Electron shell — **running it on Electron's own
+bundled Node via `utilityProcess.fork()`** (not a standalone SEA binary;
+see `phase-0-decisions.md` §2a) — so a non-technical user can install a
+`.exe` / `.dmg` / `.AppImage`, double-click, and land in the editor — no
+terminal, no git config, no Node install.
 
 **Hard line:** Phase 4 does not change the server's functional surface.
 Every route the editor talks to in Phase 4 is one the server already
@@ -200,13 +202,17 @@ interface SpawnOpts {
   resourceDir: string;
 }
 
-let child: ChildProcess | null = null;
+let child: UtilityProcess | null = null;
 
 export async function spawnServer(opts: SpawnOpts): Promise<number> {
   const port = await pickFreePort();
-  const binPath = serverBinaryPath(opts.resourceDir);
+  // The server is an esbuild-bundled JS file (Phase 3), run on Electron's
+  // own Node via utilityProcess.fork — NOT a standalone SEA binary.
+  const serverEntry = serverBundlePath(opts.resourceDir); // .../server/index.cjs
 
-  child = spawn(binPath, [], {
+  child = utilityProcess.fork(serverEntry, [], {
+    serviceName: "tve-server",
+    stdio: "pipe", // pipe stdin/stdout for keychain JSON-RPC + log forwarding
     env: {
       ...process.env,
       TVE_MODE: "desktop",
@@ -219,7 +225,6 @@ export async function spawnServer(opts: SpawnOpts): Promise<number> {
       GITHUB_APP_SLUG: process.env.GITHUB_APP_SLUG,
       GITHUB_APP_BROKER_URL: process.env.GITHUB_APP_BROKER_URL,
     },
-    stdio: ["pipe", "pipe", "pipe"], // pipe stdin for keychain JSON-RPC
   });
 
   pipeServerLogs(child); // forward stdout/stderr to a rolling log file
@@ -229,11 +234,21 @@ export async function spawnServer(opts: SpawnOpts): Promise<number> {
 
 export async function stopServer(): Promise<void> {
   if (!child) return;
-  child.kill("SIGTERM");
-  await waitForExit(child, { timeoutMs: 5_000 }).catch(() => child!.kill("SIGKILL"));
+  child.kill(); // utilityProcess.kill(); SIGKILL fallback below
+  await waitForExit(child, { timeoutMs: 5_000 }).catch(() => child!.kill());
   child = null;
 }
 ```
+
+> **Why `utilityProcess.fork` over `child_process.spawn` of a binary.**
+> Electron's `utilityProcess` runs the bundled server JS on Electron's
+> *own* Node — so there's no separate Node runtime to ship and no SEA
+> binary to build (`phase-0-decisions.md` §2a). Native modules
+> (`better-sqlite3`, `keytar`) must be built against **Electron's Node
+> ABI** via `@electron/rebuild` at install/package time — the one new
+> obligation this approach adds. `utilityProcess` also gives a proper
+> `MessagePort` channel if we later want structured IPC instead of the
+> stdin/stdout JSON-RPC used for the keychain bridge.
 
 **Free-port selection.**
 
@@ -433,7 +448,8 @@ editor handle the rejection of an unknown state).
 tokens by key over a JSON-RPC channel on the child's stdin/stdout.
 
 This keeps `keytar` (a native module with finicky cross-platform
-build quirks) out of the SEA-bundled server entirely. It also means
+build quirks) in the Electron main process — where it's already an
+Electron-ABI native — rather than in the forked server. It also means
 the keychain prompt UI (macOS especially) attributes correctly to
 "Tailwind Visual Editor.app" instead of "node".
 

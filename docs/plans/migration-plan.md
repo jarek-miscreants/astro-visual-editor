@@ -201,25 +201,35 @@ edit visually, and push back. No Electron.
 
 ## Phase 3 — Server bundling
 
-15. **`packages/server` → single binary.** Node SEA (Node 22+) build.
-    Validates that `better-sqlite3`, `keytar` (built but unused yet),
-    `@astrojs/compiler` WASM all bundle correctly per platform. Adds a
-    `pnpm --filter @tve/server build:binary` task. Standalone
-    `tve-server` CLI works as a side benefit.
+> **Revised 2026-06-09 (Electron-only).** The Node SEA single-binary
+> approach is **dropped** — Electron is the only delivery path, so the
+> server runs on Electron's bundled Node via `utilityProcess.fork()`, not
+> a standalone binary. See `phase-0-decisions.md` §2a and the banner in
+> `phase-3-plan.md`. Phase 3 is now just steps 15 (JS bundle) + 16
+> (static-serve) below.
+
+15. **`packages/server` → single esbuild JS bundle.** `index.cjs` that
+    Electron forks on its own Node. Native modules (`better-sqlite3`,
+    `keytar`) are rebuilt for Electron's ABI in Phase 4/5 via
+    `@electron/rebuild`; `@astrojs/compiler` WASM resolves from
+    `node_modules`. ~~Node SEA build / per-platform binary / `postject` /
+    native sidecars~~ — dropped.
 16. **Editor production bundle served by the server.** `packages/server`
     static-serves `packages/editor/dist/` at `/`. Confirms the
-    same-origin packaging model works end-to-end.
+    same-origin packaging model works end-to-end. (Unchanged.)
 
-**Exit criteria:** the binary boots on Win/macOS/Linux without a system
-Node, serves the built editor, and passes the Phase 2 E2E in a browser.
+**Exit criteria:** the esbuild server bundle boots under `node` (and,
+in Phase 4, under Electron's `utilityProcess`), serves the built editor,
+and passes the Phase 2 E2E in a browser.
 
 ## Phase 4 — Electron shell
 
 Now wrap the working system. New code, no rework of Phases 1–3.
 
-17. **`packages/desktop/`.** Electron main + preload. Spawns the Phase 3
-    server binary as a child on a free localhost port, waits for
-    `/api/health`, opens `BrowserWindow` at `http://localhost:{port}/`.
+17. **`packages/desktop/`.** Electron main + preload. Forks the Phase 3
+    server JS bundle via `utilityProcess.fork()` (Electron's own Node) on
+    a free localhost port, waits for `/api/health`, opens `BrowserWindow`
+    at `http://localhost:{port}/`.
 18. **Deep-link handler.** Register `tve://` scheme. macOS: `open-url`.
     Windows/Linux: `second-instance` + `app.setAsDefaultProtocolClient`.
     Forwards `tve://auth/callback?code=...` to
@@ -347,7 +357,9 @@ differ:
   non-Astro repo, post-clone filesystem check rejects when Contents
   API lagged, branch switch to a branch missing `astro.config` is
   blocked. Size-cap and symlink-escape rejection also covered.
-- **Phase 3:** binary boots and serves built editor on all three OSes.
+- **Phase 3:** the esbuild server bundle boots under `node` and serves
+  the built editor (cross-OS validation happens via the Electron build
+  in Phase 4/5, not a standalone binary).
 - **Phase 4:** Electron E2E (install → login → clone → edit → push →
   switch → reopen) on all three OSes, unsigned.
 - **Phase 5:** signed installer passes notarization (macOS) and
