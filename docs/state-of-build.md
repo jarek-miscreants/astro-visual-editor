@@ -2,6 +2,17 @@
 
 Snapshot of what's working today. Updated 2026-04-26.
 
+> **2026-06-09 update:** The local-SaaS migration (Phases 0–2: GitHub App
+> OAuth via the Cloudflare broker, repo cache, SQLite state store,
+> token-injecting git transport) and the marketer-mode feature wave
+> (image picker, content library, SEO/Social panel, component registry
+> via `*.tve.ts`, raw `<style>`/`<script>` editing) have **landed on
+> `main`** — `feat/local-saas` was fast-forward merged. `main` is now the
+> trunk. The body of this doc below predates that merge, so it is missing
+> the newest features above; treat the [`CHANGELOG.md`](../CHANGELOG.md)
+> `[Unreleased]` section as the authoritative recent-feature list until
+> this snapshot is fully refreshed.
+
 For architectural context and design decisions, see [`CLAUDE.md`](../CLAUDE.md). For the git integration design rationale, see [`docs/plans/git-integration.md`](plans/git-integration.md).
 
 ## Quick start

@@ -3,8 +3,8 @@
 Status: draft for review — do not implement until approved.
 
 Companion to `migration-plan.md` Phase 3 (steps 15–16). Phases 0–2 are
-complete on `feat/local-saas`: the server boots in `cli` or auth-enabled
-mode against a real GitHub App, the editor is a Vite SPA at
+complete and **merged to `main`** (2026-06-09): the server boots in `cli`
+or auth-enabled mode against a real GitHub App, the editor is a Vite SPA at
 `packages/editor/dist/`, and `pnpm dev` against `test-project/` still
 passes.
 
@@ -48,6 +48,7 @@ process by the Phase 4 Electron shell. **No Electron code lands here.**
 
 1. **Phase 1 + Phase 2 PRs landed on `main`** behind `TVE_MODE`. The
    binary cannot diverge from source, so source must be final first.
+   ✅ **Met 2026-06-09** — `feat/local-saas` fast-forward merged to `main`.
 2. **Node version pinned.** Add `"engines": {"node": ">=22.7.0"}` to
    the root `package.json` and a `.nvmrc` containing `22`. SEA APIs
    stabilized in 22; Phase 3 builds against exactly that line.

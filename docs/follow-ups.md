@@ -15,6 +15,8 @@ matters, and a concrete fix shape.
 
 When fixing an item: leave the entry, add **Fixed: `<commit-sha>` (`<short message>`)** to the bottom. Don't delete — the history of *what we decided not to do* is as useful as the issues themselves.
 
+> **2026-06-09 — `feat/local-saas` fast-forward merged into `main`.** All Phase 0–2 work plus the marketer-mode features are now on `main` (tip `4334143`); `main` and `origin/main` are in sync. The "Fixed (working tree, uncommitted)" and "unmerged Phase N work" notes below predate this merge — every fix and feature they describe is now committed on `main`. The wording is updated inline. **Still genuinely open:** the P1/P2/P3 items in the "Open" sections below (notably the org-installs schema P1 and the pre-production-deploy lane: broker extraction + installationId-in-SQLite).
+
 ---
 
 ## P1 — Open
@@ -28,7 +30,7 @@ When fixing an item: leave the entry, add **Fixed: `<commit-sha>` (`<short messa
   - Add a broker-shared secret (`wrangler secret put BROKER_SHARED_SECRET`, matching env var on the TVE server) and require `Authorization: Bearer <secret>` on both `/oauth/exchange` and `/installations/:id/token`.
   - Additionally verify the installation belongs to the requesting user: take the `userToken` back, call `GET /user/installations`, and confirm the `installationId` is in the list before minting. Restores the §9.2 contract.
   - Land this **before the production Miscreants App deploy** — couple with the broker-extraction follow-up (same file moves).
-- **Fixed (working tree, uncommitted):** `broker/src/index.ts` `handleInstallationToken` now requires a `userToken` in the body, calls `GET /user/installations?per_page=100` with it, and returns `401 user-token-invalid` / `403 user-not-authorized-for-installation` unless the caller actually has the installation before minting. Server side: `services/installation-token-source.ts` gained a `getUserToken` option (wired to `getCurrentAccessToken` in `index.ts`) and sends the user token in the POST body; it returns null (→ ambient git auth) when signed out. Tests: broker `index.test.ts` + `installation-token-source.test.ts` updated, all green. Still open: optional broker-shared-secret as further defense-in-depth, and the membership check is page-1-of-100 only (a user with >100 installations could false-403 — rare).
+- **Fixed (committed; merged to `main` 2026-06-09):** `broker/src/index.ts` `handleInstallationToken` now requires a `userToken` in the body, calls `GET /user/installations?per_page=100` with it, and returns `401 user-token-invalid` / `403 user-not-authorized-for-installation` unless the caller actually has the installation before minting. Server side: `services/installation-token-source.ts` gained a `getUserToken` option (wired to `getCurrentAccessToken` in `index.ts`) and sends the user token in the POST body; it returns null (→ ambient git auth) when signed out. Tests: broker `index.test.ts` + `installation-token-source.test.ts` updated, all green. Still open: optional broker-shared-secret as further defense-in-depth, and the membership check is page-1-of-100 only (a user with >100 installations could false-403 — rare).
 
 ### OAuth `state` CSRF check is bypassable
 
@@ -39,7 +41,7 @@ When fixing an item: leave the entry, add **Fixed: `<commit-sha>` (`<short messa
   - Always require and consume a valid `state` on the sign-in callback. Only waive it when `installation_id` **and** `setup_action` are present (the genuine install-redirect shape), not when state is merely absent.
   - Optionally bind state to the browser: set an httpOnly cookie at `/start` and compare it in the callback.
   - `auth.test.ts` currently *demonstrates* the bypass passing (the install-flow test omits state and succeeds) — add an explicit "missing state on sign-in callback → 400" assertion.
-- **Fixed (working tree, uncommitted):** `routes/auth.ts` callback now requires a valid, known `state` before the broker exchange — a missing/unknown state returns 400 and stores no token. The broker-URL-unset debug page (which stores nothing) was moved above the check so it stays state-free. `auth.test.ts`: the old "no state works" test is now a "rejects no state (login-CSRF guard)" test; the broker-error test fetches a real state first. Not done: cookie-binding the state to the initiating browser (replay-window hardening) — left as a P2/P3 follow-up.
+- **Fixed (committed; merged to `main` 2026-06-09):** `routes/auth.ts` callback now requires a valid, known `state` before the broker exchange — a missing/unknown state returns 400 and stores no token. The broker-URL-unset debug page (which stores nothing) was moved above the check so it stays state-free. `auth.test.ts`: the old "no state works" test is now a "rejects no state (login-CSRF guard)" test; the broker-error test fetches a real state first. Not done: cookie-binding the state to the initiating browser (replay-window hardening) — left as a P2/P3 follow-up.
 
 ### State-changing GitHub/auth routes lack an origin gate
 
@@ -47,7 +49,7 @@ When fixing an item: leave the entry, add **Fixed: `<commit-sha>` (`<short messa
 - **Symptom:** None of `/api/auth/*`, `/api/github/*`, or `/api/project/switch` check `Origin`/`Referer`. A drive-by browser tab the user visits while TVE is running can `fetch()` `POST /api/project/switch {kind:"github",…}` to mint an installation token and clone an arbitrary accessible repo to disk, or kick off `/api/auth/github/start`.
 - **Why it matters:** Same class as the tracked unauthenticated `/exit` route below, but the consequences are heavier — token minting + arbitrary disk writes, not just a DoS. Becomes worse in desktop packaging.
 - **Fix shape:** A single `requireEditorOrigin` middleware (must match `http://localhost:3005` in dev / the bundled-editor origin in desktop) applied to every state-changing route. Fold the `/exit` fix into the same middleware — see the P2 `/exit` entry, which proposed exactly this.
-- **Fixed (working tree, uncommitted):** new `lib/require-editor-origin.ts` (+ test). It rejects a request whose `Origin` header is present and not in the allowlist (editor URL + server origin); absent-Origin requests pass (navigations, non-browser callers, tests). Mounted in `index.ts` on `/api/project` (covers `/switch` and `/exit`, closing the P2 `/exit` item too) and `/api/github`. The OAuth `start`/`callback` GET navigations stay exempt and rely on the now-mandatory `state` nonce. A drive-by tab's cross-origin `fetch` carries its own (non-editor) Origin → 403.
+- **Fixed (committed; merged to `main` 2026-06-09):** new `lib/require-editor-origin.ts` (+ test). It rejects a request whose `Origin` header is present and not in the allowlist (editor URL + server origin); absent-Origin requests pass (navigations, non-browser callers, tests). Mounted in `index.ts` on `/api/project` (covers `/switch` and `/exit`, closing the P2 `/exit` item too) and `/api/github`. The OAuth `start`/`callback` GET navigations stay exempt and rely on the now-mandatory `state` nonce. A drive-by tab's cross-origin `fetch` carries its own (non-editor) Origin → 403.
 
 ### Installation schema can't represent org installs
 
@@ -74,7 +76,7 @@ When fixing an item: leave the entry, add **Fixed: `<commit-sha>` (`<short messa
   - Windows: reject reserved device names case-insensitively (`/^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i`), with or without an extension.
   - After `path.resolve(path.join(base, owner, repo))`, assert the result starts with `path.resolve(base) + path.sep`. Throw if not.
   - **Reuse:** the existing `ensurePathInsideBase` helper in the same file already does the path-prefix check — call it from `resolvePath` instead of swallowing it later (see next item).
-- **Fixed (working tree, uncommitted):** `repo-cache.ts` `resolvePath` now validates `owner` against the GitHub username grammar, `repo` against `^[a-zA-Z0-9._-]{1,100}$` with explicit `.`/`..` rejection, rejects Windows reserved device names (`con`/`nul`/`com1`…), and asserts the resolved path stays inside `path.resolve(base)` before returning. `repo-cache.test.ts` updated (the old "`..` is accepted" assertion flipped to expect a throw, plus reserved-name coverage). Note: the sibling P2 "symlink-escape check is swallowed" (`ensureDir`'s `.catch(() => {})`) is still open — left as P2.
+- **Fixed (committed; merged to `main` 2026-06-09):** `repo-cache.ts` `resolvePath` now validates `owner` against the GitHub username grammar, `repo` against `^[a-zA-Z0-9._-]{1,100}$` with explicit `.`/`..` rejection, rejects Windows reserved device names (`con`/`nul`/`com1`…), and asserts the resolved path stays inside `path.resolve(base)` before returning. `repo-cache.test.ts` updated (the old "`..` is accepted" assertion flipped to expect a throw, plus reserved-name coverage). Note: the sibling P2 "symlink-escape check is swallowed" (`ensureDir`'s `.catch(() => {})`) is still open — left as P2.
 
 ---
 
@@ -229,35 +231,35 @@ When fixing an item: leave the entry, add **Fixed: `<commit-sha>` (`<short messa
 ### Phase 2 GitHub picker route was a 501 stub
 - **Where (was):** `packages/server/src/routes/project.ts` `kind: "github"` branch — returned `501 Not Implemented` until Phase 2 landed.
 - **Fix:** Now calls `cloneFromGithub` (broker-mints token → URL-embedded clone → scrub → validator → switchProject → auto-install). Verified end-to-end on 2026-05-07: cloned `jarek-miscreants/astro-starter-playground`, edited, pushed.
-- **Status:** Lives in unmerged Phase 2 work on `feat/local-saas`.
+- **Status:** Merged to `main` 2026-06-09 (was Phase 2 work on `feat/local-saas`).
 
 ### `installation-token-source` not wired up
 - **Where (was):** `services/installation-token-source.ts` shipped in Phase 1 with full broker-call logic + 60s safety-margin caching, but no caller — `git-transport.ts` still ran the ambient pass-through on every push.
 - **Fix:** `index.ts` now wires `createBrokerInstallationTokenSource(...)` into `createTokenGitTransport(...)` whenever an App config is present, and calls `setGitTransport(tokenTransport)`. Debug log line per push confirms which path was taken.
-- **Status:** Lives in unmerged Phase 2 work.
+- **Status:** Merged to `main` 2026-06-09 (was Phase 2 work).
 
 ### Pull/Push pair was confusing for marketers
 - **Where (was):** `GitPanelDialog.tsx` rendered separate "Pull" and "Push" buttons unconditionally. Marketers don't think in git verbs — they think in "publish my changes."
 - **Fix:** Single `Publish` button (auto-commits dirty tree with timestamped message, then pushes). `Pull` only renders when `userMode === "dev"` and `behind > 0`.
-- **Status:** Lives in unmerged Phase 2 work.
+- **Status:** Merged to `main` 2026-06-09 (was Phase 2 work).
 
 ### `AGENTS.md` stale duplicate of `CLAUDE.md`
 - **Fix:** Replaced with a one-line redirect pointing at `CLAUDE.md`. Cannot drift if there's nothing to drift from.
-- **Status:** Working tree contains the fix; not yet committed.
+- **Status:** Committed; merged to `main` 2026-06-09.
 
 ### `mode-store.loadMode` swallows config errors
 - **Where (was):** `packages/editor/src/store/mode-store.ts:22`
 - **Fix:** `catch (err) { console.warn("[tve] failed to load TVE config; using built-in defaults", err); set({ loaded: true }); }` — error surfaces in DevTools instead of silent fallback.
-- **Status:** Working tree contains the fix; not yet committed.
+- **Status:** Committed; merged to `main` 2026-06-09.
 
 ### `CHANGELOG.md` missing Phase 0/1 entries
 - **Fix:** Added `[Unreleased]` entries for the local-SaaS migration scaffolding (Phase 0), CI smoke job, and Phase 1 steps 5–8 with their test counts.
-- **Status:** Working tree contains the fix; not yet committed.
+- **Status:** Committed; merged to `main` 2026-06-09.
 
 ### `recent-projects.ts` JSON path mismatch with `tveHome()`
 - **Symptom (was):** Plan assumed `~/.tve/recent-projects.json`; existing code uses `~/.tve-recent.json`. SQLite import would have looked at the wrong path.
 - **Fix:** `state-store.ts` defaults `legacyJsonPaths` to *both* — `os.homedir()/.tve-recent.json` and `tveHome()/recent-projects.json`. First non-empty source wins. No history loss.
-- **Status:** Lives in unmerged Phase 1 step 7 work.
+- **Status:** Merged to `main` 2026-06-09 (was Phase 1 step 7 work).
 
 ### `tsconfig.tsbuildinfo` not gitignored (review claim)
 - **Disposition:** False positive. `.gitignore:5` already has `*.tsbuildinfo`. Confirmed via `git ls-files --error-unmatch packages/editor/tsconfig.tsbuildinfo` returning "did not match any file(s)".

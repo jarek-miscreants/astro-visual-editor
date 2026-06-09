@@ -7,8 +7,8 @@
 > installation token → token-scrub → install → push via injected
 > installation token) was driven via the editor + Chrome DevTools and
 > a real commit landed on `jarek-miscreants/astro-starter-playground`.
-> Nothing in this work has been committed to git yet — it lives in the
-> working tree on `feat/local-saas`.
+> **Committed and merged to `main` on 2026-06-09** (was previously
+> uncommitted working-tree work on `feat/local-saas`).
 
 ## Status snapshot
 

@@ -1,10 +1,24 @@
 # TVE → Electron Migration Plan
 
-Status: draft for review — do not implement.
+Status: **Phases 0–2 implemented and merged to `main`** (2026-06-09, tip
+`4334143`); Phases 3–6 are still draft — do not implement 3+ until
+their prerequisites (below) are met.
 
 Companion to `local-saas-migration.md`. That doc decides *what* to build;
 this doc sequences *how* to build it without breaking the current CLI
 workflow on `main`.
+
+## Landing status (2026-06-09)
+
+`feat/local-saas` fast-forward merged into `main`. Phases 0–2 (mode flag,
+git transport, repo cache, SQLite state store, project-validator, GitHub
+App OAuth via the Cloudflare broker, repo picker, token-injecting git)
+are on `main`, behind App-config presence so the CLI flow is unchanged.
+The marketer-mode feature set (image picker, content library, SEO/Social
+panel, component registry `*.tve.ts`, raw `<style>`/`<script>` editing)
+also landed in the same merge. Phases 3–6 remain unstarted; `main` is now
+the trunk and the natural base for a fresh Phase 3 branch when its
+prerequisites are met.
 
 ## Guiding principles
 
@@ -257,7 +271,8 @@ on all three OSes (install → login → clone → edit → push → switch repo
 - Land Phase 1 + 2 work in **incremental PRs back to `main` behind the
   mode flag** — they're additive and low-risk. `main` benefits from the
   centralized git transport, SQLite store, and project-switch extension
-  regardless of when Electron ships.
+  regardless of when Electron ships. **Done 2026-06-09** — landed as a
+  single fast-forward merge rather than incremental PRs.
 - Only Phase 3+ stays on the long-lived branch until ready.
 - If desktop work stalls, `main` is a stronger CLI tool. That's the
   safety net.
