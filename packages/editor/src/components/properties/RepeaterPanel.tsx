@@ -7,11 +7,29 @@ import {
   Trash2,
   Globe,
   FileText,
+  SlidersHorizontal,
 } from "lucide-react";
-import type { RepeaterArray, LoopBinding, LinkTarget } from "@tve/shared";
+import type { RepeaterArray, LoopBinding, LinkTarget, RepeaterFieldType } from "@tve/shared";
 import { api } from "../../lib/api-client";
 import { toast } from "../../store/toast-store";
 import { useLinkTargets, groupLinkTargets, LinkTargetPicker } from "./LinkSection";
+import { EditRepeaterFieldsDialog } from "../dialogs/EditRepeaterFieldsDialog";
+
+/** Best-effort field type from existing values (text/textarea/link/image all
+ *  read back as strings, so those default to "text" — only used to seed the
+ *  edit dialog's display + new-field defaults). */
+function inferFieldType(
+  items: Record<string, string | number | boolean>[],
+  field: string
+): RepeaterFieldType {
+  for (const item of items) {
+    const v = item[field];
+    if (typeof v === "boolean") return "boolean";
+    if (typeof v === "number") return "number";
+    if (typeof v === "string") return "text";
+  }
+  return "text";
+}
 
 /** Field names that should use the link picker (manual URL or page dropdown). */
 const LINK_FIELDS = new Set(["href", "url", "link", "to"]);
@@ -123,6 +141,7 @@ function RepeaterArrayEditor({
   const [items, setItems] = useState(array.items);
   useEffect(() => setItems(array.items), [array]);
   const [busy, setBusy] = useState(false);
+  const [showFields, setShowFields] = useState(false);
   // Index to auto-expand after an add (the new, empty item) so the user sees
   // the blank fields to fill in.
   const [openIndex, setOpenIndex] = useState<number | null>(null);
@@ -200,10 +219,36 @@ function RepeaterArrayEditor({
 
   return (
     <div className="tve-prop-section">
-      <div className="tve-prop-section__header">
-        List content · {array.name}
-        <span style={{ opacity: 0.5, fontWeight: 400 }}> ({array.count})</span>
+      <div
+        className="tve-prop-section__header"
+        style={{ display: "flex", alignItems: "center" }}
+      >
+        <span style={{ flex: 1 }}>
+          List content · {array.name}
+          <span style={{ opacity: 0.5, fontWeight: 400 }}> ({array.count})</span>
+        </span>
+        <button
+          type="button"
+          className="tve-prop-icon-action"
+          title="Edit fields"
+          aria-label="Edit fields"
+          onClick={() => setShowFields(true)}
+        >
+          <SlidersHorizontal size={12} />
+        </button>
       </div>
+      {showFields && (
+        <EditRepeaterFieldsDialog
+          componentPath={componentPath}
+          arrayName={array.name}
+          initialFields={array.fields.map((name) => ({
+            name,
+            type: inferFieldType(array.items, name),
+          }))}
+          onClose={() => setShowFields(false)}
+          onApplied={onChanged}
+        />
+      )}
       <div className="tve-prop-stack">
         {items.map((item, index) => (
           <RepeaterItem

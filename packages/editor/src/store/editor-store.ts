@@ -56,6 +56,8 @@ function describeMutation(mutation: Mutation): string {
       return "Element moved";
     case "wrap-element":
       return "Element wrapped";
+    case "insert-repeater":
+      return "List added";
     default:
       return "Saved";
   }
@@ -564,7 +566,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             nextState.selectedNodeId = null;
             nextState.selectedElementInfo = null;
           }
-        } else if (mutation.type === "add-element") {
+        } else if (
+          mutation.type === "add-element" ||
+          mutation.type === "insert-repeater"
+        ) {
           // Re-locate the inserted child so the properties panel populates
           // immediately (especially for components — without this, CONTENT/Props
           // stays empty until the user clicks the new instance).
@@ -608,6 +613,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         // undo/redo target the wrong elements.
         if (
           mutation.type === "add-element" ||
+          mutation.type === "insert-repeater" ||
           mutation.type === "remove-element" ||
           mutation.type === "duplicate-element" ||
           mutation.type === "wrap-element" ||
@@ -621,6 +627,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         // dom-ready re-applies selection automatically.
         if (
           (mutation.type === "add-element" ||
+            mutation.type === "insert-repeater" ||
             mutation.type === "duplicate-element" ||
             mutation.type === "wrap-element") &&
           nextState.selectedNodeId

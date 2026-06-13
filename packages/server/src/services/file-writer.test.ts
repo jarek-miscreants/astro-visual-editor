@@ -5,6 +5,8 @@ import os from "os";
 import { fileURLToPath } from "url";
 import { applyMutation } from "./file-writer.js";
 import { parseAstroFileAsync } from "./astro-parser.js";
+import { readComponentArrays } from "./component-data.js";
+import type { RepeaterFieldSpec } from "@tve/shared";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const fixturesDir = path.join(__dirname, "__fixtures__");
@@ -546,6 +548,108 @@ describe("applyMutation: add-element", () => {
     expect(out).toContain('import PromoCard from "../components/marketing/PromoCard.astro";');
     expect(out).toContain("<PromoCard />");
     expect(out.startsWith("---\n")).toBe(true);
+  });
+});
+
+describe("applyMutation: insert-repeater", () => {
+  const FIELDS: RepeaterFieldSpec[] = [
+    { name: "title", type: "text" },
+    { name: "body", type: "textarea" },
+    { name: "href", type: "link" },
+  ];
+
+  it("appends a const array to frontmatter and map markup, editable by the reader", async () => {
+    const file = await stage("with-component.astro");
+    const { ast } = await parseAstroFileAsync(file);
+    const section = ast[0];
+    expect(section.tagName).toBe("section");
+
+    const result = await applyMutation(file, {
+      type: "insert-repeater",
+      parentNodeId: section.nodeId,
+      position: 99,
+      arrayName: "cards",
+      itemVar: "card",
+      layout: "card-grid",
+      fields: FIELDS,
+    });
+    expect(result.success).toBe(true);
+
+    const out = await readFile(file);
+    expect(out).toContain("const cards = [");
+    expect(out).toContain("{cards.map((card) => (");
+    expect(out).toContain("{card.title}");
+
+    // The generated array is immediately readable by the repeater editor.
+    const dir = path.dirname(file);
+    const rel = path.basename(file);
+    const data = await readComponentArrays(dir, rel);
+    const arr = data.arrays.find((a) => a.name === "cards")!;
+    expect(arr).toBeDefined();
+    expect(arr.fields).toEqual(["title", "body", "href"]);
+    expect(arr.items).toEqual([{ title: "", body: "", href: "" }]);
+    expect(data.loopBindings).toContainEqual({ arrayName: "cards", itemVar: "card" });
+  });
+
+  it("creates a frontmatter block when the file has none", async () => {
+    const file = path.join(tmpDir, "bare.astro");
+    await fs.writeFile(file, "<main></main>\n", "utf-8");
+    const { ast } = await parseAstroFileAsync(file);
+
+    const result = await applyMutation(file, {
+      type: "insert-repeater",
+      parentNodeId: ast[0].nodeId,
+      position: 0,
+      arrayName: "items",
+      itemVar: "item",
+      layout: "card-grid",
+      fields: [{ name: "title", type: "text" }],
+    });
+    expect(result.success).toBe(true);
+
+    const out = await readFile(file);
+    expect(out.startsWith("---\n")).toBe(true);
+    expect(out).toContain("const items = [");
+    expect(out).toContain("{items.map((item) => (");
+  });
+
+  it("refuses a duplicate array name already in frontmatter", async () => {
+    const file = path.join(tmpDir, "dup.astro");
+    await fs.writeFile(
+      file,
+      "---\nconst items = [{ title: \"x\" }];\n---\n<main></main>\n",
+      "utf-8"
+    );
+    const { ast } = await parseAstroFileAsync(file);
+    const before = await readFile(file);
+
+    const result = await applyMutation(file, {
+      type: "insert-repeater",
+      parentNodeId: ast[0].nodeId,
+      position: 0,
+      arrayName: "items",
+      itemVar: "item",
+      layout: "card-grid",
+      fields: [{ name: "title", type: "text" }],
+    });
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/already exists/i);
+    expect(await readFile(file)).toBe(before);
+  });
+
+  it("rejects an invalid array name", async () => {
+    const file = await stage("with-component.astro");
+    const { ast } = await parseAstroFileAsync(file);
+    const result = await applyMutation(file, {
+      type: "insert-repeater",
+      parentNodeId: ast[0].nodeId,
+      position: 0,
+      arrayName: "2bad",
+      itemVar: "item",
+      layout: "card-grid",
+      fields: [{ name: "title", type: "text" }],
+    });
+    expect(result.success).toBe(false);
   });
 });
 

@@ -7,6 +7,14 @@ Categories: `Added`, `Changed`, `Fixed`, `Removed`, `Deprecated`, `Security`.
 
 ## [Unreleased]
 
+### Added - Author & manage repeater lists from the editor (2026-06-13)
+- **Insert list (repeater) block.** A new "Insert list" button (Elements panel, Dev mode) opens a dialog to name the list, pick a layout (card grid / stacked list), and define fields (Text, Long text, Link, Image, Toggle, Number). It scaffolds the frontmatter data array *and* the `.map()` card markup at the selected spot, then the repeater editor drives content — no code required.
+- **Edit a repeater's fields.** A control on each list opens a dialog (prefilled with the current fields) to add, rename, or remove fields. Rename and add sync both the data and the card bindings; remove drops the data only (a leftover spot just renders empty), and changing an existing field's *type* is intentionally locked to avoid mangling restyled cards.
+
+### Fixed - Dark dropdowns and dialog surfaces (2026-06-13)
+- **Native `<select>` dropdown lists now render dark app-wide.** They were drawing as a light, low-contrast popup against the dark UI; selects now declare a dark color scheme with explicit option colors everywhere.
+- **Dialog panels use a solid surface.** The Insert/Edit list dialogs were using a near-transparent overlay token and looked blank; they now match the rest of the UI.
+
 ### Added - Editable list content (repeater fields) (2026-06-13)
 - **Repeater editor for component list content.** When a component renders a `.map()` over a local frontmatter array (e.g. `const features = [{…}]`), selecting the looped content now shows that array as an editable list in the properties panel — one collapsible card per item with a field per property. Edits write straight back to the array in the component's source, and the preview hot-reloads.
 - **Add, remove, and reorder list items.** Each list has an "Add item" button that appends a deliberately **empty** card (never a clone, so half-finished content can't be shipped by accident), a per-card delete, and up/down controls to reorder items. Reordering preserves each item's exact formatting.

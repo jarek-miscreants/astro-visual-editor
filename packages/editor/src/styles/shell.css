@@ -44,6 +44,28 @@
 }
 
 /* ──────────────────────────────────────────────
+   Native <select> dropdowns (global)
+   The OS renders the open option list, not us. Without a dark color-scheme it
+   draws a light, low-contrast popup against the dark UI. Force dark mode and
+   set explicit option colors so every <select> app-wide is readable, whatever
+   class it carries.
+   ────────────────────────────────────────────── */
+select {
+  color-scheme: dark;
+}
+select option,
+select optgroup {
+  background-color: var(--shell-bg-subtle);
+  color: var(--shell-text);
+}
+select optgroup {
+  font-weight: 600;
+}
+select option:disabled {
+  color: var(--shell-text-faint);
+}
+
+/* ──────────────────────────────────────────────
    Shell container
    ────────────────────────────────────────────── */
 

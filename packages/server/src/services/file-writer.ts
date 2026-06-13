@@ -4,6 +4,101 @@ import MagicString from "magic-string";
 import type { Mutation, ASTNode } from "@tve/shared";
 import { parseAstroFileAsync, buildNodeMap } from "./astro-parser.js";
 import * as sourceRange from "./source-range.js";
+import {
+  generateRepeaterSource,
+  validateRepeaterInput,
+} from "./repeater-generator.js";
+
+interface InsertableParent {
+  tagName: string;
+  children: unknown[];
+  position: { start: { offset: number }; end: { offset: number } };
+}
+
+/**
+ * Insert child markup into `parentNode` at `position`, handling self-closing
+ * parents (convert to open/close), end-insertion (before the close tag), and
+ * mid-list insertion (before the child at `position`). Mutates `s`. Returns an
+ * error message, or null on success. Shared by add-element and insert-repeater.
+ */
+function insertChildMarkup(
+  s: MagicString,
+  source: string,
+  parentNode: InsertableParent,
+  position: number,
+  html: string
+): string | null {
+  const validated = sourceRange.validateElementRange(source, parentNode as any);
+  if (!validated) {
+    return `Could not validate range for <${parentNode.tagName}>`;
+  }
+
+  const parentLine = source.lastIndexOf("\n", validated.start);
+  const parentIndent = source.slice(parentLine + 1, validated.start);
+  const childIndent = parentIndent + "  ";
+
+  const openTagEnd = sourceRange.findOpenTagEnd(source, validated.start);
+  if (openTagEnd === -1) {
+    return `Could not locate opening tag terminator for <${parentNode.tagName}>`;
+  }
+  const isSelfClosing =
+    source[openTagEnd - 2] === "/" && parentNode.children.length === 0;
+
+  if (isSelfClosing) {
+    // Convert `<Tag />` / `<Tag attr=".." />` to `<Tag>\n  child\n</Tag>`,
+    // trimming any whitespace before `/>` so we don't leave `<Tag >`.
+    let trimStart = openTagEnd - 2; // position of '/'
+    while (
+      trimStart > 0 &&
+      (source[trimStart - 1] === " " || source[trimStart - 1] === "\t")
+    ) {
+      trimStart--;
+    }
+    const replacement = `>\n${childIndent}${html}\n${parentIndent}</${parentNode.tagName}>`;
+    s.overwrite(trimStart, openTagEnd, replacement);
+  } else if (position >= parentNode.children.length || parentNode.children.length === 0) {
+    // Insert at end of parent, before the close tag.
+    const closeTagStart = sourceRange.findCloseTagStart(
+      source,
+      validated.end,
+      parentNode.tagName
+    );
+    s.appendLeft(closeTagStart, `\n${childIndent}${html}\n${parentIndent}`);
+  } else {
+    // Insert before the child currently at `position`.
+    const targetChild = (parentNode.children as any[])[position];
+    const targetRange = sourceRange.validateElementRange(source, targetChild);
+    if (!targetRange) {
+      return `Could not validate target position for <${targetChild.tagName}>`;
+    }
+    s.appendLeft(targetRange.start, `${html}\n${childIndent}`);
+  }
+  return null;
+}
+
+/**
+ * Append a top-level `const …` block to the file's frontmatter, creating the
+ * `---` fence block if the file has none. Mirrors ensureComponentImports'
+ * frontmatter handling.
+ */
+function appendConstToFrontmatter(
+  s: MagicString,
+  source: string,
+  constBlock: string
+): void {
+  const fmStart = source.indexOf("---");
+  const hasFrontmatter =
+    fmStart !== -1 && (fmStart === 0 || source.slice(0, fmStart).trim() === "");
+  const fmEnd = hasFrontmatter ? source.indexOf("---", fmStart + 3) : -1;
+
+  if (hasFrontmatter && fmEnd !== -1) {
+    const frontmatter = source.slice(fmStart + 3, fmEnd);
+    const needsLeadingNewline = !frontmatter.endsWith("\n");
+    s.appendLeft(fmEnd, `${needsLeadingNewline ? "\n" : ""}${constBlock}\n`);
+  } else {
+    s.prepend(`---\n${constBlock}\n---\n\n`);
+  }
+}
 
 /** Escape double quotes for values written inside `attr="..."`. A raw `"`
  *  (e.g. from arbitrary-value classes like `content-['say_"hi"']` or free-form
@@ -208,81 +303,14 @@ export async function applyMutation(
         if (!parentNode)
           return { success: false, error: `Parent node ${mutation.parentNodeId} not found` };
 
-        // Resolve the parent's real source range. The Astro compiler can
-        // report off-by-N start/end offsets for some elements (notably
-        // self-closing components like <SectionMain />), and the previous
-        // implementation's "search +2 bytes for /\/\s*>/" window wasn't wide
-        // enough to find `/>` when the parser reported `end.offset` well
-        // before the trailing `/>`. validateElementRange locates the opening
-        // tag from `<TagName` and walks forward, so it always finds the real
-        // bounds.
-        const validated = sourceRange.validateElementRange(source, parentNode);
-        if (!validated) {
-          return {
-            success: false,
-            error: `Could not validate range for <${parentNode.tagName}>`,
-          };
-        }
-
-        const parentLine = source.lastIndexOf("\n", validated.start);
-        const parentIndent = source.slice(parentLine + 1, validated.start);
-        const childIndent = parentIndent + "  ";
-
-        // Locate the opening-tag terminator (`>`) and check for self-close.
-        // For non-self-closing elements `validated.end` already includes the
-        // close tag; for self-closing it's the offset right after `/>`.
-        const openTagEnd = sourceRange.findOpenTagEnd(source, validated.start);
-        if (openTagEnd === -1) {
-          return {
-            success: false,
-            error: `Could not locate opening tag terminator for <${parentNode.tagName}>`,
-          };
-        }
-        const isSelfClosing =
-          source[openTagEnd - 2] === "/" && parentNode.children.length === 0;
-
-        if (isSelfClosing) {
-          // Convert self-closing to open/close:
-          //   `<Tag />`           → `<Tag>\n  child\n</Tag>`
-          //   `<Tag attr="x" />`  → `<Tag attr="x">\n  child\n</Tag>`
-          // Walk back over whitespace before `/>` so we don't leave a stray
-          // space-before-`>` like `<Tag >`.
-          let trimStart = openTagEnd - 2; // position of '/'
-          while (
-            trimStart > 0 &&
-            (source[trimStart - 1] === " " || source[trimStart - 1] === "\t")
-          ) {
-            trimStart--;
-          }
-          const replacement = `>\n${childIndent}${mutation.html}\n${parentIndent}</${parentNode.tagName}>`;
-          s.overwrite(trimStart, openTagEnd, replacement);
-        } else if (
-          mutation.position >= parentNode.children.length ||
-          parentNode.children.length === 0
-        ) {
-          // Insert at end of parent (before closing tag). Use validated.end
-          // — the offset right after `</TagName>` — so findCloseTagStart's
-          // backwards scan reliably lands on the close tag.
-          const closeTagStart = sourceRange.findCloseTagStart(
-            source,
-            validated.end,
-            parentNode.tagName
-          );
-          const insertHtml = `\n${childIndent}${mutation.html}\n${parentIndent}`;
-          s.appendLeft(closeTagStart, insertHtml);
-        } else {
-          // Insert before the child at the given position
-          const targetChild = parentNode.children[mutation.position];
-          const targetRange = sourceRange.validateElementRange(source, targetChild);
-          if (!targetRange) {
-            return {
-              success: false,
-              error: `Could not validate target position for <${targetChild.tagName}>`,
-            };
-          }
-          const insertHtml = `${mutation.html}\n${childIndent}`;
-          s.appendLeft(targetRange.start, insertHtml);
-        }
+        const err = insertChildMarkup(
+          s,
+          source,
+          parentNode,
+          mutation.position,
+          mutation.html
+        );
+        if (err) return { success: false, error: err };
 
         // If the inserted HTML references project components (PascalCase tags),
         // add the missing imports to the frontmatter so the page still renders.
@@ -298,6 +326,40 @@ export async function applyMutation(
           mutation.html,
           componentPathByTag
         );
+        break;
+      }
+
+      case "insert-repeater": {
+        const parentNode = nodeMap.get(mutation.parentNodeId);
+        if (!parentNode)
+          return { success: false, error: `Parent node ${mutation.parentNodeId} not found` };
+
+        const validation = validateRepeaterInput(mutation);
+        if (validation) return { success: false, error: validation };
+
+        // Refuse if the array name already exists in the frontmatter — the
+        // generated `const` would shadow/clash with it.
+        const fm = source.match(/^---\s*\n([\s\S]*?)\n[ \t]*---/);
+        if (
+          fm &&
+          new RegExp(`\\bconst\\s+${mutation.arrayName}\\b`).test(fm[1])
+        ) {
+          return {
+            success: false,
+            error: `\`${mutation.arrayName}\` already exists in this file's frontmatter — pick another name.`,
+          };
+        }
+
+        const { constBlock, markup } = generateRepeaterSource(mutation);
+        const err = insertChildMarkup(
+          s,
+          source,
+          parentNode,
+          mutation.position,
+          markup
+        );
+        if (err) return { success: false, error: err };
+        appendConstToFrontmatter(s, source, constBlock);
         break;
       }
 

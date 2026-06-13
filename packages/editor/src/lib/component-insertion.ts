@@ -3,6 +3,8 @@ import type {
   ComponentRegistryEntry,
   ComponentRegistryItem,
   Mutation,
+  RepeaterFieldSpec,
+  RepeaterLayout,
 } from "@tve/shared";
 
 type RegistryInsertable = Pick<
@@ -47,6 +49,26 @@ export function makeAddElementMutation(
     position: target.position,
     html,
     componentPath,
+  };
+}
+
+export function makeInsertRepeaterMutation(
+  ast: ASTNode[] | null,
+  selectedNodeId: string | null,
+  config: {
+    arrayName: string;
+    itemVar: string;
+    layout: RepeaterLayout;
+    fields: RepeaterFieldSpec[];
+  }
+): Mutation | null {
+  const target = resolveInsertionTarget(ast, selectedNodeId);
+  if (!target) return null;
+  return {
+    type: "insert-repeater",
+    parentNodeId: target.parentNodeId,
+    position: target.position,
+    ...config,
   };
 }
 

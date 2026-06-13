@@ -8,7 +8,7 @@ export const mutationsRouter = Router();
 const VALID_MUTATION_TYPES = new Set([
   "update-classes", "update-text", "update-raw-content", "update-attribute",
   "add-element", "remove-element", "move-element",
-  "duplicate-element", "wrap-element",
+  "duplicate-element", "wrap-element", "insert-repeater",
 ]);
 
 mutationsRouter.post("/*filePath", async (req, res) => {

@@ -2,7 +2,13 @@ import fs from "fs/promises";
 import path from "path";
 import ts from "typescript";
 import MagicString from "magic-string";
-import type { RepeaterArray, LoopBinding, ComponentDataResult } from "@tve/shared";
+import type {
+  RepeaterArray,
+  LoopBinding,
+  ComponentDataResult,
+  RepeaterFieldType,
+} from "@tve/shared";
+import { renderFieldBinding } from "./repeater-generator.js";
 
 export type { RepeaterArray, LoopBinding, ComponentDataResult };
 
@@ -433,5 +439,256 @@ export async function moveComponentArrayItem(
   s.overwrite(bStart, bEnd, aText);
   await fs.writeFile(full, s.toString(), "utf-8");
 
+  return { success: true };
+}
+
+const IDENT_RE = /^[A-Za-z_$][\w$]*$/;
+
+/** Locate the `{arrayName.map((itemVar) => …)}` call in the markup: the offset
+ *  range of the callback args `(…)` (so template edits stay scoped to THIS
+ *  loop, not another repeater that happens to share the item variable). */
+function findMapRegion(
+  source: string,
+  arrayName: string
+): { itemVar: string; open: number; close: number } | null {
+  const re = new RegExp(
+    `\\b${arrayName}\\s*\\.\\s*map\\s*\\(\\s*\\(?\\s*([A-Za-z_$][\\w$]*)`
+  );
+  const m = re.exec(source);
+  if (!m) return null;
+  const itemVar = m[1];
+  // The '(' that opens map(...) — first '(' at/after the matched `.map`.
+  const mapWord = source.indexOf("map", m.index);
+  const open = source.indexOf("(", mapWord);
+  if (open === -1) return null;
+  // Paren-match to the closing ')' of the map call.
+  let depth = 0;
+  for (let i = open; i < source.length; i++) {
+    const c = source[i];
+    if (c === "(") depth++;
+    else if (c === ")") {
+      depth--;
+      if (depth === 0) return { itemVar, open, close: i };
+    }
+  }
+  return null;
+}
+
+/** The empty seed literal for a field type. */
+function emptyFieldLiteral(type: RepeaterFieldType): string {
+  if (type === "boolean") return "false";
+  if (type === "number") return "0";
+  return '""';
+}
+
+/** Indentation of the line containing `offset`, within frontmatter content. */
+function lineIndentInFm(content: string, offset: number): string {
+  const lineStart = content.lastIndexOf("\n", offset - 1) + 1;
+  return content.slice(lineStart, offset).match(/^[ \t]*/)?.[0] ?? "";
+}
+
+interface FieldOpContext {
+  full: string;
+  source: string;
+  fm: { content: string; start: number };
+  sf: ts.SourceFile;
+  array: ts.ArrayLiteralExpression;
+}
+
+/** Shared setup for the field ops: read + parse + locate the array. */
+async function fieldOpContext(
+  projectPath: string,
+  relPath: string,
+  arrayName: string
+): Promise<FieldOpContext | { error: string }> {
+  const full = path.join(projectPath, relPath);
+  const source = await fs.readFile(full, "utf-8");
+  const fm = frontmatterRange(source);
+  if (!fm) return { error: "No frontmatter block found." };
+  const sf = ts.createSourceFile(
+    "frontmatter.ts",
+    fm.content,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TS
+  );
+  const decl = findArrayDeclarations(sf).find((d) => d.name === arrayName);
+  if (!decl) return { error: `Array \`${arrayName}\` not found in frontmatter.` };
+  return { full, source, fm, sf, array: decl.array };
+}
+
+function objectLiterals(array: ts.ArrayLiteralExpression): ts.ObjectLiteralExpression[] {
+  return array.elements.filter((e): e is ts.ObjectLiteralExpression =>
+    ts.isObjectLiteralExpression(e)
+  );
+}
+
+function findProp(
+  obj: ts.ObjectLiteralExpression,
+  name: string
+): ts.PropertyAssignment | null {
+  for (const p of obj.properties) {
+    if (ts.isPropertyAssignment(p) && propKey(p.name) === name) return p;
+  }
+  return null;
+}
+
+/** Add a field: append `name: <empty>` to every item object, and a binding to
+ *  the card template so the new field renders. */
+export async function addArrayField(
+  projectPath: string,
+  relPath: string,
+  arrayName: string,
+  fieldName: string,
+  fieldType: RepeaterFieldType
+): Promise<WriteComponentArrayResult> {
+  if (!IDENT_RE.test(fieldName)) {
+    return { success: false, error: `"${fieldName}" is not a valid field name.` };
+  }
+  const ctx = await fieldOpContext(projectPath, relPath, arrayName);
+  if ("error" in ctx) return { success: false, error: ctx.error };
+  const { full, source, fm, array } = ctx;
+
+  const objs = objectLiterals(array);
+  if (objs.some((o) => findProp(o, fieldName))) {
+    return { success: false, error: `Field \`${fieldName}\` already exists.` };
+  }
+
+  const s = new MagicString(source);
+  const literal = emptyFieldLiteral(fieldType);
+  for (const obj of objs) {
+    const props = obj.properties;
+    if (props.length === 0) {
+      // Empty object: insert just inside the braces.
+      const indent = lineIndentInFm(fm.content, obj.getStart(ctx.sf)) + "  ";
+      s.appendLeft(
+        fm.start + obj.getStart(ctx.sf) + 1,
+        `\n${indent}${fieldName}: ${literal},`
+      );
+      continue;
+    }
+    const last = props[props.length - 1];
+    const indent = lineIndentInFm(fm.content, last.getStart(ctx.sf));
+    // Insert AFTER the last property — and after its trailing comma if it has
+    // one — so we never produce `value,,` or a missing separator.
+    let cursor = last.getEnd();
+    while (cursor < fm.content.length && /[ \t]/.test(fm.content[cursor])) cursor++;
+    if (fm.content[cursor] === ",") {
+      // Trailing comma present: insert after it, with our own trailing comma.
+      s.appendLeft(fm.start + cursor + 1, `\n${indent}${fieldName}: ${literal},`);
+    } else {
+      // No trailing comma: add one to the previous prop, then our prop.
+      s.appendLeft(fm.start + last.getEnd(), `,\n${indent}${fieldName}: ${literal},`);
+    }
+  }
+
+  // Template: insert a binding before the card's closing tag (the last `</…>`
+  // inside the map callback, which is the loop root element's close).
+  const region = findMapRegion(source, arrayName);
+  if (region) {
+    const closeIdx = source.lastIndexOf("</", region.close);
+    if (closeIdx > region.open) {
+      const tagLineStart = source.lastIndexOf("\n", closeIdx - 1) + 1;
+      const indent = source.slice(tagLineStart, closeIdx).match(/^[ \t]*/)?.[0] ?? "        ";
+      const binding = renderFieldBinding({ name: fieldName, type: fieldType }, region.itemVar);
+      s.appendLeft(closeIdx, `${binding}\n${indent}`);
+    }
+  }
+
+  await fs.writeFile(full, s.toString(), "utf-8");
+  return { success: true };
+}
+
+/** Rename a field across every item object and its `{itemVar.field}` bindings. */
+export async function renameArrayField(
+  projectPath: string,
+  relPath: string,
+  arrayName: string,
+  from: string,
+  to: string
+): Promise<WriteComponentArrayResult> {
+  if (!IDENT_RE.test(to)) {
+    return { success: false, error: `"${to}" is not a valid field name.` };
+  }
+  if (from === to) return { success: true };
+  const ctx = await fieldOpContext(projectPath, relPath, arrayName);
+  if ("error" in ctx) return { success: false, error: ctx.error };
+  const { full, source, fm, sf, array } = ctx;
+
+  const objs = objectLiterals(array);
+  if (objs.some((o) => findProp(o, to))) {
+    return { success: false, error: `Field \`${to}\` already exists.` };
+  }
+
+  const s = new MagicString(source);
+  // Data: rename the property key on every item that has it.
+  let renamedAny = false;
+  for (const obj of objs) {
+    const prop = findProp(obj, from);
+    if (!prop) continue;
+    renamedAny = true;
+    const nameStart = fm.start + prop.name.getStart(sf);
+    const nameEnd = fm.start + prop.name.getEnd();
+    s.overwrite(nameStart, nameEnd, to);
+  }
+  if (!renamedAny) {
+    return { success: false, error: `Field \`${from}\` not found.` };
+  }
+
+  // Template: replace `itemVar.from` with `itemVar.to`, scoped to this map call.
+  const region = findMapRegion(source, arrayName);
+  if (region) {
+    const body = source.slice(region.open, region.close);
+    const bindingRe = new RegExp(
+      `\\b${region.itemVar}\\s*\\.\\s*${from}\\b`,
+      "g"
+    );
+    const replaced = body.replace(bindingRe, `${region.itemVar}.${to}`);
+    if (replaced !== body) s.overwrite(region.open, region.close, replaced);
+  }
+
+  await fs.writeFile(full, s.toString(), "utf-8");
+  return { success: true };
+}
+
+/** Remove a field from every item object (data only). Any leftover
+ *  `{itemVar.field}` binding renders empty — we don't touch the markup, to
+ *  avoid mangling a card the user may have restyled. */
+export async function removeArrayField(
+  projectPath: string,
+  relPath: string,
+  arrayName: string,
+  fieldName: string
+): Promise<WriteComponentArrayResult> {
+  const ctx = await fieldOpContext(projectPath, relPath, arrayName);
+  if ("error" in ctx) return { success: false, error: ctx.error };
+  const { full, source, fm, sf, array } = ctx;
+
+  const objs = objectLiterals(array);
+  const s = new MagicString(source);
+  let removedAny = false;
+  for (const obj of objs) {
+    const prop = findProp(obj, fieldName);
+    if (!prop) continue;
+    removedAny = true;
+    // Remove the property line including indentation + trailing comma.
+    const propStartInContent = prop.getStart(sf);
+    const lineStart = fm.content.lastIndexOf("\n", propStartInContent - 1) + 1;
+    let endInContent = prop.getEnd();
+    while (endInContent < fm.content.length && /[ \t]/.test(fm.content[endInContent])) {
+      endInContent++;
+    }
+    if (fm.content[endInContent] === ",") endInContent++;
+    while (endInContent < fm.content.length && fm.content[endInContent] !== "\n") {
+      endInContent++;
+    }
+    if (fm.content[endInContent] === "\n") endInContent++;
+    s.remove(fm.start + lineStart, fm.start + endInContent);
+  }
+  if (!removedAny) {
+    return { success: false, error: `Field \`${fieldName}\` not found.` };
+  }
+
+  await fs.writeFile(full, s.toString(), "utf-8");
   return { success: true };
 }

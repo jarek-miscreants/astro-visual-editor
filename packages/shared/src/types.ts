@@ -72,6 +72,25 @@ export interface ElementInfo {
   };
 }
 
+/** Field control types for an authored repeater (see `RepeaterFieldSpec`).
+ *  Mirrors the editable subset of `ComponentControlKind`. */
+export type RepeaterFieldType =
+  | "text"
+  | "textarea"
+  | "image"
+  | "link"
+  | "boolean"
+  | "number";
+
+/** One field of an authored repeater item: a property name + how it renders. */
+export interface RepeaterFieldSpec {
+  name: string;
+  type: RepeaterFieldType;
+}
+
+/** Built-in layout templates for a generated repeater block. */
+export type RepeaterLayout = "card-grid" | "stacked-list";
+
 /** Mutation types for modifying source files */
 export type Mutation =
   | { type: "update-classes"; nodeId: string; classes: string }
@@ -106,6 +125,19 @@ export type Mutation =
       nodeId: string;
       wrapperTag: string;
       wrapperClasses?: string;
+    }
+  | {
+      /** Scaffold a new repeater: append a `const <arrayName> = [{…}]` array to
+       *  the file frontmatter and insert `{<arrayName>.map(...)}` markup that
+       *  renders it, at parentNodeId/position. The existing repeater editor then
+       *  drives content. */
+      type: "insert-repeater";
+      parentNodeId: string;
+      position: number;
+      arrayName: string;
+      itemVar: string;
+      layout: RepeaterLayout;
+      fields: RepeaterFieldSpec[];
     };
 
 /** Inverse of a mutation for undo */

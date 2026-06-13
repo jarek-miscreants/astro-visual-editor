@@ -8,6 +8,9 @@ import {
   addComponentArrayItem,
   removeComponentArrayItem,
   moveComponentArrayItem,
+  addArrayField,
+  renameArrayField,
+  removeArrayField,
 } from "./component-data.js";
 
 let tmpDir: string;
@@ -250,5 +253,70 @@ describe("moveComponentArrayItem", () => {
     expect(
       (await moveComponentArrayItem(tmpDir, "FeatureGrid.astro", "features", 1, "down")).success
     ).toBe(false);
+  });
+});
+
+describe("addArrayField", () => {
+  it("adds the field to every item and a binding to the card template", async () => {
+    const res = await addArrayField(tmpDir, "FeatureGrid.astro", "features", "cta", "link");
+    expect(res.success).toBe(true);
+
+    const arr = (await readComponentArrays(tmpDir, "FeatureGrid.astro")).arrays[0];
+    expect(arr.fields).toContain("cta");
+    expect(arr.items.every((i) => i.cta === "")).toBe(true);
+    // ALL items got it (regression: a comma bug previously corrupted item 2+).
+    expect(arr.count).toBe(2);
+    expect(arr.items.length).toBe(2);
+
+    const out = await fs.readFile(path.join(tmpDir, "FeatureGrid.astro"), "utf-8");
+    // Binding rendered with the loop's item variable.
+    expect(out).toContain("href={feature.cta}");
+    // Source must stay well-formed — no doubled commas.
+    expect(out).not.toMatch(/,\s*,/);
+    expect(out).toContain('cta: "",');
+  });
+
+  it("rejects a duplicate field", async () => {
+    const res = await addArrayField(tmpDir, "FeatureGrid.astro", "features", "title", "text");
+    expect(res.success).toBe(false);
+  });
+});
+
+describe("renameArrayField", () => {
+  it("renames the key on every item and the template binding", async () => {
+    const res = await renameArrayField(tmpDir, "FeatureGrid.astro", "features", "title", "heading");
+    expect(res.success).toBe(true);
+
+    const arr = (await readComponentArrays(tmpDir, "FeatureGrid.astro")).arrays[0];
+    expect(arr.fields).toContain("heading");
+    expect(arr.fields).not.toContain("title");
+    expect(arr.items[0].heading).toBe("Isolated by default.");
+
+    const out = await fs.readFile(path.join(tmpDir, "FeatureGrid.astro"), "utf-8");
+    expect(out).toContain("{feature.heading}");
+    expect(out).not.toContain("{feature.title}");
+  });
+
+  it("rejects renaming onto an existing field", async () => {
+    const res = await renameArrayField(tmpDir, "FeatureGrid.astro", "features", "title", "body");
+    expect(res.success).toBe(false);
+  });
+});
+
+describe("removeArrayField", () => {
+  it("removes the key from every item (data-only)", async () => {
+    const res = await removeArrayField(tmpDir, "FeatureGrid.astro", "features", "body");
+    expect(res.success).toBe(true);
+
+    const arr = (await readComponentArrays(tmpDir, "FeatureGrid.astro")).arrays[0];
+    expect(arr.fields).not.toContain("body");
+    expect(arr.items.every((i) => !("body" in i))).toBe(true);
+    // Other fields intact.
+    expect(arr.items[0].title).toBe("Isolated by default.");
+  });
+
+  it("rejects removing a missing field", async () => {
+    const res = await removeArrayField(tmpDir, "FeatureGrid.astro", "features", "nope");
+    expect(res.success).toBe(false);
   });
 });

@@ -10,6 +10,9 @@ import {
   addComponentArrayItem,
   removeComponentArrayItem,
   moveComponentArrayItem,
+  addArrayField,
+  renameArrayField,
+  removeArrayField,
 } from "../services/component-data.js";
 import { validateElementRange } from "../services/source-range.js";
 import { resolveProjectPath, PathTraversalError } from "../lib/path-guard.js";
@@ -212,6 +215,63 @@ componentsRouter.post("/array-item", async (req, res) => {
       return;
     }
     res.status(500).json({ error: err?.message || "failed to update array" });
+  }
+});
+
+/** POST /api/components/array-field — Edit a repeater's field schema:
+ *  `op: "add"` (name + type), `op: "rename"` (name → newName), or
+ *  `op: "remove"` (name). Add/rename sync the card template bindings; remove is
+ *  data-only. */
+componentsRouter.post("/array-field", async (req, res) => {
+  try {
+    const projectPath = req.app.locals.projectPath as string;
+    const { path: relPath, arrayName, op, name, newName, type } = req.body as {
+      path?: string;
+      arrayName?: string;
+      op?: "add" | "rename" | "remove";
+      name?: string;
+      newName?: string;
+      type?: string;
+    };
+    const normalized = relPath?.replace(/\\/g, "/");
+    if (!normalized || !arrayName || !name || !op) {
+      res.status(400).json({ error: "path, arrayName, op and name are required" });
+      return;
+    }
+    validateAstroPath(projectPath, normalized);
+
+    let result;
+    if (op === "add") {
+      const fieldType = (type ?? "text") as any;
+      result = await addArrayField(projectPath, normalized, arrayName, name, fieldType);
+    } else if (op === "rename") {
+      if (!newName) {
+        res.status(400).json({ error: "rename requires newName" });
+        return;
+      }
+      result = await renameArrayField(projectPath, normalized, arrayName, name, newName);
+    } else if (op === "remove") {
+      result = await removeArrayField(projectPath, normalized, arrayName, name);
+    } else {
+      res.status(400).json({ error: "op must be add|rename|remove" });
+      return;
+    }
+
+    if (!result.success) {
+      res.status(400).json({ error: result.error });
+      return;
+    }
+    res.json({ success: true });
+  } catch (err: any) {
+    if (err instanceof PathTraversalError) {
+      res.status(400).json({ error: "invalid path" });
+      return;
+    }
+    if (err?.code === "ENOENT") {
+      res.status(404).json({ error: "component not found" });
+      return;
+    }
+    res.status(500).json({ error: err?.message || "failed to edit field" });
   }
 });
 

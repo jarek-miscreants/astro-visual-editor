@@ -1,13 +1,17 @@
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Plus, Trash2, Search, Focus, X } from "lucide-react";
+import { Plus, Trash2, Search, Focus, X, List } from "lucide-react";
 import { ElementTree } from "../tree/ElementTree";
 import { AddElementPanel } from "../tree/AddElementPanel";
+import { InsertRepeaterDialog } from "../dialogs/InsertRepeaterDialog";
 import { useEditorStore } from "../../store/editor-store";
 import { useModeStore } from "../../store/mode-store";
 import { useTreeUIStore } from "../../store/tree-ui-store";
 import { useComponentRegistryStore } from "../../store/component-registry-store";
-import { makeAddElementMutation } from "../../lib/component-insertion";
+import {
+  makeAddElementMutation,
+  makeInsertRepeaterMutation,
+} from "../../lib/component-insertion";
 import { toast } from "../../store/toast-store";
 import { Tooltip } from "../ui/Tooltip";
 
@@ -19,6 +23,7 @@ export function LeftSidebar() {
   const userMode = useModeStore((s) => s.userMode);
   const loadRegistry = useComponentRegistryStore((s) => s.load);
   const [showAddPanel, setShowAddPanel] = useState(false);
+  const [showRepeaterDialog, setShowRepeaterDialog] = useState(false);
   const addBtnRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -112,6 +117,16 @@ export function LeftSidebar() {
     setShowAddPanel(false);
   }
 
+  function handleInsertRepeater(config: Parameters<typeof makeInsertRepeaterMutation>[2]) {
+    const state = useEditorStore.getState();
+    const mutation = makeInsertRepeaterMutation(state.ast, state.selectedNodeId, config);
+    if (!mutation) {
+      toast.error("No insertion target", "Open a page with a block container.");
+      return;
+    }
+    applyMutation(mutation);
+  }
+
   const query = useTreeUIStore((s) => s.query);
   const setQuery = useTreeUIStore((s) => s.setQuery);
   const marketerZoom = useTreeUIStore((s) => s.marketerZoom);
@@ -147,6 +162,17 @@ export function LeftSidebar() {
               <Plus size={13} />
             </button>
           </Tooltip>
+          {userMode === "dev" && (
+            <Tooltip content="Insert list (repeater)">
+              <button
+                onClick={() => setShowRepeaterDialog(true)}
+                disabled={!currentFile || !ast}
+                className="tve-icon-btn tve-icon-btn--sm"
+              >
+                <List size={13} />
+              </button>
+            </Tooltip>
+          )}
           {showAddPanel && addBtnRef.current && createPortal(
             <div
               ref={panelRef}
@@ -211,6 +237,13 @@ export function LeftSidebar() {
           <ElementTree nodes={ast} depth={0} />
         )}
       </div>
+
+      {showRepeaterDialog && (
+        <InsertRepeaterDialog
+          onClose={() => setShowRepeaterDialog(false)}
+          onSubmit={handleInsertRepeater}
+        />
+      )}
     </div>
   );
 }

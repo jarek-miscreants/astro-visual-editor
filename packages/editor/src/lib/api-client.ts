@@ -353,6 +353,44 @@ export const api = {
     });
   },
 
+  /** Add a field to a repeater (data + card binding). */
+  addRepeaterField(
+    path: string,
+    arrayName: string,
+    name: string,
+    type: string
+  ): Promise<{ success: boolean }> {
+    return fetchJson("/components/array-field", {
+      method: "POST",
+      body: JSON.stringify({ path, arrayName, op: "add", name, type }),
+    });
+  },
+
+  /** Rename a repeater field across data + card bindings. */
+  renameRepeaterField(
+    path: string,
+    arrayName: string,
+    name: string,
+    newName: string
+  ): Promise<{ success: boolean }> {
+    return fetchJson("/components/array-field", {
+      method: "POST",
+      body: JSON.stringify({ path, arrayName, op: "rename", name, newName }),
+    });
+  },
+
+  /** Remove a repeater field (data only). */
+  removeRepeaterField(
+    path: string,
+    arrayName: string,
+    name: string
+  ): Promise<{ success: boolean }> {
+    return fetchJson("/components/array-field", {
+      method: "POST",
+      body: JSON.stringify({ path, arrayName, op: "remove", name }),
+    });
+  },
+
   /** Fetch one component's resolved registry entry, including fields and slots. */
   getComponentRegistryEntry(componentPath: string): Promise<ComponentRegistryEntry> {
     const qs = encodeURIComponent(componentPath);
