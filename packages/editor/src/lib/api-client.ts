@@ -21,6 +21,7 @@ import type {
   SeoPageData,
   SeoPageResponse,
   LinkTarget,
+  ComponentDataResult,
 } from "@tve/shared";
 
 const API_BASE = "/api";
@@ -296,6 +297,60 @@ export const api = {
   /** List project components with marketer-facing registry metadata. */
   getComponentRegistry(): Promise<{ components: ComponentRegistryItem[] }> {
     return fetchJson("/registry/components");
+  },
+
+  /** Read editable list content (frontmatter `const X = [{…}]` arrays) and
+   *  `.map()` loop bindings for the repeater panel. */
+  getComponentData(componentPath: string): Promise<ComponentDataResult> {
+    const qs = encodeURIComponent(componentPath);
+    return fetchJson(`/components/data?path=${qs}`);
+  },
+
+  /** Rewrite one literal field of a frontmatter array item. */
+  updateComponentData(input: {
+    path: string;
+    arrayName: string;
+    index: number;
+    field: string;
+    value: string | number | boolean;
+  }): Promise<{ success: boolean }> {
+    return fetchJson("/components/data", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  },
+
+  /** Add an empty item to a frontmatter array (matching its field shape). */
+  addComponentArrayItem(path: string, arrayName: string): Promise<{ success: boolean }> {
+    return fetchJson("/components/array-item", {
+      method: "POST",
+      body: JSON.stringify({ path, arrayName, op: "add" }),
+    });
+  },
+
+  /** Remove the item at `index` from a frontmatter array. */
+  removeComponentArrayItem(
+    path: string,
+    arrayName: string,
+    index: number
+  ): Promise<{ success: boolean }> {
+    return fetchJson("/components/array-item", {
+      method: "POST",
+      body: JSON.stringify({ path, arrayName, op: "remove", index }),
+    });
+  },
+
+  /** Reorder: swap the item at `index` with its neighbour (up|down). */
+  moveComponentArrayItem(
+    path: string,
+    arrayName: string,
+    index: number,
+    dir: "up" | "down"
+  ): Promise<{ success: boolean }> {
+    return fetchJson("/components/array-item", {
+      method: "POST",
+      body: JSON.stringify({ path, arrayName, op: "move", index, dir }),
+    });
   },
 
   /** Fetch one component's resolved registry entry, including fields and slots. */

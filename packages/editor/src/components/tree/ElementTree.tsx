@@ -364,6 +364,41 @@ function TreeNode({
   showFriendlyLabels: boolean;
   componentLabels: Map<string, string>;
 }) {
+  // All hooks live ABOVE the early returns below. A mounted node can flip
+  // between rendered and filtered/flattened (search query edits, zoom toggle);
+  // if hooks came after the returns, React would see a different hook count
+  // across renders and throw "Rendered fewer hooks than expected".
+  // Components default to expanded so the slot placeholder is visible.
+  const [expanded, setExpanded] = useState(depth < 2 || node.isComponent);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const selectedNodeId = useEditorStore((s) => s.selectedNodeId);
+  const hoveredNodeId = useEditorStore((s) => s.hoveredNodeId);
+  const selectNode = useEditorStore((s) => s.selectNode);
+  const enterComponent = useEditorStore((s) => s.enterComponent);
+  const nodeRef = useRef<HTMLDivElement>(null);
+
+  // Drag + drop wired to the whole row — click passes through thanks to
+  // the 8px activation distance set on the PointerSensor.
+  const { attributes, listeners, setNodeRef: setDragRef } = useDraggable({ id: node.nodeId });
+  const { setNodeRef: setDropRef } = useDroppable({ id: node.nodeId });
+  const setRowRef = useCallback(
+    (el: HTMLDivElement | null) => {
+      (nodeRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
+      setDragRef(el);
+      setDropRef(el);
+    },
+    [setDragRef, setDropRef]
+  );
+
+  const isSelected = selectedNodeId === node.nodeId;
+
+  // Scroll into view when selected from iframe
+  useEffect(() => {
+    if (isSelected) {
+      nodeRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+  }, [isSelected]);
+
   // Zoom: when the node isn't "meaningful" (structural wrapper), don't render its
   // own row — flatten by rendering its children at the same depth. Keep rendering
   // if the subtree has no meaningful descendants either (fallback to something).
@@ -391,18 +426,10 @@ function TreeNode({
   if (query && !subtreeMatchesSearch(node, query)) {
     return null;
   }
-  // Components default to expanded so the slot placeholder is visible. When
-  // searching, auto-expand any node whose subtree matches.
-  const [expanded, setExpanded] = useState(depth < 2 || node.isComponent);
+  // When searching, auto-expand any node whose subtree matches.
   if (query && !expanded && subtreeMatchesSearch(node, query)) {
     setExpanded(true);
   }
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
-  const selectedNodeId = useEditorStore((s) => s.selectedNodeId);
-  const hoveredNodeId = useEditorStore((s) => s.hoveredNodeId);
-  const selectNode = useEditorStore((s) => s.selectNode);
-  const enterComponent = useEditorStore((s) => s.enterComponent);
-  const nodeRef = useRef<HTMLDivElement>(null);
 
   // Components have a virtual slot child even when empty
   const hasSlot = node.isComponent && node.children.length === 0;
@@ -415,28 +442,9 @@ function TreeNode({
     setExpanded(true);
   }
 
-  const isSelected = selectedNodeId === node.nodeId;
   const isHovered = hoveredNodeId === node.nodeId;
   const hasChildren = node.children.length > 0;
   const isDragging = draggedNodeId === node.nodeId;
-
-  // Drag + drop wired to the whole row — click passes through thanks to
-  // the 8px activation distance set on the PointerSensor.
-  const { attributes, listeners, setNodeRef: setDragRef } = useDraggable({ id: node.nodeId });
-  const { setNodeRef: setDropRef } = useDroppable({ id: node.nodeId });
-  const setRowRef = useCallback(
-    (el: HTMLDivElement | null) => {
-      (nodeRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
-      setDragRef(el);
-      setDropRef(el);
-    },
-    [setDragRef, setDropRef]
-  );
-
-  // Scroll into view when selected from iframe
-  if (isSelected && nodeRef.current) {
-    nodeRef.current.scrollIntoView({ block: "nearest", behavior: "smooth" });
-  }
 
   // Drop indicator state
   const isDropTarget = dropTarget?.nodeId === node.nodeId;

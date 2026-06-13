@@ -1,0 +1,16 @@
+# Normalize all text files to LF in both the repo and the working tree.
+# Server tests assert on exact byte content of .astro fixtures (e.g. untrimmed
+# rawTextContent starting with "\n"); a CRLF checkout on Windows breaks them.
+* text=auto eol=lf
+
+# Binary assets — never touch line endings.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary

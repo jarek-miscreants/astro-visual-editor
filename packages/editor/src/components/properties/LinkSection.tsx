@@ -32,6 +32,53 @@ interface LinkTargetGroup {
 
 const NEW_TAB_REL = "noopener noreferrer";
 
+/** Fetch the project's internal link targets (pages + routed content). Shared
+ *  by the anchor LinkSection and the repeater's href field control. */
+export function useLinkTargets() {
+  const [linkTargets, setLinkTargets] = useState<LinkTarget[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    api
+      .getLinkTargets()
+      .then(({ targets }) => {
+        if (!cancelled) setLinkTargets(targets);
+      })
+      .catch((err: any) => {
+        if (!cancelled) setError(err.message || "Failed to load link targets");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return { linkTargets, loading, error };
+}
+
+/** Order targets into Pages → collections → Templates groups. */
+export function groupLinkTargets(linkTargets: LinkTarget[]): LinkTargetGroup[] {
+  const groups = new Map<string, LinkTarget[]>();
+  for (const option of linkTargets) {
+    const list = groups.get(option.group) ?? [];
+    list.push(option);
+    groups.set(option.group, list);
+  }
+  const collectionGroups = [...groups.keys()]
+    .filter((group) => group !== "Pages" && group !== "Templates")
+    .sort();
+  const order = ["Pages", ...collectionGroups, "Templates"];
+  return order
+    .filter((group) => groups.has(group))
+    .map((group) => ({ group, options: groups.get(group)! }));
+}
+
 export function LinkSection({
   href,
   target,
@@ -40,51 +87,14 @@ export function LinkSection({
   label = "Link",
   hideNewTab = false,
 }: Props) {
-  const [linkTargets, setLinkTargets] = useState<LinkTarget[]>([]);
-  const [loadingTargets, setLoadingTargets] = useState(false);
-  const [targetError, setTargetError] = useState<string | null>(null);
+  const { linkTargets, loading: loadingTargets, error: targetError } = useLinkTargets();
   const [mode, setModeState] = useState<"url" | "page">("url");
   const modeTouchedRef = useRef(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoadingTargets(true);
-    setTargetError(null);
-
-    api
-      .getLinkTargets()
-      .then(({ targets }) => {
-        if (!cancelled) setLinkTargets(targets);
-      })
-      .catch((err: any) => {
-        if (!cancelled) setTargetError(err.message || "Failed to load link targets");
-      })
-      .finally(() => {
-        if (!cancelled) setLoadingTargets(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const groupedOptions = useMemo<LinkTargetGroup[]>(() => {
-    const groups = new Map<string, LinkTarget[]>();
-    for (const option of linkTargets) {
-      const list = groups.get(option.group) ?? [];
-      list.push(option);
-      groups.set(option.group, list);
-    }
-
-    const collectionGroups = [...groups.keys()]
-      .filter((group) => group !== "Pages" && group !== "Templates")
-      .sort();
-    const order = ["Pages", ...collectionGroups, "Templates"];
-
-    return order
-      .filter((group) => groups.has(group))
-      .map((group) => ({ group, options: groups.get(group)! }));
-  }, [linkTargets]);
+  const groupedOptions = useMemo<LinkTargetGroup[]>(
+    () => groupLinkTargets(linkTargets),
+    [linkTargets]
+  );
 
   const selectedTarget = useMemo(
     () => linkTargets.find((option) => !option.disabled && option.url === href) ?? null,
@@ -206,7 +216,7 @@ export function LinkSection({
   );
 }
 
-function LinkTargetPicker({
+export function LinkTargetPicker({
   value,
   selectedTarget,
   groups,

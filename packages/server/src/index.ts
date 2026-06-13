@@ -20,7 +20,7 @@ import { projectRouter } from "./routes/project.js";
 import { gitRouter } from "./routes/git.js";
 import { authRouter, attachAuthStateStore, getCurrentAccessToken } from "./routes/auth.js";
 import { githubRouter } from "./routes/github.js";
-import { requireEditorOrigin } from "./lib/require-editor-origin.js";
+import { requireEditorOrigin, allowedEditorOrigins } from "./lib/require-editor-origin.js";
 import { setupFileWatcher } from "./services/file-watcher.js";
 import { stopDevServer } from "./services/astro-dev-server.js";
 import { getGitTransport, setGitTransport, createTokenGitTransport } from "./services/git-transport.js";
@@ -53,8 +53,10 @@ if (resolvedInitialPath) {
   console.log(`[TVE Server] No project path — open one from the editor UI`);
 }
 
-// Middleware
-app.use(cors());
+// Middleware. CORS is allowlisted to the editor's origin (plus loopback
+// aliases and the server's own origin) — a bare `cors()` would reflect ANY
+// origin and let a drive-by page read API responses cross-origin.
+app.use(cors({ origin: allowedEditorOrigins() }));
 app.use(express.json());
 
 // Mutable project path + file watcher handle. Stored on app.locals so routes
@@ -163,13 +165,17 @@ app.use("/api/injected", express.static(path.join(__dirname, "../public")));
 
 // API routes
 //
-// `requireEditorOrigin` gates routes that mint GitHub tokens, write
-// repos to disk, switch the active project, or shut the server down —
-// so a drive-by browser tab the user happens to have open can't drive
-// them via a cross-origin fetch. The OAuth `start`/`callback` GET
-// navigations are exempt (no usable Origin) and rely on the CSRF state
-// nonce in routes/auth.ts instead.
-app.use("/api/project", requireEditorOrigin, projectRouter);
+// `requireEditorOrigin` gates the WHOLE API surface: every router below can
+// read project source or write to disk (mutations rewrite .astro files,
+// config writes Tailwind config, content/pages create and delete files,
+// project switches the workspace, github mints tokens). A drive-by browser
+// tab the user happens to have open must not be able to drive any of it via
+// a cross-origin fetch. Requests with no Origin header pass — that keeps the
+// OAuth `start`/`callback` top-level GET navigations working (they rely on
+// the CSRF state nonce in routes/auth.ts instead) along with non-browser
+// callers (CLI, tests, smoke script).
+app.use("/api", requireEditorOrigin);
+app.use("/api/project", projectRouter);
 app.use("/api/files", filesRouter);
 app.use("/api/ast", astRouter);
 app.use("/api/mutations", mutationsRouter);
@@ -182,9 +188,9 @@ app.use("/api/registry", registryRouter);
 app.use("/api/links", linksRouter);
 app.use("/api/assets", assetsRouter);
 app.use("/api/seo", seoRouter);
-app.use("/api/git", requireEditorOrigin, gitRouter);
+app.use("/api/git", gitRouter);
 app.use("/api/auth", authRouter);
-app.use("/api/github", requireEditorOrigin, githubRouter);
+app.use("/api/github", githubRouter);
 
 // WebSocket connections
 const wsClients = new Set<WebSocket>();

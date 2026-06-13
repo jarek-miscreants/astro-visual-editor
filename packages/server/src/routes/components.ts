@@ -4,6 +4,13 @@ import path from "path";
 import { parseAstroFileAsync, buildNodeMap } from "../services/astro-parser.js";
 import { getComponentPropSchema } from "../services/component-props.js";
 import { getComponentSlots } from "../services/component-slots.js";
+import {
+  readComponentArrays,
+  writeComponentArrayField,
+  addComponentArrayItem,
+  removeComponentArrayItem,
+  moveComponentArrayItem,
+} from "../services/component-data.js";
 import { validateElementRange } from "../services/source-range.js";
 import { resolveProjectPath, PathTraversalError } from "../lib/path-guard.js";
 
@@ -68,6 +75,143 @@ componentsRouter.get("/props", async (req, res) => {
       return;
     }
     res.status(500).json({ error: err?.message || "failed to parse props" });
+  }
+});
+
+/** GET /api/components/data?path=<relPath> — Return editable list content
+ *  (top-level `const X = [{…}]` arrays) and `.map()` loop bindings for the
+ *  repeater panel. */
+componentsRouter.get("/data", async (req, res) => {
+  try {
+    const projectPath = req.app.locals.projectPath as string;
+    const relPath = (req.query.path as string | undefined)?.replace(/\\/g, "/");
+    if (!relPath) {
+      res.status(400).json({ error: "path query param is required" });
+      return;
+    }
+    validateAstroPath(projectPath, relPath);
+    const result = await readComponentArrays(projectPath, relPath);
+    res.json(result);
+  } catch (err: any) {
+    if (err instanceof PathTraversalError) {
+      res.status(400).json({ error: "invalid path" });
+      return;
+    }
+    if (err?.code === "ENOENT") {
+      res.status(404).json({ error: "component not found" });
+      return;
+    }
+    res.status(500).json({ error: err?.message || "failed to read component data" });
+  }
+});
+
+/** POST /api/components/data — Rewrite one literal field of a frontmatter
+ *  array item (`arrayName[index].field = value`). */
+componentsRouter.post("/data", async (req, res) => {
+  try {
+    const projectPath = req.app.locals.projectPath as string;
+    const { path: relPath, arrayName, index, field, value } = req.body as {
+      path?: string;
+      arrayName?: string;
+      index?: number;
+      field?: string;
+      value?: string | number | boolean;
+    };
+    const normalized = relPath?.replace(/\\/g, "/");
+    if (!normalized || !arrayName || typeof index !== "number" || !field) {
+      res.status(400).json({ error: "path, arrayName, index and field are required" });
+      return;
+    }
+    validateAstroPath(projectPath, normalized);
+    const result = await writeComponentArrayField(projectPath, normalized, {
+      arrayName,
+      index,
+      field,
+      value: value ?? "",
+    });
+    if (!result.success) {
+      res.status(400).json({ error: result.error });
+      return;
+    }
+    res.json({ success: true });
+  } catch (err: any) {
+    if (err instanceof PathTraversalError) {
+      res.status(400).json({ error: "invalid path" });
+      return;
+    }
+    if (err?.code === "ENOENT") {
+      res.status(404).json({ error: "component not found" });
+      return;
+    }
+    res.status(500).json({ error: err?.message || "failed to write component data" });
+  }
+});
+
+/** POST /api/components/array-item — Add, remove, or reorder an item in a
+ *  frontmatter array. `op: "add"` appends an empty item matching the array's
+ *  shape; `op: "remove"` deletes the item at `index`; `op: "move"` swaps the
+ *  item at `index` with its neighbour in direction `dir`. */
+componentsRouter.post("/array-item", async (req, res) => {
+  try {
+    const projectPath = req.app.locals.projectPath as string;
+    const { path: relPath, arrayName, op, index, dir } = req.body as {
+      path?: string;
+      arrayName?: string;
+      op?: "add" | "remove" | "move";
+      index?: number;
+      dir?: "up" | "down";
+    };
+    const normalized = relPath?.replace(/\\/g, "/");
+    if (
+      !normalized ||
+      !arrayName ||
+      (op !== "add" && op !== "remove" && op !== "move")
+    ) {
+      res
+        .status(400)
+        .json({ error: "path, arrayName and op (add|remove|move) are required" });
+      return;
+    }
+    validateAstroPath(projectPath, normalized);
+
+    let result;
+    if (op === "add") {
+      result = await addComponentArrayItem(projectPath, normalized, arrayName);
+    } else if (op === "remove") {
+      result = await removeComponentArrayItem(
+        projectPath,
+        normalized,
+        arrayName,
+        typeof index === "number" ? index : -1
+      );
+    } else {
+      if (dir !== "up" && dir !== "down") {
+        res.status(400).json({ error: "move requires dir (up|down)" });
+        return;
+      }
+      result = await moveComponentArrayItem(
+        projectPath,
+        normalized,
+        arrayName,
+        typeof index === "number" ? index : -1,
+        dir
+      );
+    }
+    if (!result.success) {
+      res.status(400).json({ error: result.error });
+      return;
+    }
+    res.json({ success: true });
+  } catch (err: any) {
+    if (err instanceof PathTraversalError) {
+      res.status(400).json({ error: "invalid path" });
+      return;
+    }
+    if (err?.code === "ENOENT") {
+      res.status(404).json({ error: "component not found" });
+      return;
+    }
+    res.status(500).json({ error: err?.message || "failed to update array" });
   }
 });
 

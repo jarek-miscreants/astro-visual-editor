@@ -4,6 +4,7 @@ import type {
   FileInfo,
   ElementInfo,
   Mutation,
+  MutationWithInverse,
   DevServerStatus,
   DevServerStartError,
 } from "@tve/shared";
@@ -303,6 +304,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   async setCurrentFile(path, options = {}) {
+    // History entries hold nodeIds that only mean something in the file they
+    // were recorded for — undoing them against another file would mutate the
+    // wrong elements. Drop the stack when switching files.
+    if (path !== get().currentFile) {
+      useHistoryStore.getState().clear();
+    }
     set({
       currentFile: path,
       componentReturnTarget: options.componentReturnTarget ?? null,
@@ -415,30 +422,32 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const state = get();
     if (!state.currentFile) return;
 
-    // Compute inverse for undo before applying
+    const targetNode =
+      "nodeId" in mutation ? state.nodeMap.get(mutation.nodeId) : undefined;
+
+    // Capture previous values BEFORE the optimistic patch below — they feed
+    // both the undo inverse and the revert path if the server rejects.
+    let prevClasses: string | undefined;
+    let prevText: string | undefined;
+    let prevContent: string | undefined;
+    let prevValue: string | null | undefined;
+    if (mutation.type === "update-classes") {
+      prevClasses = targetNode?.classes || state.selectedElementInfo?.classes || "";
+    } else if (mutation.type === "update-text") {
+      prevText = targetNode?.textContent || state.selectedElementInfo?.textContent || "";
+    } else if (mutation.type === "update-raw-content") {
+      // Use the UNTRIMMED raw body so undo restores it byte-for-byte.
+      prevContent = targetNode?.rawTextContent ?? "";
+    } else if (mutation.type === "update-attribute") {
+      // null when the attribute was absent — undo then removes it.
+      prevValue = targetNode?.attributes?.[mutation.attr] ?? null;
+    }
+
+    // Compute inverse for undo before applying. Keep a handle on the entry so
+    // a server rejection can retract it — otherwise undo would "revert" a
+    // change that never landed on disk.
+    let pushedEntry: MutationWithInverse | null = null;
     if (!skipHistory) {
-      let prevClasses: string | undefined;
-      let prevText: string | undefined;
-      let prevContent: string | undefined;
-      if (mutation.type === "update-classes") {
-        const node = state.nodeMap.get(mutation.nodeId);
-        prevClasses = node?.classes || state.selectedElementInfo?.classes || "";
-      }
-      if (mutation.type === "update-text") {
-        const node = state.nodeMap.get(mutation.nodeId);
-        prevText = node?.textContent || state.selectedElementInfo?.textContent || "";
-      }
-      if (mutation.type === "update-raw-content") {
-        // Use the UNTRIMMED raw body so undo restores it byte-for-byte.
-        const node = state.nodeMap.get(mutation.nodeId);
-        prevContent = node?.rawTextContent ?? "";
-      }
-      let prevValue: string | null | undefined;
-      if (mutation.type === "update-attribute") {
-        const node = state.nodeMap.get(mutation.nodeId);
-        // null when the attribute was absent — undo then removes it.
-        prevValue = node?.attributes?.[mutation.attr] ?? null;
-      }
       const inverse = computeInverse(mutation, {
         previousClasses: prevClasses,
         previousText: prevText,
@@ -448,7 +457,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         nodeMap: state.nodeMap,
       });
       if (inverse) {
-        useHistoryStore.getState().push({ mutation, inverse });
+        pushedEntry = { mutation, inverse };
+        useHistoryStore.getState().push(pushedEntry);
       }
     }
 
@@ -462,6 +472,55 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (mutation.type === "update-attribute") {
       updateAttributeInIframe(mutation.nodeId, mutation.attr, mutation.value);
     }
+
+    // Optimistically patch the AST node too. Controls compute the next class
+    // string from `astNode.classes`, so without this a second edit fired
+    // before the first round-trip resolves would be computed from the stale
+    // value and silently revert the first edit in source. Node objects are
+    // shared between `ast` and `nodeMap`; the new Map identity re-renders
+    // subscribers.
+    const patchNode = (apply: boolean) => {
+      if (!targetNode) return;
+      if (mutation.type === "update-classes") {
+        targetNode.classes = apply ? mutation.classes : prevClasses ?? "";
+      } else if (mutation.type === "update-text") {
+        targetNode.textContent = apply ? mutation.text : prevText ?? "";
+      } else if (mutation.type === "update-raw-content") {
+        targetNode.rawTextContent = apply ? mutation.content : prevContent ?? "";
+      } else if (mutation.type === "update-attribute") {
+        const value = apply ? mutation.value : prevValue ?? null;
+        if (value === null) delete targetNode.attributes[mutation.attr];
+        else targetNode.attributes[mutation.attr] = value;
+      } else {
+        return;
+      }
+      const current = get();
+      set({
+        nodeMap: new Map(current.nodeMap),
+        selectedElementInfo:
+          current.selectedElementInfo?.nodeId === targetNode.nodeId
+            ? elementInfoFromNode(targetNode, current.selectedElementInfo)
+            : current.selectedElementInfo,
+      });
+    };
+    patchNode(true);
+
+    // Server rejected the mutation: retract the history entry and roll back
+    // the optimistic AST + iframe patches so the UI matches what's on disk.
+    const revertOptimistic = () => {
+      if (pushedEntry) {
+        useHistoryStore.getState().remove(pushedEntry);
+      }
+      patchNode(false);
+      if (!targetNode) return;
+      if (mutation.type === "update-classes") {
+        updateClassesInIframe(mutation.nodeId, targetNode.classes);
+      } else if (mutation.type === "update-text") {
+        updateTextInIframe(mutation.nodeId, targetNode.textContent ?? "");
+      } else if (mutation.type === "update-attribute") {
+        updateAttributeInIframe(mutation.nodeId, mutation.attr, prevValue ?? null);
+      }
+    };
 
     // Apply to source file
     try {
@@ -543,6 +602,19 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         }
 
         set(nextState);
+        // Structural edits reassign positional nodeIds (`tve-{hash}-{index}`)
+        // document-wide, so every recorded history entry — past and redo
+        // future — now points at stale ids. Drop the stack rather than let
+        // undo/redo target the wrong elements.
+        if (
+          mutation.type === "add-element" ||
+          mutation.type === "remove-element" ||
+          mutation.type === "duplicate-element" ||
+          mutation.type === "wrap-element" ||
+          mutation.type === "move-element"
+        ) {
+          useHistoryStore.getState().clear();
+        }
         // Push the new selection to the iframe overlay so the highlight ring
         // tracks the freshly-inserted/duplicated/wrapped element. The iframe
         // may not have re-mapped yet (Astro HMR is mid-flight); the next
@@ -561,10 +633,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         useGitStore.getState().refreshDebounced();
       } else if (!result.success) {
         console.error("Mutation failed:", result.error);
+        revertOptimistic();
         toast.error("Couldn't save", result.error || "The mutation was rejected.");
       }
     } catch (err: any) {
       console.error("Failed to apply mutation:", err);
+      revertOptimistic();
       toast.error("Couldn't save", err?.message ?? "Unknown error");
     }
   },

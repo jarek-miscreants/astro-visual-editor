@@ -217,6 +217,196 @@ describe("applyMutation: update-attribute", () => {
   });
 });
 
+describe("applyMutation: attribute/class value hardening", () => {
+  it("escapes double quotes in class values instead of corrupting the tag", async () => {
+    const file = await stage("update-classes-input.astro");
+    const { ast } = await parseAstroFileAsync(file);
+
+    const result = await applyMutation(file, {
+      type: "update-classes",
+      nodeId: ast[0].nodeId,
+      classes: `content-['say_"hi"']`,
+    });
+
+    expect(result.success).toBe(true);
+    const out = await readFile(file);
+    // The raw quote must not close the attribute early.
+    expect(out).toContain('class="content-[\'say_&quot;hi&quot;\']"');
+    // Still parses back into a well-formed AST.
+    const { ast: reparsed } = await parseAstroFileAsync(file);
+    expect(reparsed[0].tagName).toBe("div");
+  });
+
+  it("escapes double quotes in attribute values", async () => {
+    const file = await stage("with-component.astro");
+    const { ast } = await parseAstroFileAsync(file);
+    const button = ast[0].children.find((c) => c.tagName === "Button")!;
+
+    const result = await applyMutation(file, {
+      type: "update-attribute",
+      nodeId: button.nodeId,
+      attr: "title",
+      value: 'Say "hello"',
+    });
+
+    expect(result.success).toBe(true);
+    const out = await readFile(file);
+    expect(out).toContain('title="Say &quot;hello&quot;"');
+  });
+
+  it("rejects attribute names with regex metacharacters or invalid syntax", async () => {
+    const file = await stage("with-component.astro");
+    const before = await readFile(file);
+    const { ast } = await parseAstroFileAsync(file);
+    const button = ast[0].children.find((c) => c.tagName === "Button")!;
+
+    for (const attr of ['x"y', "a(b)", "on click", ".leading-dot"]) {
+      const result = await applyMutation(file, {
+        type: "update-attribute",
+        nodeId: button.nodeId,
+        attr,
+        value: "x",
+      });
+      expect(result.success).toBe(false);
+      expect(result.error).toMatch(/invalid attribute name/i);
+    }
+    expect(await readFile(file)).toBe(before);
+  });
+
+  it("does not match a longer attribute name containing the target as a suffix", async () => {
+    const file = path.join(tmpDir, "data-attr.astro");
+    await fs.writeFile(
+      file,
+      '<button data-type="primary">Hi</button>\n',
+      "utf-8"
+    );
+    const { ast } = await parseAstroFileAsync(file);
+
+    const result = await applyMutation(file, {
+      type: "update-attribute",
+      nodeId: ast[0].nodeId,
+      attr: "type",
+      value: "submit",
+    });
+
+    expect(result.success).toBe(true);
+    const out = await readFile(file);
+    // data-type untouched; a NEW type attribute inserted.
+    expect(out).toContain('data-type="primary"');
+    expect(out).toContain('type="submit"');
+  });
+});
+
+describe("applyMutation: update-text edge cases", () => {
+  it("fills an empty element (zero-length inner range)", async () => {
+    const file = path.join(tmpDir, "empty.astro");
+    await fs.writeFile(file, "<p></p>\n", "utf-8");
+    const { ast } = await parseAstroFileAsync(file);
+
+    const result = await applyMutation(file, {
+      type: "update-text",
+      nodeId: ast[0].nodeId,
+      text: "Now with text",
+    });
+
+    expect(result.success).toBe(true);
+    expect(await readFile(file)).toContain("<p>Now with text</p>");
+  });
+
+  it("returns success: false for a self-closing target instead of writing a bad range", async () => {
+    const file = await stage("self-closing-component.astro");
+    const before = await readFile(file);
+    const { ast } = await parseAstroFileAsync(file);
+    const sectionMain = ast[0].children.find((c) => c.tagName === "SectionMain")!;
+
+    const result = await applyMutation(file, {
+      type: "update-text",
+      nodeId: sectionMain.nodeId,
+      text: "anything",
+    });
+
+    expect(result.success).toBe(false);
+    expect(await readFile(file)).toBe(before);
+  });
+});
+
+describe("applyMutation: update-text expression guard", () => {
+  it("flags expression-bound text in the parsed AST", async () => {
+    const file = await stage("with-text-expression.astro");
+    const { ast } = await parseAstroFileAsync(file);
+    const section = ast[0];
+    const h2 = section.children.find((c) => c.tagName === "h2")!;
+
+    expect(h2.isTextDynamic).toBe(true);
+    expect(h2.textExpression).toBe("{heading}");
+    expect(h2.textContent).toBeNull();
+  });
+
+  it("refuses to overwrite a top-level `{expr}` text binding", async () => {
+    const file = await stage("with-text-expression.astro");
+    const before = await readFile(file);
+    const { ast } = await parseAstroFileAsync(file);
+    const h2 = ast[0].children.find((c) => c.tagName === "h2")!;
+
+    const result = await applyMutation(file, {
+      type: "update-text",
+      nodeId: h2.nodeId,
+      text: "should not be written",
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/JSX expression|bound/i);
+    const out = await readFile(file);
+    expect(out).not.toContain("should not be written");
+    expect(out).toContain("{heading}");
+    expect(out).toBe(before);
+  });
+
+  it("refuses to overwrite a `.map()` template binding (corruption repro)", async () => {
+    // <h3>{feature.title}</h3> lives once inside features.map(...) and renders
+    // N times. Overwriting it with a literal would corrupt every card — the
+    // exact bug this guard prevents.
+    const file = await stage("with-text-expression.astro");
+    const { ast } = await parseAstroFileAsync(file);
+    const article = ast[0].children.find((c) => c.tagName === "article")!;
+    const h3 = article.children.find((c) => c.tagName === "h3")!;
+    expect(h3.isTextDynamic).toBe(true);
+
+    const result = await applyMutation(file, {
+      type: "update-text",
+      nodeId: h3.nodeId,
+      text: "Clobbered title",
+    });
+
+    expect(result.success).toBe(false);
+    const out = await readFile(file);
+    expect(out).not.toContain("Clobbered title");
+    expect(out).toContain("{feature.title}");
+  });
+
+  it("still allows editing genuinely static text in the same file", async () => {
+    const file = await stage("with-text-expression.astro");
+    const { ast } = await parseAstroFileAsync(file);
+    // The trailing <p>Plain static text.</p> is a real literal — editable.
+    const plainP = ast[0].children
+      .filter((c) => c.tagName === "p")
+      .find((c) => c.textContent === "Plain static text.")!;
+    expect(plainP.isTextDynamic).toBeFalsy();
+
+    const result = await applyMutation(file, {
+      type: "update-text",
+      nodeId: plainP.nodeId,
+      text: "Edited static text.",
+    });
+
+    expect(result.success).toBe(true);
+    const out = await readFile(file);
+    expect(out).toContain("Edited static text.");
+    // Bindings elsewhere untouched.
+    expect(out).toContain("{feature.body}");
+  });
+});
+
 describe("applyMutation: remove-element", () => {
   it("removes an element and updates AST", async () => {
     const file = await stage("simple.astro");

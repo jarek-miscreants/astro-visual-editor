@@ -7,12 +7,21 @@ let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 const handlers = new Set<WsHandler>();
 
 export function connectWebSocket() {
-  if (ws?.readyState === WebSocket.OPEN) return;
+  // CONNECTING counts too — a second call while the handshake is in flight
+  // (StrictMode double-invoke, project switch) must not open a parallel
+  // socket that keeps feeding the shared handler set.
+  if (
+    ws &&
+    (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)
+  ) {
+    return;
+  }
 
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-  ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+  const socket = new WebSocket(`${protocol}//${window.location.host}/ws`);
+  ws = socket;
 
-  ws.onopen = () => {
+  socket.onopen = () => {
     console.log("[WS] Connected");
     if (reconnectTimer) {
       clearTimeout(reconnectTimer);
@@ -20,7 +29,7 @@ export function connectWebSocket() {
     }
   };
 
-  ws.onmessage = (event) => {
+  socket.onmessage = (event) => {
     try {
       const message = JSON.parse(event.data) as ServerWsMessage;
       for (const handler of handlers) {
@@ -31,7 +40,10 @@ export function connectWebSocket() {
     }
   };
 
-  ws.onclose = () => {
+  socket.onclose = () => {
+    // A superseded socket closing must not null out (or reconnect over)
+    // the currently active one.
+    if (ws !== socket) return;
     console.log("[WS] Disconnected, reconnecting in 2s...");
     ws = null;
     reconnectTimer = setTimeout(connectWebSocket, 2000);

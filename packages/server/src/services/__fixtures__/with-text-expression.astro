@@ -1,0 +1,18 @@
+---
+const features = [
+  { title: "First feature", body: "Body copy one." },
+  { title: "Second feature", body: "Body copy two." },
+];
+const heading = "Static heading";
+---
+
+<section>
+  <h2>{heading}</h2>
+  {features.map((feature) => (
+    <article>
+      <h3>{feature.title}</h3>
+      <p>{feature.body}</p>
+    </article>
+  ))}
+  <p>Plain static text.</p>
+</section>

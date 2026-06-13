@@ -7,6 +7,7 @@ import SEO from "../components/SEO.astro";
 import MarketingHero from "../components/MarketingHero.astro";
 import ResourceCard from "../components/ResourceCard.astro";
 import LandingCTA from "../components/LandingCTA.astro";
+import FeatureGrid from "../components/FeatureGrid.astro";
 ---
 
 <Layout title="Home">
@@ -50,6 +51,12 @@ import LandingCTA from "../components/LandingCTA.astro";
 
     <GridColumns>
     </GridColumns>
+
+    <FeatureGrid
+      eyebrow="Product features"
+      headline="Enterprise capabilities, without the complexity."
+      class="my-10"
+    />
 
     <section class="my-10 grid gap-4 md:grid-cols-3">
       <ResourceCard

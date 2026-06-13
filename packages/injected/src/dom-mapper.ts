@@ -3,6 +3,10 @@ interface ASTNodeLike {
   tagName: string;
   isComponent: boolean;
   isDynamic?: boolean;
+  /** True when the element's inner content is a JSX expression binding
+   *  (`{title}`). Inline text editing is refused for these to avoid clobbering
+   *  the binding — the editor surfaces them read-only. */
+  isTextDynamic?: boolean;
   classes: string;
   attributes?: Record<string, string>;
   renderTarget?: "body" | "head";
@@ -573,6 +577,13 @@ export class DomMapper {
   isComponentNode(nodeId: string): boolean {
     const node = this.findNode(this.ast, nodeId);
     return !!node && (node.isComponent || this.isPascalCase(node.tagName));
+  }
+
+  /** True when the node's text is bound to a JSX expression (`{title}`), so
+   *  inline editing must be refused to avoid clobbering the binding. */
+  isTextDynamicNode(nodeId: string): boolean {
+    const node = this.findNode(this.ast, nodeId);
+    return !!node && node.isTextDynamic === true;
   }
 
   /** Find the closest mapped ancestor (or self) */

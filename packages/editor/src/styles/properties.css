@@ -1038,6 +1038,101 @@
 }
 .tve-prop-warning-card__desc { color: rgba(253, 230, 138, 0.6); }
 
+/* Repeater (list content) editor — one card per array item. */
+.tve-repeater-item {
+  border: 1px solid var(--prop-section-border);
+  background-color: rgba(24, 24, 27, 0.4);
+  border-radius: 6px;
+  padding: 8px;
+}
+.tve-repeater-item + .tve-repeater-item {
+  margin-top: 8px;
+}
+.tve-repeater-item__head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow: hidden;
+}
+.tve-repeater-item__toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+  overflow: hidden;
+}
+.tve-repeater-item__toggle > svg {
+  flex: none;
+  color: var(--prop-icon-color);
+}
+.tve-repeater-item__index {
+  flex: none;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--prop-icon-color);
+}
+.tve-repeater-item__title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--prop-input-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tve-repeater-item__toggle:hover .tve-repeater-item__title {
+  color: var(--prop-section-title-color-hover, #fff);
+}
+.tve-repeater-item__body {
+  margin-top: 8px;
+}
+
+/* "Add item" button below the list. */
+.tve-repeater-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  margin-top: 8px;
+  padding: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--prop-section-title-color);
+  background: transparent;
+  border: 1px dashed var(--prop-section-border);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: color 100ms, border-color 100ms;
+}
+.tve-repeater-add:hover {
+  color: var(--prop-input-text);
+  border-color: var(--prop-icon-color);
+}
+.tve-repeater-add:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.tve-repeater-field--bool {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+}
+.tve-repeater-field--bool input {
+  margin: 0;
+}
+/* The field the bound expression pointed at (e.g. `title` for {feature.title}). */
+.tve-repeater-field__label--match {
+  color: var(--prop-link-icon, #60a5fa);
+}
+
 .tve-prop-marketer-card {
   border: 1px solid var(--prop-section-border);
   background-color: rgba(24, 24, 27, 0.4);

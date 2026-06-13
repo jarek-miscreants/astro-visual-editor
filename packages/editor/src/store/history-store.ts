@@ -9,6 +9,9 @@ interface HistoryState {
   push: (entry: MutationWithInverse) => void;
   undo: () => MutationWithInverse | null;
   redo: () => MutationWithInverse | null;
+  /** Retract a specific entry (by identity) — used when the server rejects a
+   *  mutation that was optimistically recorded before the round-trip. */
+  remove: (entry: MutationWithInverse) => void;
   clear: () => void;
 }
 
@@ -53,6 +56,19 @@ export const useHistoryStore = create<HistoryState>((set, get) => ({
       canRedo: state.future.length > 1,
     }));
     return entry;
+  },
+
+  remove(entry) {
+    set((state) => {
+      const past = state.past.filter((e) => e !== entry);
+      const future = state.future.filter((e) => e !== entry);
+      return {
+        past,
+        future,
+        canUndo: past.length > 0,
+        canRedo: future.length > 0,
+      };
+    });
   },
 
   clear() {

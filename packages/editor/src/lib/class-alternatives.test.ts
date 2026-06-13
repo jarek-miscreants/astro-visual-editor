@@ -53,6 +53,25 @@ describe("getAlternatives", () => {
       const alts = getAlternatives("pt-0.5");
       expect(alts.map((a) => a.value)).toContain("pt-0.5");
     });
+
+    it("gap-x-4 stays on the x axis (longest prefix wins)", () => {
+      const values = getAlternatives("gap-x-4").map((a) => a.value);
+      expect(values).toContain("gap-x-0");
+      expect(values).toContain("gap-x-4");
+      expect(values.every((v) => v.startsWith("gap-x-"))).toBe(true);
+    });
+
+    it("gap-4 stays both-axes", () => {
+      const values = getAlternatives("gap-4").map((a) => a.value);
+      expect(values).toContain("gap-0");
+      expect(values.every((v) => /^gap-[^xy]/.test(v))).toBe(true);
+    });
+
+    it("inset-y-0 stays on the y axis", () => {
+      const values = getAlternatives("inset-y-0").map((a) => a.value);
+      expect(values).toContain("inset-y-auto");
+      expect(values.every((v) => v.startsWith("inset-y-"))).toBe(true);
+    });
   });
 
   describe("color patterns", () => {

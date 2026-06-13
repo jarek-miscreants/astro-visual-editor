@@ -133,7 +133,10 @@ for (const [groupKey, alts] of Object.entries(GROUPS)) {
   }
 }
 
-/** Spacing prefixes that use the standard spacing scale */
+/** Spacing prefixes that use the standard spacing scale.
+ *  Sorted longest-first so axis variants win over their parent prefix —
+ *  otherwise `gap-x-4` matches `^gap-(\S+)$` and the chip dropdown offers
+ *  both-axes `gap-*` values, silently changing the axis on pick. */
 const SPACING_PREFIXES = [
   "p", "px", "py", "pt", "pr", "pb", "pl",
   "m", "mx", "my", "mt", "mr", "mb", "ml",
@@ -143,7 +146,7 @@ const SPACING_PREFIXES = [
   "top", "right", "bottom", "left",
   "inset", "inset-x", "inset-y",
   "space-x", "space-y",
-];
+].sort((a, b) => b.length - a.length);
 
 /** Color prefixes */
 const COLOR_PREFIXES = ["text", "bg", "border", "ring", "from", "to", "via", "accent", "outline", "fill", "stroke"];

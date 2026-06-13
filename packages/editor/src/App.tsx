@@ -32,8 +32,22 @@ export default function App() {
   // Global keyboard shortcuts
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
+      // Don't hijack undo/redo while the user is typing in a text field —
+      // let the native text-editing undo work there.
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.tagName === "SELECT" ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+      // Lowercase so CapsLock doesn't flip the key ("Z" without shift).
+      const key = e.key.toLowerCase();
       // Undo: Ctrl+Z
-      if (e.ctrlKey && e.key === "z" && !e.shiftKey) {
+      if (e.ctrlKey && key === "z" && !e.shiftKey) {
         e.preventDefault();
         const entry = useHistoryStore.getState().undo();
         if (entry) {
@@ -41,7 +55,7 @@ export default function App() {
         }
       }
       // Redo: Ctrl+Shift+Z or Ctrl+Y
-      if ((e.ctrlKey && e.shiftKey && e.key === "Z") || (e.ctrlKey && e.key === "y")) {
+      if ((e.ctrlKey && e.shiftKey && key === "z") || (e.ctrlKey && key === "y")) {
         e.preventDefault();
         const entry = useHistoryStore.getState().redo();
         if (entry) {

@@ -15,6 +15,7 @@ import { CollapsibleSection } from "../ui/Collapsible";
 import { LinkSection } from "./LinkSection";
 import { ImageSection } from "./ImageSection";
 import { RawContentEditor, RawContentMarketerNote } from "./RawContentEditor";
+import { RepeaterPanel } from "./RepeaterPanel";
 
 interface PropertiesPanelProps {
   nodeId: string;
@@ -46,6 +47,20 @@ export function PropertiesPanel({ nodeId, elementInfo }: PropertiesPanelProps) {
   const attributes = astNode?.attributes ?? elementInfo.attributes;
   const isComponent = astNode?.isComponent || /^[A-Z]/.test(elementInfo.tagName);
   const textContent = astNode?.textContent ?? elementInfo.textContent;
+  // Text bound to a JSX expression (`<h3>{feature.title}</h3>`). Editing the
+  // resolved text would clobber the binding (and corrupt every `.map()`
+  // instance), so we surface it read-only instead of an editable field.
+  const isTextDynamic = astNode?.isTextDynamic === true;
+  const textExpression = astNode?.textExpression ?? null;
+  const currentFile = useEditorStore((s) => s.currentFile);
+  // Show the repeater for loop content: either the bound text itself
+  // (`{feature.title}`) or its `.map()` container node. Only meaningful when
+  // the current file is a component that owns the array (the case after you
+  // enter a component); on a page the loop content isn't directly addressable.
+  const showRepeater =
+    (isTextDynamic || astNode?.isDynamic === true) &&
+    !!currentFile &&
+    currentFile.startsWith("src/components/");
   const files = useEditorStore((s) => s.files);
 
   // Names this component's introspected Props schema covers — used to hide
@@ -147,7 +162,17 @@ export function PropertiesPanel({ nodeId, elementInfo }: PropertiesPanelProps) {
                   }
                 />
               )}
-              {textContent !== null ? (
+              {isTextDynamic ? (
+                <>
+                  <DynamicTextCard expression={textExpression} />
+                  {showRepeater && (
+                    <RepeaterPanel
+                      componentPath={currentFile!}
+                      focusExpression={textExpression}
+                    />
+                  )}
+                </>
+              ) : textContent !== null ? (
                 <InlineTextContentField
                   text={textContent}
                   onUpdate={(text) => applyMutation({ type: "update-text", nodeId, text })}
@@ -184,6 +209,23 @@ export function PropertiesPanel({ nodeId, elementInfo }: PropertiesPanelProps) {
               />
             )}
           </CollapsibleSection>
+
+          {/* 1b. Dynamic text binding — read-only. When the element's text is
+              `{expr}` (e.g. a `.map()` item like `{feature.title}`), editing it
+              here would clobber the binding, so we show the source instead. */}
+          {!isComponent && isTextDynamic && (
+            <div className="tve-prop-section">
+              <DynamicTextCard expression={textExpression} />
+            </div>
+          )}
+
+          {/* 1c. Repeater — edit the list items behind a `.map()` loop. */}
+          {showRepeater && (
+            <RepeaterPanel
+              componentPath={currentFile!}
+              focusExpression={textExpression}
+            />
+          )}
 
           {/* 2. Content — typed component Content + Link fields, plus the
               empty-component slot affordance. Use astNode.tagName to keep
@@ -484,6 +526,28 @@ function InlineTextContentField({
         rows={Math.min(6, Math.max(2, Math.ceil(text.length / 48)))}
         className="tve-prop-textarea tve-prop-textarea--prominent"
       />
+    </div>
+  );
+}
+
+/**
+ * Read-only affordance for text bound to a JSX expression (e.g.
+ * `<h3>{feature.title}</h3>`). Mirrors the class-expression warning card.
+ * The value lives in source (a prop, frontmatter, or a `.map()` over a local
+ * array) — editing the resolved render here would sever the binding.
+ */
+function DynamicTextCard({ expression }: { expression: string | null }) {
+  return (
+    <div className="tve-prop-warning-card">
+      <div className="tve-prop-warning-card__title">Bound text</div>
+      {expression && (
+        <div className="tve-prop-warning-card__code">{expression}</div>
+      )}
+      <div className="tve-prop-warning-card__desc">
+        This text is rendered from an expression, so it can't be edited here
+        without breaking the binding. Edit the value at its source — a component
+        prop, page frontmatter, or the list it's mapped from.
+      </div>
     </div>
   );
 }

@@ -1,0 +1,99 @@
+---
+// "Product Features" section — eyebrow + headline, then a responsive grid of
+// capability cards. Mirrors the real-world pattern where a component owns its
+// content as a `const` array in its OWN frontmatter and renders each entry via
+// `{feature.title}` / `{feature.body}` expression bindings.
+//
+// This is the "content defined as frontmatter inside the component" case:
+//   - `eyebrow` / `headline` are literal PROPS (editable at the call site)
+//   - the card copy comes from the local `features` const (expression-bound;
+//     the editor should treat these as read-only "edit in source")
+import Button from "./Button.astro";
+
+interface Props {
+  eyebrow?: string;
+  headline?: string;
+  class?: string;
+}
+
+const {
+  eyebrow = "Product features",
+  headline = "Enterprise capabilities, without the complexity.",
+  class: className = "",
+} = Astro.props;
+
+const features = [
+  {
+    id: "orchestration",
+    title: "Orchestration, handled for you.",
+    body: "Workloads are placed, scaled, and healed across machines and regions automatically — no schedulers to tune, no capacity plans to babysit.",
+    cta: "See how it works",
+    href: "/about",
+  },
+  {
+    id: "services",
+    title: "Every service, one platform.",
+    body: "Databases, queues, vectors, and AI ship as first-class services — provisioned with your app and scaled alongside it.",
+    cta: "Explore the services",
+    href: "/about",
+  },
+  {
+    id: "hybrid",
+    title: "One platform, anywhere.",
+    body: "Run the same platform across cloud, on-prem, and edge. Workloads move freely — your code and tooling never change.",
+    cta: "See the hybrid platform",
+    href: "/about",
+  },
+  {
+    id: "security",
+    title: "Isolated by default.",
+    body: "Every workload runs inside its own dedicated network, created at startup and removed when it stops. No shared infrastructure or credentials to manage.",
+    cta: "Learn more",
+    href: "/about",
+  },
+  {
+    id: "private-ai",
+    title: "AI that stays yours.",
+    body: "Run models next to your data inside your own isolated networks. Nothing leaves your boundary — no third-party inference, no data sharing.",
+    cta: "See private AI",
+    href: "/about",
+  },
+  {
+    id: "observability",
+    title: "Insight, built in.",
+    body: "Metrics, logs, and traces are wired up from the first deploy — so you can see what every workload is doing without bolting on extra tooling.",
+    cta: "Tour observability",
+    href: "/about",
+  },
+  {
+    id: "new-item",
+    title: "Test Card",
+    body: "This is optional text",
+    cta: "Click me",
+    href: "/about",
+  },
+];
+---
+
+<section class:list={["rounded-xl border border-slate-200 bg-white p-6 md:p-10", className]}>
+  <div class="flex flex-col items-start gap-3">
+    <p class="text-sm font-semibold uppercase tracking-wide text-blue-600">{eyebrow}</p>
+    <h2 class="max-w-2xl text-3xl font-bold tracking-tight text-slate-950 md:text-4xl">
+      {headline}
+    </h2>
+  </div>
+
+  <div class="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+    {features.map((feature) => (
+      <div class="flex flex-col justify-between gap-6 rounded-lg border border-slate-200 bg-slate-50 p-6">
+        <div class="flex flex-col gap-3">
+          <h3 class="text-xl font-semibold text-slate-950">{feature.title}</h3>
+        
+          <p class="text-sm leading-6 text-slate-600">{feature.body}</p></div>
+        <a class="inline-flex text-sm font-semibold text-blue-600 hover:text-blue-500" href={feature.href}>
+          {feature.cta}
+        </a>
+      </div>
+    ))}
+  </div>
+</section>

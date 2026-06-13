@@ -252,6 +252,35 @@ describe("useHistoryStore", () => {
     expect(useHistoryStore.getState().future).toEqual([]);
   });
 
+  it("remove retracts a specific entry by identity (failed-mutation rollback)", () => {
+    const a = makeEntry("a");
+    const b = makeEntry("b");
+    useHistoryStore.getState().push(a);
+    useHistoryStore.getState().push(b);
+
+    useHistoryStore.getState().remove(b);
+    let s = useHistoryStore.getState();
+    expect(s.past).toEqual([a]);
+    expect(s.canUndo).toBe(true);
+
+    useHistoryStore.getState().remove(a);
+    s = useHistoryStore.getState();
+    expect(s.past).toEqual([]);
+    expect(s.canUndo).toBe(false);
+  });
+
+  it("remove also drops the entry from the redo future", () => {
+    const a = makeEntry("a");
+    useHistoryStore.getState().push(a);
+    useHistoryStore.getState().undo();
+    expect(useHistoryStore.getState().future).toEqual([a]);
+
+    useHistoryStore.getState().remove(a);
+    const s = useHistoryStore.getState();
+    expect(s.future).toEqual([]);
+    expect(s.canRedo).toBe(false);
+  });
+
   it("clear resets everything", () => {
     useHistoryStore.getState().push(makeEntry("a"));
     useHistoryStore.getState().clear();

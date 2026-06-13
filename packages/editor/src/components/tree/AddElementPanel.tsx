@@ -170,8 +170,13 @@ export function AddElementPanel({ onSelect, onClose, componentsOnly = false }: A
   const activators = useMemo<Array<() => void | Promise<void>>>(() => {
     const list: Array<() => void | Promise<void>> = [];
     if (componentsOnly) {
-      for (const component of filteredRegistryComponents) {
-        list.push(() => activateRegistryComponent(component));
+      // Walk the GROUPED (category- and label-sorted) list — the buttons below
+      // render in this order, so indices must be assigned from it too or the
+      // highlight and Enter would activate different items.
+      for (const group of groupedRegistryComponents) {
+        for (const component of group.items) {
+          list.push(() => activateRegistryComponent(component));
+        }
       }
     } else {
       for (const comp of filteredComponents) {
@@ -199,7 +204,7 @@ export function AddElementPanel({ onSelect, onClose, componentsOnly = false }: A
   }, [
     filteredComponents,
     filteredExternals,
-    filteredRegistryComponents,
+    groupedRegistryComponents,
     componentsOnly,
     query,
     ast,

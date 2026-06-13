@@ -5,6 +5,17 @@ import type { Mutation, ASTNode } from "@tve/shared";
 import { parseAstroFileAsync, buildNodeMap } from "./astro-parser.js";
 import * as sourceRange from "./source-range.js";
 
+/** Escape double quotes for values written inside `attr="..."`. A raw `"`
+ *  (e.g. from arbitrary-value classes like `content-['say_"hi"']` or free-form
+ *  alt/title text) would close the attribute early and corrupt the tag. */
+function escapeAttrValue(value: string): string {
+  return value.replace(/"/g, "&quot;");
+}
+
+/** Valid HTML/Astro attribute name (also covers namespaced forms like
+ *  `xlink:href`, `data-*`, and Astro directives like `client:load`). */
+const ATTR_NAME_RE = /^[A-Za-z_:][A-Za-z0-9_:.-]*$/;
+
 /** Apply a mutation to an .astro source file */
 export async function applyMutation(
   filePath: string,
@@ -58,12 +69,12 @@ export async function applyMutation(
           // +1 to skip the leading whitespace we matched
           const attrStart = tagStart + classMatch.index! + 1;
           const fullMatch = classMatch[0].trimStart();
-          const newAttr = `class="${mutation.classes}"`;
+          const newAttr = `class="${escapeAttrValue(mutation.classes)}"`;
           s.overwrite(attrStart, attrStart + fullMatch.length, newAttr);
         } else {
           // No class attribute exists — insert one right after the tag name.
           const tagNameEnd = tagStart + node.tagName.length + 1; // +1 for <
-          s.appendRight(tagNameEnd, ` class="${mutation.classes}"`);
+          s.appendRight(tagNameEnd, ` class="${escapeAttrValue(mutation.classes)}"`);
         }
         break;
       }
@@ -72,16 +83,39 @@ export async function applyMutation(
         const node = nodeMap.get(mutation.nodeId);
         if (!node) return { success: false, error: `Node ${mutation.nodeId} not found` };
 
-        // Find the text content between the opening and closing tags
-        const openTagEnd = sourceRange.findOpenTagEnd(source, node.position.start.offset);
-        const closeTagStart = sourceRange.findCloseTagStart(
-          source,
-          node.position.end.offset,
-          node.tagName
-        );
+        // Resolve the inner range from source text rather than raw compiler
+        // offsets — the Astro compiler can report off-by-N positions, and a
+        // short `end.offset` would make findCloseTagStart fall back to an
+        // invalid range. innerContentRange relocates the real bounds.
+        const innerRange = sourceRange.innerContentRange(source, node);
+        if (!innerRange) {
+          return {
+            success: false,
+            error: `Could not resolve text range for <${node.tagName}> — it may be self-closing or void.`,
+          };
+        }
 
-        if (openTagEnd !== -1 && closeTagStart !== -1) {
-          s.overwrite(openTagEnd, closeTagStart, mutation.text);
+        // Refuse to overwrite text bound to a JSX expression (e.g.
+        // `<h3>{feature.title}</h3>`). Mirrors the update-classes guard above:
+        // clobbering the binding with a literal severs it and — inside a
+        // `.map()` — corrupts every rendered instance. The parser flags these
+        // via isTextDynamic; we also scan the inner source for a raw `{` as a
+        // backstop (a literal brace in element text would be escaped in Astro,
+        // so a bare `{` reliably indicates an expression).
+        const innerSource = source.slice(innerRange.start, innerRange.end);
+        if (node.isTextDynamic || innerSource.includes("{")) {
+          const expr = node.textExpression ?? innerSource.trim();
+          return {
+            success: false,
+            error: `Cannot edit text on <${node.tagName}> — it is bound to a JSX expression (${expr}). Edit the value at its source (or, for list items, via the repeater fields).`,
+          };
+        }
+
+        if (innerRange.start === innerRange.end) {
+          // Empty element (`<p></p>`) — overwrite throws on zero-length ranges.
+          s.appendLeft(innerRange.start, mutation.text);
+        } else {
+          s.overwrite(innerRange.start, innerRange.end, mutation.text);
         }
         break;
       }
@@ -102,13 +136,25 @@ export async function applyMutation(
           };
         }
 
-        s.overwrite(inner.start, inner.end, mutation.content);
+        if (inner.start === inner.end) {
+          // Empty body (`<style></style>`) — overwrite throws on zero-length ranges.
+          s.appendLeft(inner.start, mutation.content);
+        } else {
+          s.overwrite(inner.start, inner.end, mutation.content);
+        }
         break;
       }
 
       case "update-attribute": {
         const node = nodeMap.get(mutation.nodeId);
         if (!node) return { success: false, error: `Node ${mutation.nodeId} not found` };
+
+        // Validate the attribute name before interpolating it into a RegExp
+        // and into the written source — regex metacharacters would corrupt
+        // the match, and arbitrary text would corrupt the tag.
+        if (!ATTR_NAME_RE.test(mutation.attr)) {
+          return { success: false, error: `Invalid attribute name "${mutation.attr}"` };
+        }
 
         // Resolve the real `<TagName` start (handles parser off-by-N).
         const validated = sourceRange.validateElementRange(source, node);
@@ -119,34 +165,40 @@ export async function applyMutation(
         const openTagEnd = sourceRange.findOpenTagEnd(source, tagStart);
         const tagSource = source.slice(tagStart, openTagEnd);
 
+        // Escape the (validated) name — it may still contain `.` or `-` —
+        // and require leading whitespace so `type` can't match inside
+        // `data-type="..."`.
+        const escapedAttr = mutation.attr.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
         const attrRegex = new RegExp(
-          `${mutation.attr}\\s*=\\s*(?:"[^"]*"|'[^']*')`
+          `\\s${escapedAttr}\\s*=\\s*(?:"[^"]*"|'[^']*')`
         );
         const attrMatch = tagSource.match(attrRegex);
+        // +1 skips the leading whitespace the regex consumed.
+        const attrMatchStart =
+          attrMatch ? tagStart + attrMatch.index! + 1 : -1;
+        const attrMatchLength = attrMatch ? attrMatch[0].length - 1 : 0;
 
         if (mutation.value === null) {
           // Remove attribute
           if (attrMatch) {
-            const attrAbsStart = tagStart + attrMatch.index!;
             // Also remove leading whitespace
-            let removeStart = attrAbsStart;
+            let removeStart = attrMatchStart;
             while (removeStart > tagStart && source[removeStart - 1] === " ") {
               removeStart--;
             }
-            s.remove(removeStart, attrAbsStart + attrMatch[0].length);
+            s.remove(removeStart, attrMatchStart + attrMatchLength);
           }
         } else if (attrMatch) {
           // Update existing attribute
-          const attrAbsStart = tagStart + attrMatch.index!;
           s.overwrite(
-            attrAbsStart,
-            attrAbsStart + attrMatch[0].length,
-            `${mutation.attr}="${mutation.value}"`
+            attrMatchStart,
+            attrMatchStart + attrMatchLength,
+            `${mutation.attr}="${escapeAttrValue(mutation.value)}"`
           );
         } else {
           // Insert new attribute
           const tagNameEnd = tagStart + node.tagName.length + 1;
-          s.appendRight(tagNameEnd, ` ${mutation.attr}="${mutation.value}"`);
+          s.appendRight(tagNameEnd, ` ${mutation.attr}="${escapeAttrValue(mutation.value)}"`);
         }
         break;
       }
@@ -428,7 +480,7 @@ export async function applyMutation(
 
         const wrapperTag = mutation.wrapperTag || "div";
         const classAttr = mutation.wrapperClasses
-          ? ` class="${mutation.wrapperClasses}"`
+          ? ` class="${escapeAttrValue(mutation.wrapperClasses)}"`
           : "";
 
         const openTag = `<${wrapperTag}${classAttr}>`;

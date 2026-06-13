@@ -13,6 +13,15 @@ export interface ASTNode {
   classExpression?: string | null;
   /** Text content (for text-only nodes) */
   textContent: string | null;
+  /** True when the element's inner content is (or contains) a JSX expression
+   *  binding like `{title}` / `{feature.body}` rather than static text.
+   *  `update-text` is refused for these so the binding isn't clobbered — the
+   *  editor surfaces them read-only ("edit in source"). Mirrors how
+   *  `classExpression` protects `class={…}`. */
+  isTextDynamic?: boolean;
+  /** Raw `{…}` source of the text expression when `isTextDynamic` is true,
+   *  for read-only display in the properties panel. */
+  textExpression?: string | null;
   /** Untrimmed raw inner text of a `<style>`/`<script>` block. Populated only
    *  for those elements so the raw-content editor can load the exact body and
    *  the undo inverse can restore it byte-for-byte. null for everything else. */
@@ -408,6 +417,36 @@ export interface ComponentRegistryEntry extends ComponentRegistryItem {
   slots: ComponentSlotSchema;
   defaultProps?: Record<string, string | number | boolean | null>;
   defaultChildren?: string;
+}
+
+/**
+ * Editable "list content" surfaced by the repeater panel: a top-level
+ * `const X = [{…}, …]` array of object literals in a component's frontmatter
+ * (the data behind a `{X.map(…)}` loop). Only string/number/boolean literal
+ * fields are editable; see `services/component-data.ts`.
+ */
+export interface RepeaterArray {
+  /** The const name, e.g. `features`. */
+  name: string;
+  /** Field names in first-seen order across all items. */
+  fields: string[];
+  /** One record per array element; only literal fields are present. */
+  items: Record<string, string | number | boolean>[];
+  /** Total array elements (including any with only non-literal fields). */
+  count: number;
+}
+
+/** An `arrayName.map((itemVar) => …)` binding parsed from a component's markup,
+ *  used to resolve a bound expression (`{feature.title}`) to its source array. */
+export interface LoopBinding {
+  arrayName: string;
+  itemVar: string;
+}
+
+export interface ComponentDataResult {
+  componentPath: string;
+  arrays: RepeaterArray[];
+  loopBindings: LoopBinding[];
 }
 
 export interface SeoPageData {

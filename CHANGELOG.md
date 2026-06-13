@@ -7,6 +7,14 @@ Categories: `Added`, `Changed`, `Fixed`, `Removed`, `Deprecated`, `Security`.
 
 ## [Unreleased]
 
+### Added - Editable list content (repeater fields) (2026-06-13)
+- **Repeater editor for component list content.** When a component renders a `.map()` over a local frontmatter array (e.g. `const features = [{…}]`), selecting the looped content now shows that array as an editable list in the properties panel — one collapsible card per item with a field per property. Edits write straight back to the array in the component's source, and the preview hot-reloads.
+- **Add, remove, and reorder list items.** Each list has an "Add item" button that appends a deliberately **empty** card (never a clone, so half-finished content can't be shipped by accident), a per-card delete, and up/down controls to reorder items. Reordering preserves each item's exact formatting.
+- **Link picker for `href`-style list fields.** List fields named `href`/`url`/`link`/`to` use the same URL-or-page-dropdown control as button and component links, instead of a plain text box.
+
+### Fixed - Inline text editing no longer corrupts expression bindings (2026-06-13)
+- **Editing text that comes from an expression is now blocked instead of silently breaking it.** Double-clicking text rendered from a JSX binding (such as `{feature.title}` inside a `.map()`) previously overwrote the binding with a literal — which corrupted *every* rendered instance of the loop. Such text is now read-only, with a "Bound text" note pointing to its real source (a component prop, frontmatter, or the list it's mapped from), and the server refuses the write as a safety net even if an older client sends it.
+
 ### Added - Marketer content and component workflows (2026-06-08)
 - **Component registry for marketer-friendly editing.** TVE now reads optional `*.tve.ts` component metadata for labels, categories, descriptions, thumbnails, insertability, default props, and default children. The server exposes registry endpoints, the editor caches them, and Marketer mode uses the registry for friendlier component names and safer block insertion.
 - **Section/block inserter foundation.** The Add Element panel and selection toolbar can insert configured Astro components with generated props/children and auto-import handling. The test project now includes sample editable marketing blocks (`MarketingHero`, `ResourceCard`, `LandingCTA`, `GridColumns`) with `.tve.ts` metadata.

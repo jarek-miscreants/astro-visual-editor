@@ -188,6 +188,38 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
   function setupInteraction(overlay, bridge, domMapper) {
     let selectedElement = null;
     let editMode = true;
+    function selectElement(mappedEl, nodeId) {
+      selectedElement = mappedEl;
+      const rect = mappedEl.getBoundingClientRect();
+      const cs = getComputedStyle(mappedEl);
+      overlay.clearHover();
+      overlay.showSelected(rect, cs, formatElementLabel(mappedEl));
+      bridge.sendToEditor({
+        type: "tve:select",
+        nodeId,
+        elementInfo: {
+          nodeId,
+          tagName: mappedEl.tagName.toLowerCase(),
+          // SVG elements expose `className` as an SVGAnimatedString rather
+          // than a plain string; postMessage's structured-clone algorithm
+          // can't transfer it and throws DataCloneError. Read via the
+          // attribute instead so HTML and SVG behave the same.
+          classes: mappedEl.getAttribute("class") ?? "",
+          textContent: getDirectTextContent(mappedEl),
+          attributes: getAttributes(mappedEl),
+          rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+          computedStyles: {
+            display: cs.display,
+            position: cs.position,
+            padding: cs.padding,
+            margin: cs.margin,
+            fontSize: cs.fontSize,
+            color: cs.color,
+            backgroundColor: cs.backgroundColor
+          }
+        }
+      });
+    }
     document.addEventListener(
       "click",
       (e) => {
@@ -203,36 +235,7 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
         if (!mappedEl) return;
         const nodeId = domMapper.getNodeId(mappedEl);
         if (!nodeId) return;
-        selectedElement = mappedEl;
-        const rect = mappedEl.getBoundingClientRect();
-        const cs = getComputedStyle(mappedEl);
-        overlay.clearHover();
-        overlay.showSelected(rect, cs, formatElementLabel(mappedEl));
-        bridge.sendToEditor({
-          type: "tve:select",
-          nodeId,
-          elementInfo: {
-            nodeId,
-            tagName: mappedEl.tagName.toLowerCase(),
-            // SVG elements expose `className` as an SVGAnimatedString rather
-            // than a plain string; postMessage's structured-clone algorithm
-            // can't transfer it and throws DataCloneError. Read via the
-            // attribute instead so HTML and SVG behave the same.
-            classes: mappedEl.getAttribute("class") ?? "",
-            textContent: getDirectTextContent(mappedEl),
-            attributes: getAttributes(mappedEl),
-            rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
-            computedStyles: {
-              display: cs.display,
-              position: cs.position,
-              padding: cs.padding,
-              margin: cs.margin,
-              fontSize: cs.fontSize,
-              color: cs.color,
-              backgroundColor: cs.backgroundColor
-            }
-          }
-        });
+        selectElement(mappedEl, nodeId);
       },
       true
     );
@@ -320,6 +323,10 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
         if (!nodeId) return;
         if (domMapper.isComponentNode(nodeId)) {
           bridge.sendToEditor({ type: "tve:enter-component", nodeId });
+          return;
+        }
+        if (domMapper.isTextDynamicNode(nodeId)) {
+          selectElement(mappedEl, nodeId);
           return;
         }
         const text = getDirectTextContent(mappedEl);
@@ -880,6 +887,12 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
     isComponentNode(nodeId) {
       const node = this.findNode(this.ast, nodeId);
       return !!node && (node.isComponent || this.isPascalCase(node.tagName));
+    }
+    /** True when the node's text is bound to a JSX expression (`{title}`), so
+     *  inline editing must be refused to avoid clobbering the binding. */
+    isTextDynamicNode(nodeId) {
+      const node = this.findNode(this.ast, nodeId);
+      return !!node && node.isTextDynamic === true;
     }
     /** Find the closest mapped ancestor (or self) */
     getClosestMappedElement(element) {

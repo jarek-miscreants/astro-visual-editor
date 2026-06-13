@@ -84,8 +84,35 @@ async function parseAstroSourceAsync(
 
       // Extract text content (only if single text child)
       let textContent: string | null = null;
+      let isTextDynamic = false;
+      let textExpression: string | null = null;
       if (node.children?.length === 1 && node.children[0].type === "text") {
         textContent = node.children[0].value?.trim() || null;
+      } else {
+        // Detect text bound to a JSX expression — e.g. `<h3>{feature.title}</h3>`
+        // or mixed `Hello {name}`. We must NOT treat the resolved render as
+        // editable literal text: overwriting it would clobber the binding (and
+        // inside a `.map()`, every rendered instance). Capture the raw `{…}`
+        // for read-only display and flag it so the writer refuses update-text.
+        // An expression that yields ELEMENTS (`{cond && <a/>}`) is handled by
+        // the dynamic-children branch below, not as text — skip those.
+        const exprChild = node.children?.find(
+          (c: any) => c.type === "expression"
+        );
+        const exprHasElements = (exprChild?.children ?? []).some(
+          (c: any) =>
+            c.type === "element" ||
+            c.type === "component" ||
+            c.type === "custom-element"
+        );
+        if (exprChild && !exprHasElements) {
+          isTextDynamic = true;
+          const raw = (exprChild.children ?? [])
+            .map((c: any) => (typeof c.value === "string" ? c.value : ""))
+            .join("")
+            .trim();
+          textExpression = `{${raw}}`;
+        }
       }
 
       // For <style>/<script> blocks, also surface the UNTRIMMED inner text so
@@ -123,6 +150,8 @@ async function parseAstroSourceAsync(
         classes,
         classExpression,
         textContent,
+        isTextDynamic,
+        textExpression,
         rawTextContent,
         attributes,
         children: [],

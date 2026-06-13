@@ -10,6 +10,43 @@ export function setupInteraction(
   let selectedElement: Element | null = null;
   let editMode = true;
 
+  /** Select a mapped element and notify the editor with full elementInfo.
+   *  Shared by click selection and the dblclick fallback for dynamic text. */
+  function selectElement(mappedEl: Element, nodeId: string) {
+    selectedElement = mappedEl;
+    const rect = mappedEl.getBoundingClientRect();
+    const cs = getComputedStyle(mappedEl);
+
+    overlay.clearHover();
+    overlay.showSelected(rect, cs, formatElementLabel(mappedEl));
+
+    bridge.sendToEditor({
+      type: "tve:select",
+      nodeId,
+      elementInfo: {
+        nodeId,
+        tagName: mappedEl.tagName.toLowerCase(),
+        // SVG elements expose `className` as an SVGAnimatedString rather
+        // than a plain string; postMessage's structured-clone algorithm
+        // can't transfer it and throws DataCloneError. Read via the
+        // attribute instead so HTML and SVG behave the same.
+        classes: mappedEl.getAttribute("class") ?? "",
+        textContent: getDirectTextContent(mappedEl),
+        attributes: getAttributes(mappedEl),
+        rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+        computedStyles: {
+          display: cs.display,
+          position: cs.position,
+          padding: cs.padding,
+          margin: cs.margin,
+          fontSize: cs.fontSize,
+          color: cs.color,
+          backgroundColor: cs.backgroundColor,
+        },
+      },
+    });
+  }
+
   // Prevent all default navigation in edit mode
   document.addEventListener(
     "click",
@@ -32,38 +69,7 @@ export function setupInteraction(
       const nodeId = domMapper.getNodeId(mappedEl);
       if (!nodeId) return;
 
-      selectedElement = mappedEl;
-      const rect = mappedEl.getBoundingClientRect();
-      const cs = getComputedStyle(mappedEl);
-
-      overlay.clearHover();
-      overlay.showSelected(rect, cs, formatElementLabel(mappedEl));
-
-      bridge.sendToEditor({
-        type: "tve:select",
-        nodeId,
-        elementInfo: {
-          nodeId,
-          tagName: mappedEl.tagName.toLowerCase(),
-          // SVG elements expose `className` as an SVGAnimatedString rather
-          // than a plain string; postMessage's structured-clone algorithm
-          // can't transfer it and throws DataCloneError. Read via the
-          // attribute instead so HTML and SVG behave the same.
-          classes: mappedEl.getAttribute("class") ?? "",
-          textContent: getDirectTextContent(mappedEl),
-          attributes: getAttributes(mappedEl),
-          rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
-          computedStyles: {
-            display: cs.display,
-            position: cs.position,
-            padding: cs.padding,
-            margin: cs.margin,
-            fontSize: cs.fontSize,
-            color: cs.color,
-            backgroundColor: cs.backgroundColor,
-          },
-        },
-      });
+      selectElement(mappedEl, nodeId);
     },
     true
   );
@@ -186,6 +192,16 @@ export function setupInteraction(
 
       if (domMapper.isComponentNode(nodeId)) {
         bridge.sendToEditor({ type: "tve:enter-component", nodeId });
+        return;
+      }
+
+      // Refuse inline editing when the text is bound to a JSX expression
+      // (`<h3>{feature.title}</h3>`). The rendered DOM shows resolved text, but
+      // committing it would overwrite the binding in source — and inside a
+      // `.map()`, corrupt every rendered instance. Select the node so the panel
+      // can show the read-only "edit in source" affordance instead.
+      if (domMapper.isTextDynamicNode(nodeId)) {
+        selectElement(mappedEl, nodeId);
         return;
       }
 
