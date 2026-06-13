@@ -280,6 +280,21 @@ describe("addArrayField", () => {
     const res = await addArrayField(tmpDir, "FeatureGrid.astro", "features", "title", "text");
     expect(res.success).toBe(false);
   });
+
+  it("does not add a second binding when re-adding a removed field (regression)", async () => {
+    // Remove is data-only — the {feature.body} binding stays in the card. Re-
+    // adding `body` must reuse that binding, not append a duplicate.
+    await removeArrayField(tmpDir, "FeatureGrid.astro", "features", "body");
+    const res = await addArrayField(tmpDir, "FeatureGrid.astro", "features", "body", "textarea");
+    expect(res.success).toBe(true);
+
+    const out = await fs.readFile(path.join(tmpDir, "FeatureGrid.astro"), "utf-8");
+    const bindings = out.match(/\{feature\.body\}/g) ?? [];
+    expect(bindings.length).toBe(1);
+    // Data key is back on every item.
+    const arr = (await readComponentArrays(tmpDir, "FeatureGrid.astro")).arrays[0];
+    expect(arr.items.every((i) => i.body === "")).toBe(true);
+  });
 });
 
 describe("renameArrayField", () => {

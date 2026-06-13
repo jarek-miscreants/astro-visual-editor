@@ -583,11 +583,18 @@ export async function addArrayField(
   }
 
   // Template: insert a binding before the card's closing tag (the last `</…>`
-  // inside the map callback, which is the loop root element's close).
+  // inside the map callback, which is the loop root element's close) — unless a
+  // binding for this field already exists. (Re-adding a previously-removed
+  // field: the data key was gone but its binding remained, so without this
+  // guard we'd render the field twice.)
   const region = findMapRegion(source, arrayName);
   if (region) {
+    const body = source.slice(region.open, region.close);
+    const alreadyBound = new RegExp(
+      `\\b${region.itemVar}\\s*\\.\\s*${fieldName}\\b`
+    ).test(body);
     const closeIdx = source.lastIndexOf("</", region.close);
-    if (closeIdx > region.open) {
+    if (!alreadyBound && closeIdx > region.open) {
       const tagLineStart = source.lastIndexOf("\n", closeIdx - 1) + 1;
       const indent = source.slice(tagLineStart, closeIdx).match(/^[ \t]*/)?.[0] ?? "        ";
       const binding = renderFieldBinding({ name: fieldName, type: fieldType }, region.itemVar);

@@ -9,11 +9,12 @@ Categories: `Added`, `Changed`, `Fixed`, `Removed`, `Deprecated`, `Security`.
 
 ### Added - Author & manage repeater lists from the editor (2026-06-13)
 - **Insert list (repeater) block.** A new "Insert list" button (Elements panel, Dev mode) opens a dialog to name the list, pick a layout (card grid / stacked list), and define fields (Text, Long text, Link, Image, Toggle, Number). It scaffolds the frontmatter data array *and* the `.map()` card markup at the selected spot, then the repeater editor drives content — no code required.
-- **Edit a repeater's fields.** A control on each list opens a dialog (prefilled with the current fields) to add, rename, or remove fields. Rename and add sync both the data and the card bindings; remove drops the data only (a leftover spot just renders empty), and changing an existing field's *type* is intentionally locked to avoid mangling restyled cards.
+- **Edit a repeater's fields.** A control on each list opens a dialog (prefilled with the current fields) to add, rename, or remove fields. Rename and add sync both the data and the card bindings; remove drops the data only (a leftover spot just renders empty), and changing an existing field's *type* is intentionally locked to avoid mangling restyled cards. Removing a field shows a clear warning (the content will be deleted) and a "Delete & apply" confirm step.
 
-### Fixed - Dark dropdowns and dialog surfaces (2026-06-13)
+### Fixed - Dark dropdowns, dialog surfaces, and repeater field edits (2026-06-13)
 - **Native `<select>` dropdown lists now render dark app-wide.** They were drawing as a light, low-contrast popup against the dark UI; selects now declare a dark color scheme with explicit option colors everywhere.
-- **Dialog panels use a solid surface.** The Insert/Edit list dialogs were using a near-transparent overlay token and looked blank; they now match the rest of the UI.
+- **Dialog panels use a solid surface.** The Insert/Edit list and New Page dialogs were using a near-transparent overlay token and looked blank/washed-out; they now match the rest of the UI.
+- **Re-adding a removed repeater field no longer duplicates its content.** Because removing a field is data-only (its card binding stays), adding a field with the same name back used to append a second binding and render the value twice; adding now reuses an existing binding.
 
 ### Added - Editable list content (repeater fields) (2026-06-13)
 - **Repeater editor for component list content.** When a component renders a `.map()` over a local frontmatter array (e.g. `const features = [{…}]`), selecting the looped content now shows that array as an editable list in the properties panel — one collapsible card per item with a field per property. Edits write straight back to the array in the component's source, and the preview hot-reloads.

@@ -65,6 +65,16 @@ export function EditRepeaterFieldsDialog({
     setRows((cur) => cur.filter((_, idx) => idx !== i));
   }
 
+  // Existing fields no longer present in the rows — i.e. marked for deletion.
+  // Derived from current state so the warning shows the instant a field is
+  // removed, not only after clicking Apply.
+  const keptOriginals = new Set(
+    rows.filter((r) => r.originalName).map((r) => r.originalName!)
+  );
+  const pendingRemovals = initialFields
+    .map((f) => f.name)
+    .filter((name) => !keptOriginals.has(name));
+
   function validate(): string | null {
     if (rows.length === 0) return "Keep at least one field.";
     const seen = new Set<string>();
@@ -85,12 +95,7 @@ export function EditRepeaterFieldsDialog({
     }
 
     // Diff against the originals.
-    const keptOriginals = new Set(
-      rows.filter((r) => r.originalName).map((r) => r.originalName!)
-    );
-    const removes = initialFields
-      .map((f) => f.name)
-      .filter((name) => !keptOriginals.has(name));
+    const removes = pendingRemovals;
     const renames = rows.filter(
       (r) => r.originalName && r.name !== r.originalName
     );
@@ -194,10 +199,24 @@ export function EditRepeaterFieldsDialog({
             </button>
           </div>
 
-          <p className="tve-prop-section__hint">
-            Renaming and adding update both the data and the card. Removing drops
-            the data only — a leftover spot in the card just renders empty.
-          </p>
+          {pendingRemovals.length > 0 ? (
+            <div className="tve-prop-warning-card">
+              <div className="tve-prop-warning-card__title">
+                Deleting {pendingRemovals.length === 1 ? "a field" : `${pendingRemovals.length} fields`} removes content
+              </div>
+              <div className="tve-prop-warning-card__desc">
+                <strong>{pendingRemovals.join(", ")}</strong> will be removed from
+                every item in <strong>{arrayName}</strong>, deleting that content.
+                This can't be undone. Click “Delete &amp; apply” to confirm, or
+                Cancel to keep {pendingRemovals.length === 1 ? "it" : "them"}.
+              </div>
+            </div>
+          ) : (
+            <p className="tve-prop-section__hint">
+              Renaming and adding update both the data and the card. Removing drops
+              the data only — a leftover spot in the card just renders empty.
+            </p>
+          )}
 
           {error && (
             <p className="tve-prop-section__hint" style={{ color: "var(--shell-danger)" }}>
@@ -210,7 +229,11 @@ export function EditRepeaterFieldsDialog({
               Cancel
             </button>
             <button type="submit" className="tve-button-accent" disabled={busy}>
-              {busy ? "Applying…" : "Apply changes"}
+              {busy
+                ? "Applying…"
+                : pendingRemovals.length > 0
+                ? "Delete & apply"
+                : "Apply changes"}
             </button>
           </div>
         </form>

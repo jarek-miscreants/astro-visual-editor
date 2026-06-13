@@ -77,7 +77,8 @@ export function PageDialog({ onClose }: PageDialogProps) {
       <div
         className="w-[26rem]"
         style={{
-          backgroundColor: "var(--shell-bg-elevated)",
+          backgroundColor: "var(--shell-bg-subtle)",
+          color: "var(--shell-text)",
           border: "1px solid var(--shell-border-strong)",
           boxShadow: "0 20px 50px rgba(0,0,0,0.5)",
         }}
